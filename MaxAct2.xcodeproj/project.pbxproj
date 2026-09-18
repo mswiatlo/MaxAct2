@@ -6,6 +6,10 @@
 	objectVersion = 90;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		E40F7DE9305DB72C0002A068 /* MaxActCore in Frameworks */ = {isa = PBXBuildFile; productRef = E40F7DE8305DB72C0002A068 /* MaxActCore */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		000000000000000000000120 /* MaxAct2.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MaxAct2.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E40F7DCB305DB5750002A068 /* MaxAct2Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MaxAct2Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -34,6 +38,7 @@
 		000000000000000130000000 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
+				E40F7DE9305DB72C0002A068 /* MaxActCore in Frameworks */,
 			);
 		};
 		E40F7DC8305DB5750002A068 /* Frameworks */ = {
@@ -86,6 +91,9 @@
 				000000000000000000000010 /* MaxAct2 */,
 			);
 			name = MaxAct2;
+			packageProductDependencies = (
+				E40F7DE8305DB72C0002A068 /* MaxActCore */,
+			);
 			productName = MyApp;
 			productReference = 000000000000000000000120 /* MaxAct2.app */;
 			productType = "com.apple.product-type.application";
@@ -156,6 +164,9 @@
 			);
 			mainGroup = 000000000000000000000001;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				E40F7DE7305DB72C0002A068 /* XCLocalSwiftPackageReference "MaxActCore" */,
+			);
 			preferredProjectObjectVersion = 90;
 			productRefGroup = 000000000000000000000020 /* Products */;
 			projectDirPath = "";
@@ -549,6 +560,20 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		E40F7DE7305DB72C0002A068 /* XCLocalSwiftPackageReference "MaxActCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = MaxActCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		E40F7DE8305DB72C0002A068 /* MaxActCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MaxActCore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 000000000000000000000000 /* Project object */;
 }
