@@ -1,0 +1,479 @@
+# MaxAct — Build Plan
+
+A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**,
+with batch upload to Strava.
+
+**Status:** Phase 0 complete except linking `MaxActCore` into the app target (one Xcode UI step —
+see below). Phase 1 not started. **Last updated:** 2026-09-18.
+
+---
+
+## 1. Context
+
+`OLD_PLAN.md` assumed a companion iOS app reading HealthKit directly and shipping workouts to the
+Mac over Bonjour + TLS-PSK. That is dead: HealthKit is unavailable on macOS, and the Apple Developer
+Program cost to provision the HealthKit entitlement on a companion app isn't worth it for a personal
+tool. Everything in that plan downstream of the transport (models, SwiftData store, Table UI, GPX
+writer, Strava upload, geocoding) is still sound and is carried forward here.
+
+The replacement data source is **Health Auto Export** (HAE) on the iPhone, which already has
+HealthKit access and three ways to get data off the phone. That collapses two app targets into one
+and removes ~2 phases of work (HealthKit reading, custom TLS-PSK transport), at the cost of a new
+uncertainty: which HAE export path actually carries full-fidelity data, including GPS routes and
+heart-rate series. That question is settled empirically in Phase 1, not from documentation.
+
+**Intended outcome:** one macOS app. It browses every workout in a sortable, filterable,
+multi-selectable table with route thumbnails and Strava sync state; a detail view shows the full
+map, heart-rate chart and splits; and batch actions upload selections to Strava under correct rate
+limiting.
+
+### Research findings that shape the plan
+
+| Path | Mechanism | Route + HR? | Cost / risk |
+|---|---|---|---|
+| **REST API** | Phone POSTs JSON to a URL you own | **Yes — confirmed against the vendor's own reference server** (see below): `route?: ILocation[]` and `heartRateData?: IHeartRate[]` are first-class fields | Mac must run an HTTP listener. The Network framework has **no** HTTP server protocol, so this means hand-rolling HTTP/1.1 over `NetworkListener` or taking an SPM dependency — and the reference server sets a **200 MB** body limit, so bodies are genuinely large and a naive parser won't do. iOS background tasks get ~30 s, so backfill is awkward. |
+| **MCP / TCP server** | Mac is the client; JSON-RPC 2.0 on port 9000, `http://{LAN_IP}:9000/mcp` + `Authorization: Bearer <token>` (HTTPS available via an app-generated local CA) | `workouts` tool takes `start`, `end`, `includeRoutes`, `includeMetadata`, `metadataAggregation` — but the docs never confirm route/HR arrays actually come back | Mac controls the date range, so backfill is chunked requests and re-sync is idempotent. But HAE must be **foregrounded** on the phone for the whole sync, `listTools` is documented as non-functional, and tool names differ by contract version (v1.1.0 `get_*` vs v1.0.0 `workouts`) — needs runtime probing. |
+| **Sync to Mac** | iCloud Drive → `Auto Export/AutoSync/{Health Metrics,Workouts,Routes}` | Has a dedicated `Routes/` folder, so probably yes | Files are a **proprietary, undocumented `.hae` format**. Nothing exists in this Mac's iCloud Drive yet (no `Auto Export` folder), so it is entirely unverified — and the vendor's public server repo does **not** read `.hae`, so no reference implementation exists to crib from. Also needs `Keep Downloaded` on the folder or the files are cloud placeholders. |
+
+### The vendor's reference server — what it settles, and what it doesn't
+
+[`HealthyApps/health-auto-export-server`](https://github.com/HealthyApps/health-auto-export-server)
+(TypeScript, Express + MongoDB + Grafana; last pushed 2025-12-15) turns out to be a **REST receiver**,
+not a `.hae` reader. It does not touch iCloud Drive at all, so the `.hae` probe in Phase 1 stands
+unchanged. What it does give us:
+
+- **The exact push contract.** `POST /api/data` with an `api-key:` header (their convention, not
+  HAE's — HAE sends whatever custom headers you configure), body
+  `{"data": {"metrics": [...], "workouts": [...]}}`, `200` on success and `207` on partial failure.
+- **The authoritative workout shape**, from `server/src/models/Workout.ts`. Required: `id`, `name`,
+  `start`, `end`, `duration`. Optional: `distance`, `activeEnergyBurned`, `activeEnergy`,
+  `heartRateData`, `heartRateRecovery`, `stepCount`, `temperature`, `humidity`, `intensity`,
+  `route`. Their Mongo schema marks `activeEnergyBurned` required while the TypeScript interface
+  marks it optional — so **treat everything except the five required fields as optional**, whatever
+  the docs imply.
+- **Richer route points than the docs list.** `ILocation` carries `latitude`, `longitude`,
+  `timestamp`, `course`, `courseAccuracy`, `speed`, `speedAccuracy`, `altitude`,
+  `verticalAccuracy`, `horizontalAccuracy`. The help pages omit the three accuracy fields.
+- **A fidelity problem worth knowing about early.** `IHeartRate` is `{Min, Avg, Max, date, units,
+  source}` — a **bucketed aggregate per timestamp, not a raw beat-by-beat series**. Sample density
+  is therefore a function of the export's time-grouping setting (the MCP `workouts` tool's
+  `metadataAggregation` argument and the REST automation's grouping control are almost certainly the
+  same knob). This directly bounds how good the heart-rate track in an uploaded TCX can be, so
+  Phase 1 must measure the achievable interval, not just presence.
+- **Idempotency confirmation.** They upsert workouts and routes separately, both keyed on the
+  workout `id`, with routes in their own collection — the same split (summary row + series blob,
+  keyed on `id`) that Phase 3 plans.
+
+The repo has **no license file**. Read it as documentation and as a Phase 1 test harness; don't copy
+code from it.
+
+Prerequisites confirmed present: **HAE Premium** (required for all three paths) and a **Strava API
+application** (client ID + secret). No Apple Developer team — builds stay ad-hoc signed.
+
+Strava, as of 2026: overall limit 200 req/15 min and 2000/day; a *separate* read limit of
+100 req/15 min and 1000/day, and upload-status polls are GETs that count against the **read**
+bucket. New apps are in single-player mode (own account only), which is exactly the use case.
+
+---
+
+## 2. Decisions
+
+| Decision | Choice | Rationale |
+|---|---|---|
+| Targets | One macOS app target (`MaxAct2`, display name **MaxAct**) + `MaxActCore` local SwiftPM package + unit and UI test bundles | No iOS companion is needed any more. The package keeps model/ingest/format/Strava logic testable with `swift test`, without booting the app. |
+| Minimum OS | macOS 26.0 | Liquid Glass, `MKReverseGeocodingRequest`, Swift-native `Network` API. The current `MACOSX_DEPLOYMENT_TARGET = 26.6.2` is an inherited template artifact, not a choice. |
+| Primary sync | **Undecided by design** — Phase 1 measures all three and records the winner here | The user asked for an evaluation; the docs don't answer whether route/HR survive each path. All ingest sits behind one protocol so the decision is swappable. |
+| Backfill | HAE **manual export** (JSON + GPX) imported from a file/folder, regardless of which live path wins | Manual export has no 30-second background window and no foreground requirement. Years of history land in one pass. |
+| Canonical model | Own `Workout` value types in `MaxActCore`, decoded *from* HAE's shape | HAE identifies activity type by display name (`"Running"`), not `HKWorkoutActivityType` raw values — so `ActivityKind` must carry `.other(String)` rather than an integer fallback. |
+| Persistence | SwiftData for summary rows + local state; route/HR series as compressed JSON blobs on disk | A 4-hour ride is thousands of points and must not sit in the table's query path. |
+| Row thumbnails | Pre-rendered, disk-cached `MKMapSnapshotter` images of a simplified polyline — never a live `Map` per row | N live `Map` views in a table is the single easiest way to make this app slow. |
+| Strava upload format | **TCX only** | Carries GPS, heart rate, laps, distance and calories in one schema, and still produces a meaningful file for indoor workouts with no route. One writer, one golden-file suite. GPX/FIT explicitly out of scope for v1. |
+| Strava credentials | User's own client ID + secret, in the Keychain | Already held; a bundled secret is extractable and shares one rate-limit budget. |
+| Concurrency | Swift 6 language mode, `SWIFT_STRICT_CONCURRENCY = complete`, `async`/`await`, no Combine | Project code-style guidance. `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` and `SWIFT_APPROACHABLE_CONCURRENCY = YES` are already set and stay. |
+
+### Out of scope for v1
+Writing to HealthKit; non-workout health metrics (sleep, body mass — the model shouldn't preclude
+them); GPX/FIT export; Strava *download*; syncing between Macs.
+
+---
+
+## 3. Architecture
+
+```
+MaxAct2.xcodeproj
+├── MaxAct2              macOS app target (macOS 26+)   ← exists, currently multiplatform template
+├── MaxAct2Tests         Swift Testing                  ← to add
+├── MaxAct2UITests       XCUIAutomation                 ← to add
+└── MaxActCore/          local SwiftPM package          ← to add
+    ├── Model/           Workout, RoutePoint, HeartRateSample, Lap, ActivityKind
+    ├── Ingest/          WorkoutSource protocol + HAE decoders (MCP, REST, file)
+    ├── Formats/         TCXWriter
+    └── Strava/          OAuth, upload client, rate-limit budget
+```
+
+Data flow:
+
+```
+iPhone / Health Auto Export
+   └─ (winning path from Phase 1) ─→ HAEWorkoutPayload  [Ingest]
+                                        ↓ decode
+                                     Workout             [Model]
+                                        ↓
+                          WorkoutStore (SwiftData rows + blob files)
+                                        ↓
+                      Table + detail views ─→ TCXWriter ─→ Strava upload
+```
+
+### Canonical model sketch (`MaxActCore/Model`)
+
+```swift
+public struct Workout: Identifiable, Hashable, Sendable {
+    public let id: String              // HAE workout id — stable, our dedupe key
+    public let kind: ActivityKind
+    public let start: Date
+    public let end: Date
+    public let duration: TimeInterval
+    public let distanceMeters: Double?
+    public let activeEnergyKilocalories: Double?
+    public let elevationUpMeters: Double?
+    public let averageHeartRate: Double?
+    public let maximumHeartRate: Double?
+    public let isIndoor: Bool?
+    public let sourceName: String?
+    public let startCoordinate: Coordinate?   // coarsened to ~1 km, see Phase 6
+    public let hasRoute: Bool
+}
+
+public struct WorkoutSeries: Sendable {       // the heavy part, stored as a blob
+    public let route: [RoutePoint]
+    public let heartRate: [HeartRateSample]   // bucketed min/avg/max, NOT raw beats — see §1
+    public let laps: [Lap]
+}
+
+public struct RoutePoint: Sendable {
+    public let coordinate: Coordinate
+    public let timestamp: Date
+    public let altitudeMeters: Double?
+    public let speedMetersPerSecond: Double?
+    public let course: Double?
+    public let horizontalAccuracy: Double?
+    public let verticalAccuracy: Double?      // these three accuracy fields are undocumented
+    public let speedAccuracy: Double?         // but present in the vendor's reference server
+    public let courseAccuracy: Double?
+}
+
+public struct HeartRateSample: Sendable {
+    public let date: Date
+    public let min: Double, avg: Double, max: Double
+    public let source: String?
+}
+
+public enum ActivityKind: Hashable, Sendable {
+    case running, cycling, walking, swimming, hiking, strengthTraining /* … */
+    case other(String)                        // HAE sends display names, not HK raw values
+}
+```
+
+### Ingest boundary
+
+```swift
+public protocol WorkoutSource: Sendable {
+    /// Pull sources fetch a window; push sources ignore the interval and yield as data arrives.
+    func workouts(in interval: DateInterval) -> AsyncThrowingStream<IngestedWorkout, any Error>
+}
+```
+
+Implementations: `MCPWorkoutSource`, `RESTReceiverSource`, `HAEFileSource` (manual-export JSON/GPX
+and, if Phase 1 says it's readable, `.hae`). All of them emit the same `IngestedWorkout`
+(`Workout` + optional `WorkoutSeries`), so Phases 3–8 are written once and are indifferent to which
+path won.
+
+HAE decoding details that must be handled in one place: measurements arrive as `{ "qty": …,
+"units": … }`; dates are `yyyy-MM-dd HH:mm:ss Z`; optional fields are *absent*, not null; the
+envelope is `{"data": {"workouts": [...], "metrics": [...]}}`; and unknown keys must decode without
+throwing so an HAE update can't brick sync.
+
+---
+
+## 4. Phases
+
+Every phase ends with a green build. Don't start the next one on a broken build.
+
+### Phase 0 — Project foundation
+
+The target is still the raw multiplatform template. Fix the settings that are wrong by default:
+
+| Setting | Now | To |
+|---|---|---|
+| `SUPPORTED_PLATFORMS` | `iphoneos iphonesimulator macosx xros xrsimulator` | `macosx` |
+| `SDKROOT` | `auto` | `macosx` |
+| `TARGETED_DEVICE_FAMILY` | `1,2,7` | (clear) |
+| `MACOSX_DEPLOYMENT_TARGET` | `26.6.2` | `26.0` |
+| `SWIFT_VERSION` | `5.0` | `6.0` |
+| `SWIFT_STRICT_CONCURRENCY` | `minimal` | `complete` |
+| `PRODUCT_BUNDLE_IDENTIFIER` | `devplaceholder.MTG0HGP4.MaxAct2` | `com.swiatlowski.MaxAct` |
+| `ENABLE_OUTGOING_NETWORK_CONNECTIONS` | `NO` | `YES` |
+| `ENABLE_USER_SELECTED_FILES` | `readonly` | `readwrite` |
+| `INFOPLIST_KEY_NSLocalNetworkUsageDescription` | — | set (LAN sync) |
+
+The bundle ID must be settled **now** and never change: Keychain items are keyed to it.
+
+Also: rename `MyApp.swift` → `MaxActApp.swift` (`struct MaxActApp: App`), strip the `#Playground`
+and placeholder body from `ContentView.swift`, add `MaxActCore` as a local package and link it,
+add `MaxAct2Tests` (Swift Testing) and `MaxAct2UITests`, add a `.gitignore` for build output and
+`.swiftpm`, and copy this plan into the repo as `PLAN.md`, deleting `OLD_PLAN.md`.
+
+**Done.** All of the above is applied and verified: `BuildProject` is clean, `swift test` in
+`MaxActCore/` passes (2 tests), and `RunAllTests` passes 3 of 3 across both app test bundles.
+
+Notes on what the tooling could and couldn't do, so this isn't rediscovered later:
+
+- The two "needs Xcode's UI" test-wiring steps that `OLD_PLAN.md` predicted were both avoidable.
+  The autocreated scheme really does run **zero** tests, but writing a shared scheme by hand at
+  `MaxAct2.xcodeproj/xcshareddata/xcschemes/MaxAct2.xcscheme` with an explicit `TestAction` /
+  `Testables` fixes it, and has the side benefit of being checked in rather than living in
+  `xcuserdata`. `TEST_HOST` and `BUNDLE_LOADER` are ordinary writable build settings; the app test
+  bundle asserts `@testable import MaxAct2` resolves, so a regression in that wiring fails loudly
+  instead of silently running nothing.
+- `TEST_TARGET_NAME` is **not** writable through the build-settings tooling (it's rejected as an
+  unknown setting), so `MaxAct2UITests` has no implicit target application. Worked around in code:
+  the UI test launches `XCUIApplication(bundleIdentifier: "com.swiatlowski.MaxAct")`. The scheme's
+  build action builds the app for testing, so the bundle is present when the test runs.
+- **Still to do by hand, once:** File → Add Package Dependencies… → Add Local → `MaxActCore`, then
+  add it to the `MaxAct2` target's frameworks. Until then `ContentView.swift` carries a comment
+  where `import MaxActCore` belongs, so the app builds. Nothing else in Phase 0 depends on it, and
+  Phase 2 does.
+- `MACOSX_DEPLOYMENT_TARGET` is still `26.6.2` at the **project** level (all three targets override
+  it to `26.0`). The build-settings tooling is target-scoped only and `project.pbxproj` must not be
+  hand-edited, so this is left as-is. Harmless today; fix it in Xcode if a new target ever inherits
+  it.
+- `MaxActCore`'s manifest needs `swift-tools-version: 6.2`, not 6.0 — `.macOS(.v26)` doesn't exist
+  before 6.2.
+
+### Phase 1 — Sync evaluation spike *(throwaway code; delete when done)*
+
+Score each path against: does it carry full `route[]` **and** heart-rate series; **what sample
+interval the heart-rate and route series actually come back at, and whether that's configurable**
+(the series are bucketed aggregates, so this bounds TCX quality — see §1); payload size and wall
+time for one long (4 h+) activity and for a one-month window; how hands-off it is; whether
+multi-year backfill is practical; and implementation cost on the Mac.
+
+- **A. MCP over HTTP.** Start the server in HAE, read the LAN IP + bearer token off the Server
+  screen. From `RunCodeSnippet` or `curl`, POST
+  `{"jsonrpc":"2.0","id":"1","method":"callTool","params":{"name":"workouts","arguments":{"start":"…","end":"…","includeRoutes":true,"includeMetadata":true}}}`
+  to `http://{IP}:9000/mcp`. Resolve the contract version first (try `get_workouts`, fall back to
+  `workouts`) since `listTools` is documented as non-functional. Record whether `route` and
+  heart-rate arrays are populated, and how the server behaves when the app is backgrounded
+  mid-request.
+- **B. REST push.** Use the vendor's reference server as the capture harness rather than writing
+  any Swift: `docker compose up` in a clone of `health-auto-export-server`, then point an HAE REST
+  automation at `http://<mac-ip>:3001/api/data` with the `api-key` header its `.env` expects.
+  MongoDB then holds a queryable copy of exactly what the phone sent, and Grafana's bundled
+  `workout-details` dashboard is a free sanity check on route and HR completeness. Also tee one raw
+  request body to disk (a `nc -l` run, or a proxy) — the raw bytes are the fixture our decoder gets
+  tested against, and the parsed Mongo documents are not. Note the achievable HR/route interval at
+  different time-grouping settings, whether batching kicks in, and the size of the largest body.
+- **C. `.hae` / Sync to Mac.** No reference implementation exists — the vendor's server repo doesn't
+  read these files — so this stays a black-box inspection. Enable Sync to Mac, `Keep Downloaded` on
+  the `AutoSync` folder, then inspect one `Workouts/*.hae` and one `Routes/*.hae` with `file`,
+  `head -c 64 | xxd`. Decide: plain JSON, gzip/zlib-wrapped JSON, binary plist, or opaque. If it's
+  any of the first three this becomes the strongest option — fully automatic, incremental, no
+  foreground requirement. Time-box it: if the header isn't recognisable in an hour, drop it.
+  A sandboxed app also needs user-selected read access to the folder plus a security-scoped
+  bookmark, which is a small extra cost this option carries even when it works.
+
+**Decision rule:** pick the path that delivers complete route + HR with the least manual
+interaction; on a tie, prefer the one with a documented, stable format. Manual-export file import is
+built as the backfill path either way. Write the outcome — including the rejected options and why —
+into §2 and the change log, then delete the spike code.
+
+**Verify:** captured fixtures committed under `MaxActCore/Tests/Fixtures/`; the decision recorded
+in `PLAN.md`.
+
+### Phase 2 — Model + ingest (`MaxActCore`)
+
+Canonical types as sketched above, plus HAE decoders built against the Phase 1 fixtures, and the
+winning `WorkoutSource` implementation. `HAEFileSource` handles a manual-export folder (JSON
+workouts + per-workout GPX routes) and is always built.
+
+**Tests:** fixture → `Workout` round-trip; an unknown activity name lands in `.other`; a workout
+with no route decodes; unknown extra JSON keys don't throw; `{qty, units}` unwrapping and unit
+conversion; the `yyyy-MM-dd HH:mm:ss Z` parser across a DST boundary and a non-local offset.
+
+### Phase 3 — Persistence
+
+SwiftData `@Model WorkoutRecord` holding the summary fields plus local state — `placeLabel`,
+`stravaState`, `stravaActivityID`, `stravaUploadID`, `lastUploadedAt`, `thumbnailFileName`,
+`seriesFileName`. Series blobs go to
+`Application Support/com.swiatlowski.MaxAct/Series/<id>.json.zlib` (`NSData.compressed(using:)`).
+
+`WorkoutStore` actor: `upsert(_:)` keyed on `id`, strictly idempotent — a re-sync must never
+duplicate a row or overwrite local state with freshly imported data. Sort/filter fields are stored
+denormalized so the table never touches a blob.
+
+**Tests:** upsert idempotency; Strava state and place label survive re-import; blob round-trip;
+a missing blob file degrades to "series unavailable" rather than crashing.
+
+### Phase 4 — List UI
+
+`NavigationSplitView`:
+- **Sidebar:** All Workouts, per activity kind, and saved filters — at minimum "Not on Strava",
+  "Upload failed", "Has route".
+- **Content:** `Table(_:selection:sortOrder:columnCustomization:)` with `selection: Set<String>`
+  for multi-select (⌘A "Select All" comes free), sortable columns, and customization persisted via
+  `@AppStorage`. Columns: route thumbnail, Date, Kind (symbol + name), Duration, Distance,
+  Pace/Speed, Energy, Avg HR, Place, Strava. `.searchable` over kind, place and source.
+- **Detail:** one row selected → Phase 5's view; many selected → count, aggregate totals and the
+  batch actions.
+
+Every action lives in three places per Mac convention: toolbar, context menu, and a menu-bar
+`CommandGroup` with a shortcut.
+
+**Thumbnails are the performance crux.** A `RouteThumbnailRenderer` actor simplifies the polyline
+(Ramer–Douglas–Peucker down to ~200 points), renders once per (id, size, appearance) with
+`MKMapSnapshotter`, and caches the PNG to disk plus an in-memory `NSCache`. Rows read cached images
+only; renders are requested lazily for visible rows and cancelled on scroll-away. If snapshotter
+latency disappoints, fall back to a `Canvas`-drawn polyline with no map tiles.
+
+**Verify:** `RunProject`, then scroll a seeded table of ~1000 rows and confirm no live `Map`
+instances and no hitching; screenshot via the device-interaction tools.
+
+### Phase 5 — Detail view
+
+`Map` with `MapPolyline(coordinates:)` over the downsampled route; Swift Charts for heart rate,
+pace and elevation against time; a stats grid; laps/splits table; source and device; Strava status
+with a link to the uploaded activity. Liquid Glass only on the floating map overlay controls, inside
+a single `GlassEffectContainer` — Apple's own guidance is that over-applying it costs render time.
+
+Accessibility from the start, not retrofitted: Strava state is **symbol + text**, never colour
+alone; explicit `accessibilityLabel` on every status symbol; text styles throughout so Dynamic Type
+scales.
+
+### Phase 6 — Approximate location
+
+Snap the route's first coordinate to a ~1 km grid before storing it, so the list never depends on a
+precise home address. Resolve with `MKReverseGeocodingRequest(location:)` → `await request.mapItems`
+→ `MKAddressRepresentations.cityName` + `regionCode` ("Vancouver, BC"). Serialize through an actor,
+throttle to roughly one request per second, back off on failure, and cache by snapped coordinate —
+repeat rides from the same trailhead then cost nothing. Indoor or route-less workouts show an indoor
+badge or an em dash, never a fabricated place.
+
+### Phase 7 — TCX export and Strava
+
+**TCX writer** (`MaxActCore/Formats`): `Activities/Activity/Lap/Track/Trackpoint` with `Time`,
+`Position`, `AltitudeMeters`, `DistanceMeters`, `HeartRateBpm` and `Cadence`; lap-level
+`TotalTimeSeconds`, `DistanceMeters`, `Calories`, `AverageHeartRateBpm`, `MaximumHeartRateBpm`.
+Golden-file tests, plus one indoor (no-GPS) case that must still produce a valid file.
+
+**Strava.** A `Settings` scene takes the client ID and secret into the Keychain
+(`kSecClassGenericPassword`, `.whenUnlocked`). OAuth via `ASWebAuthenticationSession` with a custom
+callback scheme (`CFBundleURLTypes` gets added in this phase, now that the scheme is chosen), scope
+`activity:write,activity:read_all`. Strava's OAuth has no PKCE, so the secret is genuinely required
+— which is exactly why the user supplies their own. Tokens refresh proactively on expiry and
+reactively on a 401.
+
+Upload: multipart `POST /api/v3/uploads` (`file`, `data_type=tcx`, `name`, `description`,
+`activity_type`, `external_id` = our workout id), then poll `GET /api/v3/uploads/{id}` until
+`activity_id` appears or `error` is set. `external_id` buys server-side dedupe: Strava answers
+"duplicate of activity N", which we record as already-uploaded rather than as a failure.
+
+Rate limiting, via one actor with **two** budgets — overall (200/15 min, 2000/day) and read
+(100/15 min, 1000/day), because status polls are GETs and hit the read bucket. Parse
+`X-RateLimit-Usage` / `X-RateLimit-Limit` and `X-ReadRateLimit-*`, keep upload concurrency at 1, and
+on a 429 back off to the next quarter-hour boundary. Persist `stravaUploadID` so a relaunch resumes
+polling instead of re-uploading.
+
+Batch upload: progress sheet with per-item state, continue-on-error, and a "Retry failed" action.
+Failures are never swallowed — `stravaState = .failed(reason)` and the reason is readable in the
+detail pane.
+
+**Tests:** golden-file TCX; the rate-limit actor under a simulated 429 and header sequence; the
+duplicate-activity response path; token refresh on 401.
+
+### Phase 8 — Polish
+
+First-run onboarding that walks through the chosen sync setup; window state restoration and
+`@SceneStorage` for selection and sort; empty states for every list; an error banner that
+distinguishes "phone not reachable" from "auth rejected" from "HAE returned nothing" (which, per
+HAE's own docs, is indistinguishable from a permissions problem — say so, and point at Health →
+Sharing → Apps); one XCUIAutomation test that launches with seeded data, multi-selects, and runs a
+batch action.
+
+---
+
+## 5. Verification
+
+- **Compile fast:** `XcodeRefreshCodeIssuesInFile` after each edit; `BuildProject` per phase.
+- **Package logic:** `swift test` in `MaxActCore/` — models, decoders, TCX golden files, rate-limit
+  actor. No app launch needed, so this is the fast inner loop.
+- **App tests:** `RunAllTests` (once the scheme's Test action is wired in Phase 0).
+- **Spike probes:** `RunCodeSnippet` and `curl` against the live phone in Phase 1.
+- **End to end:** `RunProject`, sync from the phone, confirm rows appear with thumbnails and places;
+  open one workout and confirm map, HR chart and splits; select several, upload to Strava, and
+  confirm the activities exist there with heart-rate data attached and no duplicates on re-run.
+
+---
+
+## 6. Risks
+
+| Risk | Mitigation |
+|---|---|
+| No HAE path carries full route + HR | Phase 1 tests all three before any of Phases 2–8 depend on one. Manual export (JSON + GPX) is the documented floor and is built regardless. |
+| `.hae` is opaque | Treated as a bonus, not a dependency, and there's no reference implementation to lean on. Time-boxed to an hour in Phase 1, then dropped. |
+| Heart-rate series are bucketed min/avg/max, not raw beats, so uploaded TCX heart-rate tracks may be coarse | Phase 1 measures the achievable interval and whether HAE's time-grouping / `metadataAggregation` setting can tighten it, and records the answer before the TCX writer is built. If the best available interval is too coarse to be useful, say so in the UI rather than shipping a misleading chart. |
+| MCP tool names/contract shift between HAE versions | Probe the contract at connect time and fall back across known names; surface an actionable error rather than failing silently. |
+| MCP server dies when HAE is backgrounded | Sync is an explicit, foreground, resumable operation with visible progress — never a silent background job. Chunk by month so an interruption loses one chunk. |
+| Route-less/indoor workouts | First-class state everywhere: no thumbnail, indoor badge instead of a place, and TCX (not GPX) so the upload still carries HR, laps and calories. |
+| Table performance with thousands of rows | Denormalized sort columns in SwiftData, series in blobs off the query path, pre-rendered cached thumbnails, no live `Map` in a row. |
+| Strava rate limits and async upload processing | Two tracked budgets, serialized uploads, header-driven backoff, persisted upload IDs so polling resumes; "queued" is in-flight, not success. |
+| Ad-hoc signing invalidates Keychain items on rebuild | Bundle ID is fixed in Phase 0. If macOS starts prompting on every rebuild, create a self-signed development certificate — revisit only if it actually bites. |
+| Route data reveals home locations | The start coordinate is coarsened to ~1 km *before* storage; full routes stay local; nothing leaves the Mac without an explicit action on an explicit selection. |
+
+---
+
+## 7. Keeping this plan current
+
+`PLAN.md` in the repo is the source of truth. When something changes: edit the affected section in
+place (don't leave stale text with a contradiction below it), bump **Last updated**, append a dated
+change-log line, and update the phase table.
+
+| Phase | Status |
+|---|---|
+| 0 — Project foundation | Complete, except linking `MaxActCore` into the app target |
+| 1 — Sync evaluation spike | Not started |
+| 2 — Model + ingest | Not started |
+| 3 — Persistence | Not started |
+| 4 — List UI | Not started |
+| 5 — Detail view | Not started |
+| 6 — Approximate location | Not started |
+| 7 — TCX + Strava | Not started |
+| 8 — Polish | Not started |
+
+### Change log
+
+- **2026-09-18** — Replaced `OLD_PLAN.md`. Dropped the iOS HealthKit companion (developer-program
+  cost) in favour of Health Auto Export. Researched all three HAE export paths and found the REST
+  payload fully documented (route + heart rate present), the MCP server's route/HR coverage
+  unconfirmed, and `.hae` proprietary with no folder present on this Mac — so the sync decision
+  became Phase 1's measured spike rather than a documentation guess. Confirmed HAE Premium and a
+  Strava API app are in hand; no Apple Developer team, so signing stays ad-hoc. Chose TCX as the
+  single upload format. Recorded 2026 Strava limits, including that upload-status polls consume the
+  *read* budget. Recorded the template build settings Phase 0 has to undo.
+- **2026-09-18** — Reviewed `HealthyApps/health-auto-export-server`. It is a REST receiver
+  (Express + MongoDB + Grafana), **not** a `.hae` reader, so the iCloud probe is unchanged and all
+  three Phase 1 probes stand. It does pin down the REST contract (`POST /api/data`, `api-key`
+  header, `{"data":{"metrics","workouts"}}`, 207 on partial failure, 200 MB bodies), confirms
+  `route` and `heartRateData` are first-class, and adds three undocumented route accuracy fields to
+  `RoutePoint`. Two findings changed the plan beyond documentation: heart-rate data is a **bucketed
+  min/avg/max series rather than raw beats**, which bounds TCX quality and is now a Phase 1
+  measurement and a tracked risk; and Phase 1's REST probe now runs their server as the capture
+  harness instead of a hand-rolled listener. Repo has no license — reference only, no code reuse.
+- **2026-09-18** — Executed Phase 0. `MaxAct2` narrowed to macOS 26 (`SUPPORTED_PLATFORMS`,
+  `SDKROOT`, deployment target, `TARGETED_DEVICE_FAMILY` cleared), Swift 6 with complete
+  concurrency checking on all three targets, bundle ID fixed at `com.swiatlowski.MaxAct`, sandbox
+  opened for outgoing connections and read-write user-selected files, local-network usage
+  description set, `MyApp.swift` renamed to `MaxActApp.swift`, `.gitignore` added, `MaxActCore`
+  package created with a passing test, and both app test bundles added and wired. Both predicted
+  Xcode-UI test steps turned out to be scriptable via a checked-in shared scheme plus a
+  bundle-identifier launch in the UI test; only the local-package link remains manual. 3/3 app
+  tests and 2/2 package tests pass, build clean.
