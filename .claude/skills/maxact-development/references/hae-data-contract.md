@@ -16,8 +16,9 @@ Every scalar is a `{qty, units}` pair. **The unit strings are user preferences a
 you**, so the canonical model must normalise to SI at decode time and must never persist the
 incoming unit string as truth.
 
-This was tested directly: the energy preference was flipped from kJ to kcal between two otherwise
-identical `get_workouts` calls twelve minutes apart, against the same workout.
+Observed directly: **two** preferences were changed together — energy set to kcal, and
+**"Localize Units" turned on** — between two otherwise identical `get_workouts` calls twelve
+minutes apart, against the same workout.
 
 | Field | before | after |
 |---|---|---|
@@ -29,13 +30,17 @@ identical `get_workouts` calls twelve minutes apart, against the same workout.
 | `speed`, `avgSpeed`, `maxSpeed` | `km/hr` | `km/hr` |
 | `elevationUp`, `elevationDown` | `m` | `m` |
 
-Two things follow:
+Because two settings moved at once, this does **not** isolate which one caused which change. What
+it does establish:
 
-1. **One preference change moved unrelated fields.** Heart rate and step count changed spelling
-   although only energy was configured — and `stepCadence` stayed `count/min` while heart rate
-   became `bpm`, so the remapping isn't even uniform across identically-shaped quantities. Never
-   assume a field's unit is pinned by the preference you think governs it.
-2. **One quantity has several spellings meaning exactly the same thing.** The decoder needs a
+1. **There is a "Localize Units" toggle that rewrites unit spellings wholesale**, beyond the
+   per-quantity unit pickers. The `count/min`→`bpm` and `count`→`steps` changes are most likely
+   its doing — those look like HealthKit-canonical strings being swapped for display-friendly ones
+   — while `kJ`→`kcal` could come from either setting. Untested either way.
+2. **The remapping is not uniform.** `stepCadence` stayed `count/min` while heart rate became
+   `bpm`, in the same payload. So even under localization you cannot assume that identically-shaped
+   quantities share a spelling.
+3. **One quantity has several spellings meaning exactly the same thing.** The decoder needs a
    synonym table per dimension, not merely a units-aware parse:
 
    | Dimension | Seen | Also expect |
