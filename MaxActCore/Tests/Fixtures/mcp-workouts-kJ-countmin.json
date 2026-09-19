@@ -1,0 +1,230 @@
+{
+  "data": {
+    "workouts": [
+      {
+        "activeEnergy": [
+          {
+            "date": "2024-02-06 06:58:00 -0700",
+            "qty": 15.553788015649713,
+            "units": "kJ"
+          },
+          {
+            "date": "2024-02-06 06:59:00 -0700",
+            "qty": 19.79738773766277,
+            "units": "kJ"
+          },
+          {
+            "date": "2024-02-06 07:00:00 -0700",
+            "qty": 31.594466896865587,
+            "units": "kJ"
+          }
+        ],
+        "activeEnergyBurned": {
+          "qty": 1121.8603941990377,
+          "units": "kJ"
+        },
+        "avgHeartRate": {
+          "qty": 140.04751754400314,
+          "units": "count/min"
+        },
+        "avgSpeed": {
+          "qty": 13.501169642707001,
+          "units": "km"
+        },
+        "basalEnergy": [
+          {
+            "date": "2024-02-06 06:58:00 -0700",
+            "qty": 6.075042277694373,
+            "units": "kJ"
+          },
+          {
+            "date": "2024-02-06 06:59:00 -0700",
+            "qty": 5.514162035997213,
+            "units": "kJ"
+          },
+          {
+            "date": "2024-02-06 07:00:00 -0700",
+            "qty": 5.85830333754768,
+            "units": "kJ"
+          }
+        ],
+        "cyclingDistance": [
+          {
+            "date": "2024-02-06 06:58:00 -0700",
+            "qty": 0.22397394167276408,
+            "source": "TestDevice",
+            "units": "km"
+          },
+          {
+            "date": "2024-02-06 06:59:00 -0700",
+            "qty": 0.21697001042634023,
+            "source": "TestDevice",
+            "units": "km"
+          },
+          {
+            "date": "2024-02-06 07:00:00 -0700",
+            "qty": 0.4258698141953062,
+            "source": "TestDevice",
+            "units": "km"
+          }
+        ],
+        "distance": {
+          "qty": 11.36361451074503,
+          "units": "km"
+        },
+        "duration": 2117.362973690033,
+        "elevationDown": {
+          "qty": 92,
+          "units": "m"
+        },
+        "elevationUp": {
+          "qty": 76,
+          "units": "m"
+        },
+        "end": "2024-02-06 08:32:45 -0700",
+        "heartRate": {
+          "avg": {
+            "qty": 140.04751754400314,
+            "units": "count/min"
+          },
+          "max": {
+            "qty": 175,
+            "units": "count/min"
+          },
+          "min": {
+            "qty": 93,
+            "units": "count/min"
+          }
+        },
+        "heartRateData": [
+          {
+            "Avg": 114.28571428571429,
+            "Max": 129,
+            "Min": 109,
+            "date": "2024-02-06 06:57:35 -0700",
+            "units": "count/min"
+          },
+          {
+            "Avg": 129.41666666666666,
+            "Max": 138,
+            "Min": 122.99999999999999,
+            "date": "2024-02-06 06:58:35 -0700",
+            "units": "count/min"
+          },
+          {
+            "Avg": 116.27272727272727,
+            "Max": 131,
+            "Min": 100,
+            "date": "2024-02-06 06:59:35 -0700",
+            "units": "count/min"
+          }
+        ],
+        "heartRateRecovery": [
+          {
+            "Avg": 93,
+            "Max": 93,
+            "Min": 93,
+            "date": "2024-02-06 08:32:49 -0700",
+            "units": "count/min"
+          },
+          {
+            "Avg": 93,
+            "Max": 93,
+            "Min": 93,
+            "date": "2024-02-06 08:32:50 -0700",
+            "units": "count/min"
+          },
+          {
+            "Avg": 97,
+            "Max": 97,
+            "Min": 97,
+            "date": "2024-02-06 08:32:59 -0700",
+            "units": "count/min"
+          }
+        ],
+        "id": "1AD526FE-8129-59A0-B6FB-2B309CCCE77D",
+        "isIndoor": false,
+        "location": "Outdoor",
+        "maxHeartRate": {
+          "qty": 175,
+          "units": "count/min"
+        },
+        "maxSpeed": {
+          "qty": 35.89900478817799,
+          "units": "km"
+        },
+        "metadata": {},
+        "name": "Outdoor Cycling",
+        "route": [
+          {
+            "altitude": 62.88682303405479,
+            "horizontalAccuracy": 19.384219741362354,
+            "latitude": 49.2827,
+            "longitude": -123.1207,
+            "speed": 0.534112274646759,
+            "speedAccuracy": 2.333900448923078,
+            "timestamp": "2024-02-06 06:58:01 -0700",
+            "verticalAccuracy": 6.956143525727393
+          },
+          {
+            "altitude": 67.0547736090843,
+            "horizontalAccuracy": 15.528109866827188,
+            "latitude": 49.282693,
+            "longitude": -123.120704,
+            "speed": 0.534112274646759,
+            "speedAccuracy": 2.333900448923078,
+            "timestamp": "2024-02-06 06:58:01 -0700",
+            "verticalAccuracy": 30
+          },
+          {
+            "altitude": 67.0547736090843,
+            "horizontalAccuracy": 17.989852980266377,
+            "latitude": 49.282724,
+            "longitude": -123.120712,
+            "speed": 0.2299782931804657,
+            "speedAccuracy": 1.4518624801827265,
+            "timestamp": "2024-02-06 06:58:03 -0700",
+            "verticalAccuracy": 30
+          }
+        ],
+        "source": {
+          "identifier": "com.example.testapp",
+          "name": "TestApp"
+        },
+        "speed": {
+          "qty": 19.32073657044638,
+          "units": "km/hr"
+        },
+        "start": "2024-02-06 06:58:00 -0700",
+        "stepCadence": {
+          "qty": 94.48280772317793,
+          "units": "count/min"
+        },
+        "stepCount": [
+          {
+            "date": "2024-02-06 07:00:00 -0700",
+            "qty": 79.26415146861369,
+            "source": "TestDevice",
+            "units": "count"
+          },
+          {
+            "date": "2024-02-06 07:01:00 -0700",
+            "qty": 87.62257931081506,
+            "source": "TestDevice",
+            "units": "count"
+          },
+          {
+            "date": "2024-02-06 07:02:00 -0700",
+            "qty": 87.62257931081506,
+            "source": "TestDevice",
+            "units": "count"
+          }
+        ],
+        "totalEnergy": {
+          "qty": 1673.3471195571135,
+          "units": "kJ"
+        }
+      }
+    ]
+  }
+}

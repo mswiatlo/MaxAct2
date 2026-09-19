@@ -31,10 +31,14 @@ belongs in the app target.
 
 ## Four facts that shape the data model
 
-**Never assume units.** Energy arrives in **kJ**, distance in **km**, speed in **km/hr**, heart rate
-as `count/min` in some fields and `bpm` in others — and HAE's unit preferences are user-configurable,
-so none of this is stable across installs. Every scalar is a `{qty, units}` pair; read `units` and
-convert. This is the single easiest way to ship a wrong number.
+**Never assume units — they change under you.** Every scalar is a `{qty, units}` pair, and the unit
+strings follow HAE's user preferences. Verified by experiment: flipping the energy preference
+rewrote `kJ`→`kcal` *and also* `count/min`→`bpm` for heart rate and `count`→`steps` for step count,
+between two calls about the same workout twelve minutes apart. So one quantity has several
+spellings, and a field's spelling isn't pinned by the preference you'd expect to govern it.
+Normalise to SI at decode time via a per-dimension synonym table, never persist the incoming unit
+string, and treat an unknown unit as a hard failure. This is the single easiest way to ship a
+confidently wrong number.
 
 **Heart rate is bucketed, but the bucket is ours to choose.** HAE emits
 `{Min, Avg, Max, date, units}` per time bucket, not beat-by-beat samples. `metadataAggregation:

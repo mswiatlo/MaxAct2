@@ -10,22 +10,53 @@ Secondary sources: the vendor help centre (`help.healthyapps.dev`), the MCP serv
 
 **The reference server has no license file.** Read it as documentation. Do not copy code from it.
 
-## Units — read them, never assume *(measured)*
+## Units — read them, never assume *(measured, with a controlled experiment)*
 
-The docs' examples imply kcal and metres. The device sends neither:
+Every scalar is a `{qty, units}` pair. **The unit strings are user preferences and change under
+you**, so the canonical model must normalise to SI at decode time and must never persist the
+incoming unit string as truth.
 
-| Field | Actual units |
-|---|---|
-| `activeEnergyBurned`, `totalEnergy`, `activeEnergy`, `basalEnergy` | **kJ** |
-| `distance`, `cyclingDistance` | **km** |
-| `speed`, `avgSpeed`, `maxSpeed` | **km/hr** |
-| `elevationUp` / `elevationDown` | m |
-| `heartRate`, `avgHeartRate`, `maxHeartRate` | **count/min** |
-| `heartRateData[].Min/Avg/Max` | bpm |
+This was tested directly: the energy preference was flipped from kJ to kcal between two otherwise
+identical `get_workouts` calls twelve minutes apart, against the same workout.
 
-Note that the same quantity uses different unit strings in different places (`count/min` vs `bpm`).
-Always read `units` and convert to the canonical SI model. Unit preferences are user-configurable in
-HAE, so these are not even stable across installs.
+| Field | before | after |
+|---|---|---|
+| `activeEnergyBurned`, `totalEnergy`, `activeEnergy`, `basalEnergy` | `kJ` | `kcal` |
+| `heartRate.*`, `avgHeartRate`, `maxHeartRate`, `heartRateData[]` | `count/min` | `bpm` |
+| `stepCount[]` | `count` | `steps` |
+| `stepCadence[]` | `count/min` | `count/min` (unchanged) |
+| `distance`, `cyclingDistance` | `km` | `km` |
+| `speed`, `avgSpeed`, `maxSpeed` | `km/hr` | `km/hr` |
+| `elevationUp`, `elevationDown` | `m` | `m` |
+
+Two things follow:
+
+1. **One preference change moved unrelated fields.** Heart rate and step count changed spelling
+   although only energy was configured — and `stepCadence` stayed `count/min` while heart rate
+   became `bpm`, so the remapping isn't even uniform across identically-shaped quantities. Never
+   assume a field's unit is pinned by the preference you think governs it.
+2. **One quantity has several spellings meaning exactly the same thing.** The decoder needs a
+   synonym table per dimension, not merely a units-aware parse:
+
+   | Dimension | Seen | Also expect |
+   |---|---|---|
+   | energy | `kJ`, `kcal` | `cal`, `J` |
+   | length | `km`, `m` | `mi`, `ft`, `yd` |
+   | speed | `km/hr` | `mi/hr`, `m/s` |
+   | rate | `count/min`, `bpm` | |
+   | count | `count`, `steps` | |
+
+An unrecognised unit must be a loud decode failure, never a silent pass-through: a workout showing
+1122 "calories" because `kJ` was read as `kcal` is a plausible-looking wrong number, which is the
+worst kind.
+
+Both vocabularies are covered by fixtures —
+`MaxActCore/Tests/Fixtures/mcp-workouts-seconds.json` (kcal/bpm/steps) and
+`mcp-workouts-kJ-countmin.json` (kJ/count-min/count).
+
+> **Corrected 2026-09-18.** An earlier version of this file claimed heart rate used `count/min` in
+> some fields and `bpm` in others *within one payload*. That was wrong: it compared two captures
+> taken either side of the preference change. Within a single capture the spelling is consistent.
 
 ## Envelope
 
