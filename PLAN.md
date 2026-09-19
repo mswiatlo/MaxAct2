@@ -3,8 +3,11 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**,
 with batch upload to Strava.
 
-**Status:** Phase 0 complete except linking `MaxActCore` into the app target (one Xcode UI step —
-see below). Phase 1 not started. **Last updated:** 2026-09-18.
+**Status:** Phase 0 complete. Phase 1 not started. **Last updated:** 2026-09-18.
+
+> **Working on this project?** Read `.claude/skills/maxact-development/` first. It carries the
+> Health Auto Export data contract, the Xcode tooling limits we hit, and the Strava API facts —
+> the things that cost research to establish and aren't visible in the code.
 
 ---
 
@@ -239,10 +242,10 @@ Notes on what the tooling could and couldn't do, so this isn't rediscovered late
   unknown setting), so `MaxAct2UITests` has no implicit target application. Worked around in code:
   the UI test launches `XCUIApplication(bundleIdentifier: "com.swiatlowski.MaxAct")`. The scheme's
   build action builds the app for testing, so the bundle is present when the test runs.
-- **Still to do by hand, once:** File → Add Package Dependencies… → Add Local → `MaxActCore`, then
-  add it to the `MaxAct2` target's frameworks. Until then `ContentView.swift` carries a comment
-  where `import MaxActCore` belongs, so the app builds. Nothing else in Phase 0 depends on it, and
-  Phase 2 does.
+- There is no MCP tool to add a local package to a project, so linking `MaxActCore` was the one
+  genuine Xcode UI step (File → Add Package Dependencies… → Add Local). Done, and verified by
+  `XCLocalSwiftPackageReference` plus a `MaxActCore in Frameworks` entry in the project file —
+  a package can be referenced without being linked, which type-checks and then fails at link time.
 - `MACOSX_DEPLOYMENT_TARGET` is still `26.6.2` at the **project** level (all three targets override
   it to `26.0`). The build-settings tooling is target-scoped only and `project.pbxproj` must not be
   hand-edited, so this is left as-is. Harmless today; fix it in Xcode if a new target ever inherits
@@ -433,13 +436,28 @@ batch action.
 
 ## 7. Keeping this plan current
 
-`PLAN.md` in the repo is the source of truth. When something changes: edit the affected section in
-place (don't leave stale text with a contradiction below it), bump **Last updated**, append a dated
-change-log line, and update the phase table.
+`PLAN.md` in the repo is the source of truth for *what* and *which phase*. When something changes:
+edit the affected section in place (don't leave stale text with a contradiction below it), bump
+**Last updated**, append a dated change-log line, and update the phase table.
+
+Durable *how-to* knowledge goes in the skill at `.claude/skills/maxact-development/` instead, so it
+survives past the phase that discovered it:
+
+| File | Holds |
+|---|---|
+| `SKILL.md` | Ground rules, the fast test loop, and the two findings that shape the data model. |
+| `references/hae-data-contract.md` | Envelope, required vs optional fields, `{qty, units}`, date format, route fields, HR bucketing, and the exact invocation details for all three sync paths. |
+| `references/xcode-project-conventions.md` | Settings that must not change, which build settings the tooling can and can't write, the silent zero-tests scheme trap, SwiftPM manifest requirements. |
+| `references/strava-api.md` | The two rate-limit buckets, upload/poll flow, OAuth constraints. |
+
+Rule of thumb: if a fact would still be true two phases from now and cost research to establish, it
+belongs in the skill. If it's a decision, a status, or a sequencing choice, it belongs here.
+**Phase 1's findings are the next thing to land in both** — the measured sync decision goes in §2
+and the change log, and any new payload detail goes in `references/hae-data-contract.md`.
 
 | Phase | Status |
 |---|---|
-| 0 — Project foundation | Complete, except linking `MaxActCore` into the app target |
+| 0 — Project foundation | Complete |
 | 1 — Sync evaluation spike | Not started |
 | 2 — Model + ingest | Not started |
 | 3 — Persistence | Not started |
@@ -477,3 +495,7 @@ change-log line, and update the phase table.
   Xcode-UI test steps turned out to be scriptable via a checked-in shared scheme plus a
   bundle-identifier launch in the UI test; only the local-package link remains manual. 3/3 app
   tests and 2/2 package tests pass, build clean.
+- **2026-09-18** — `MaxActCore` linked into the app target, completing Phase 0. Captured the
+  research and Phase 0 findings as a skill at `.claude/skills/maxact-development/` so the HAE data
+  contract, Xcode tooling limits and Strava constraints don't have to be rediscovered each phase;
+  §7 now describes the split between plan and skill.
