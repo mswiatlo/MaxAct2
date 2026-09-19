@@ -55,6 +55,13 @@ An unrecognised unit must be a loud decode failure, never a silent pass-through:
 1122 "calories" because `kJ` was read as `kcal` is a plausible-looking wrong number, which is the
 worst kind.
 
+**Conversion is lossless, so no HAE setting is preferable to another** *(measured)*. The same
+workout exported under both settings gave `1121.8603941990377 kJ` and `268.13106935923463 kcal`;
+dividing by 4.184 reproduces the second exactly, delta 0. Unaffected fields are bit-identical,
+including full-precision values like `avgHeartRate = 140.04751754400314`. HAE emits raw doubles and
+converts exactly rather than rounding to a display value. There is therefore nothing to gain by
+asking the user to configure HAE a particular way — normalise whatever arrives.
+
 Both vocabularies are covered by fixtures —
 `MaxActCore/Tests/Fixtures/mcp-workouts-seconds.json` (kcal/bpm/steps) and
 `mcp-workouts-kJ-countmin.json` (kJ/count-min/count).
