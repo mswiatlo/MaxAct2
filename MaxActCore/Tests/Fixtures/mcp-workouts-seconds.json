@@ -1,0 +1,260 @@
+{
+  "data": {
+    "workouts": [
+      {
+        "activeEnergy": [
+          {
+            "date": "2024-02-06 06:59:58 -0700",
+            "qty": 0.015222044504265541,
+            "units": "kcal"
+          },
+          {
+            "date": "2024-02-06 06:59:59 -0700",
+            "qty": 0.015222044504265541,
+            "units": "kcal"
+          },
+          {
+            "date": "2024-02-06 07:00:00 -0700",
+            "qty": 0.015221939196976876,
+            "units": "kcal"
+          },
+          {
+            "date": "2024-02-06 07:00:01 -0700",
+            "qty": 0.015221810074489488,
+            "units": "kcal"
+          }
+        ],
+        "activeEnergyBurned": {
+          "qty": 880.7838790992071,
+          "units": "kcal"
+        },
+        "avgHeartRate": {
+          "qty": 119.86605226133803,
+          "units": "bpm"
+        },
+        "avgSpeed": {
+          "qty": 2.1063076083637156,
+          "units": "km"
+        },
+        "basalEnergy": [
+          {
+            "date": "2024-02-06 06:59:58 -0700",
+            "qty": 0.024199147673447784,
+            "units": "kcal"
+          },
+          {
+            "date": "2024-02-06 06:59:59 -0700",
+            "qty": 0.024199147673447784,
+            "units": "kcal"
+          },
+          {
+            "date": "2024-02-06 07:00:00 -0700",
+            "qty": 0.024198980261860677,
+            "units": "kcal"
+          },
+          {
+            "date": "2024-02-06 07:00:01 -0700",
+            "qty": 0.024198774990214056,
+            "units": "kcal"
+          }
+        ],
+        "distance": {
+          "qty": 9.040914655540139,
+          "units": "km"
+        },
+        "duration": 12645.04077899456,
+        "elevationDown": {
+          "qty": 495,
+          "units": "m"
+        },
+        "elevationUp": {
+          "qty": 498,
+          "units": "m"
+        },
+        "end": "2024-02-06 11:32:36 -0700",
+        "flightsClimbed": {
+          "qty": 231.08247779370868,
+          "units": "count"
+        },
+        "heartRate": {
+          "avg": {
+            "qty": 119.86605226133803,
+            "units": "bpm"
+          },
+          "max": {
+            "qty": 172,
+            "units": "bpm"
+          },
+          "min": {
+            "qty": 82,
+            "units": "bpm"
+          }
+        },
+        "heartRateData": [
+          {
+            "Avg": 86,
+            "Max": 86,
+            "Min": 86,
+            "date": "2024-02-06 07:00:04 -0700",
+            "units": "bpm"
+          },
+          {
+            "Avg": 83,
+            "Max": 83,
+            "Min": 83,
+            "date": "2024-02-06 07:00:09 -0700",
+            "units": "bpm"
+          },
+          {
+            "Avg": 82,
+            "Max": 82,
+            "Min": 82,
+            "date": "2024-02-06 07:00:14 -0700",
+            "units": "bpm"
+          },
+          {
+            "Avg": 84,
+            "Max": 84,
+            "Min": 84,
+            "date": "2024-02-06 07:00:17 -0700",
+            "units": "bpm"
+          }
+        ],
+        "heartRateRecovery": [
+          {
+            "Avg": 124.00000000000001,
+            "Max": 124.00000000000001,
+            "Min": 124.00000000000001,
+            "date": "2024-02-06 11:32:44 -0700",
+            "units": "bpm"
+          },
+          {
+            "Avg": 122,
+            "Max": 122,
+            "Min": 122,
+            "date": "2024-02-06 11:32:49 -0700",
+            "units": "bpm"
+          },
+          {
+            "Avg": 122,
+            "Max": 122,
+            "Min": 122,
+            "date": "2024-02-06 11:32:54 -0700",
+            "units": "bpm"
+          },
+          {
+            "Avg": 121,
+            "Max": 121,
+            "Min": 121,
+            "date": "2024-02-06 11:32:57 -0700",
+            "units": "bpm"
+          }
+        ],
+        "id": "1AD526FE-8129-59A0-B6FB-2B309CCCE77D",
+        "maxHeartRate": {
+          "qty": 172,
+          "units": "bpm"
+        },
+        "maxSpeed": {
+          "qty": 12.071916067523848,
+          "units": "km"
+        },
+        "metadata": {},
+        "name": "Hiking",
+        "route": [
+          {
+            "altitude": 921.8971598547284,
+            "course": 296.3088517767229,
+            "courseAccuracy": 47.06653996473678,
+            "horizontalAccuracy": 15.372844092452134,
+            "latitude": 49.2827,
+            "longitude": -123.1207,
+            "speed": 1.1143165826797485,
+            "speedAccuracy": 1.479230298822696,
+            "timestamp": "2024-02-06 06:59:59 -0700",
+            "verticalAccuracy": 8.735916542835795
+          },
+          {
+            "altitude": 922.0855134392451,
+            "course": 318.440601053852,
+            "courseAccuracy": 48.54202319031218,
+            "horizontalAccuracy": 16.25362078034717,
+            "latitude": 49.282698,
+            "longitude": -123.120754,
+            "speed": 0.9522625207901001,
+            "speedAccuracy": 1.111553017966665,
+            "timestamp": "2024-02-06 07:00:00 -0700",
+            "verticalAccuracy": 8.74537065496062
+          },
+          {
+            "altitude": 922.2207805466619,
+            "course": 324.777706115551,
+            "courseAccuracy": 40.31604923673637,
+            "horizontalAccuracy": 14,
+            "latitude": 49.282715,
+            "longitude": -123.120737,
+            "speed": 0.9522625207901001,
+            "speedAccuracy": 0.8694805934676015,
+            "timestamp": "2024-02-06 07:00:01 -0700",
+            "verticalAccuracy": 8.479906777304686
+          },
+          {
+            "altitude": 922.1971198028135,
+            "course": 329.64601850825056,
+            "courseAccuracy": 37.067242835201654,
+            "horizontalAccuracy": 14,
+            "latitude": 49.282717,
+            "longitude": -123.120721,
+            "speed": 0.9522625207901001,
+            "speedAccuracy": 0.8047169964039494,
+            "timestamp": "2024-02-06 07:00:02 -0700",
+            "verticalAccuracy": 8.299531474971577
+          }
+        ],
+        "source": {
+          "identifier": "com.example.testapp",
+          "name": "TestApp"
+        },
+        "speed": {
+          "qty": 2.573917579926731,
+          "units": "km/hr"
+        },
+        "start": "2024-02-06 06:59:58 -0700",
+        "stepCadence": {
+          "qty": 91.78778345284607,
+          "units": "count/min"
+        },
+        "stepCount": [
+          {
+            "date": "2024-02-06 07:00:00 -0700",
+            "qty": 1.5779381453947583,
+            "source": "TestDevice",
+            "units": "steps"
+          },
+          {
+            "date": "2024-02-06 07:00:01 -0700",
+            "qty": 3.512725401805266,
+            "source": "TestDevice",
+            "units": "steps"
+          },
+          {
+            "date": "2024-02-06 07:00:02 -0700",
+            "qty": 3.5127254018052665,
+            "source": "TestDevice",
+            "units": "steps"
+          },
+          {
+            "date": "2024-02-06 07:00:03 -0700",
+            "qty": 1.7815396147662088,
+            "source": "TestDevice",
+            "units": "steps"
+          }
+        ],
+        "totalEnergy": {
+          "qty": 1273.3554987688276,
+          "units": "kcal"
+        }
+      }
+    ]
+  }
+}

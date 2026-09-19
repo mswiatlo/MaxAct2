@@ -29,16 +29,26 @@ will otherwise be rediscovered the hard way.
 Put logic in `MaxActCore` by default. Only code that genuinely needs SwiftUI, SwiftData or AppKit
 belongs in the app target.
 
-## Two facts that shape the data model
+## Four facts that shape the data model
 
-**Heart rate is not a raw series.** Health Auto Export emits `{Min, Avg, Max, date, units, source}`
-per *time bucket*, not beat-by-beat samples. Density depends on the export's time-grouping setting.
-This bounds how good an uploaded TCX heart-rate track can be — do not design UI or export that
-implies per-second fidelity until Phase 1 has measured what's actually achievable.
+**Never assume units.** Energy arrives in **kJ**, distance in **km**, speed in **km/hr**, heart rate
+as `count/min` in some fields and `bpm` in others — and HAE's unit preferences are user-configurable,
+so none of this is stable across installs. Every scalar is a `{qty, units}` pair; read `units` and
+convert. This is the single easiest way to ship a wrong number.
 
-**Activity type is a display name, not an enum.** HAE sends `"Running"`, not an
-`HKWorkoutActivityType` raw value. `ActivityKind` therefore needs an `.other(String)` case; an
-integer fallback is wrong.
+**Heart rate is bucketed, but the bucket is ours to choose.** HAE emits
+`{Min, Avg, Max, date, units}` per time bucket, not beat-by-beat samples. `metadataAggregation:
+"seconds"` yields a 5 s median interval — the Apple Watch's native workout rate, so effectively
+lossless — against 60 s for the `"minutes"` default. Ask for `"seconds"` whenever the data will be
+charted or exported, and accept the ~30× payload cost.
+
+**Activity type is a display name, not an enum.** HAE sends `"Outdoor Cycling"`, not an
+`HKWorkoutActivityType` raw value. `ActivityKind` needs an `.other(String)` case; an integer
+fallback is wrong.
+
+**Sync cost is per workout, not per byte.** The phone spends ~2.3–2.5 s answering for each workout
+regardless of how much of it you ask for. Backfill is therefore minutes-to-tens-of-minutes of
+foreground time and must be chunked and resumable; shrinking the payload doesn't help.
 
 ## Reference material
 

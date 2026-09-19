@@ -1,11 +1,31 @@
 # Health Auto Export data contract
 
-Sources: the vendor help centre (`help.healthyapps.dev`), the MCP server repo
-(`HealthyApps/health-auto-export-mcp-server`), and — most reliably — the vendor's own REST receiver
-`HealthyApps/health-auto-export-server` (`server/src/models/Workout.ts`). The last of these is the
-authoritative shape; where it and the help pages disagree, trust the code.
+**Most of this is now verified against a real device** (Phase 1, HAE 1.1.0, 2026-09-18) rather than
+inferred from documentation. Where measured behaviour contradicts the vendor's docs or their
+reference server, the measurement wins and is marked *measured*.
+
+Secondary sources: the vendor help centre (`help.healthyapps.dev`), the MCP server repo
+(`HealthyApps/health-auto-export-mcp-server`), and their REST receiver
+`HealthyApps/health-auto-export-server` (`server/src/models/Workout.ts`).
 
 **The reference server has no license file.** Read it as documentation. Do not copy code from it.
+
+## Units — read them, never assume *(measured)*
+
+The docs' examples imply kcal and metres. The device sends neither:
+
+| Field | Actual units |
+|---|---|
+| `activeEnergyBurned`, `totalEnergy`, `activeEnergy`, `basalEnergy` | **kJ** |
+| `distance`, `cyclingDistance` | **km** |
+| `speed`, `avgSpeed`, `maxSpeed` | **km/hr** |
+| `elevationUp` / `elevationDown` | m |
+| `heartRate`, `avgHeartRate`, `maxHeartRate` | **count/min** |
+| `heartRateData[].Min/Avg/Max` | bpm |
+
+Note that the same quantity uses different unit strings in different places (`count/min` vs `bpm`).
+Always read `units` and convert to the canonical SI model. Unit preferences are user-configurable in
+HAE, so these are not even stable across installs.
 
 ## Envelope
 
@@ -29,6 +49,22 @@ error.
 `isIndoor`, `route`, `metadata`, plus swimming (`lapLength`, `strokeStyle`, `swolfScore`,
 `salinity`, `totalSwimmingStrokeCount`, `swimCadence`) and cycling (`cyclingCadence`,
 `cyclingDistance`, `cyclingPower`, `cyclingSpeed`) fields.
+
+**Undocumented but present *(measured)*:** `heartRate`, `avgHeartRate`, `maxHeartRate`,
+`basalEnergy`, `source`, `walkingAndRunningDistance`, `cyclingDistance`. Expect more to appear —
+decode leniently.
+
+Shapes that differ from what the docs and reference server suggest *(all measured)*:
+
+- **`source` is an object at workout level**: `{"name": "WorkOutDoors", "identifier": "net.workoutdoors.workoutdoors"}`.
+  Inside series samples it is a plain string (`"MaxWatch7"`). Decode both.
+- **`location` is a string, not a coordinate**: `"Outdoor"` / `"Indoor"` — it's the HealthKit
+  session location type. The workout's position comes only from `route`.
+- **`heartRate` is a summary object**, `{"min": {...}, "avg": {...}, "max": {...}}`, each a
+  `{qty, units}` pair — and `avgHeartRate` / `maxHeartRate` duplicate two of them at top level.
+- **`heartRateData` samples carry no `source` key**, though the reference server's schema marks it
+  required.
+- `metadata` came back as `{}` even with `includeMetadata: true`.
 
 Treat **everything except the five required fields as optional**, regardless of what the docs
 suggest. The vendor's own Mongo schema marks `activeEnergyBurned` required while their TypeScript
@@ -57,20 +93,38 @@ string; `HAEDateFormatTests` guards the behaviour.
 
 ## Route points
 
-More fields than the help pages list. From `ILocation`:
+Ten keys, all present in practice *(measured)*: `latitude`, `longitude`, `timestamp`, `altitude`,
+`speed`, `course`, `horizontalAccuracy`, `verticalAccuracy`, `speedAccuracy`, `courseAccuracy`.
+The last three are undocumented.
 
-`latitude`, `longitude`, `timestamp` (required), then `altitude`, `speed`, `course`,
-`horizontalAccuracy`, `verticalAccuracy`, `speedAccuracy`, `courseAccuracy` — the last three are
-undocumented but real.
+**Sampled at 1 Hz** — a 3.5-hour hike produced 12,645 points. Full fidelity; no downsampling needed
+on the phone side, and plenty of reason to downsample before drawing.
+
+Intervals are *not* uniform: median 1 s but individual gaps of 1800–3000 s appear where the workout
+was paused. Never assume evenly spaced samples, and don't interpolate across a long gap — it would
+draw a straight line through a pause.
 
 ## Heart rate
 
 ```json
-{ "Min": 120, "Avg": 150, "Max": 175, "date": "...", "units": "bpm", "source": "Apple Watch" }
+{ "Min": 120, "Avg": 150, "Max": 175, "date": "...", "units": "bpm" }
 ```
 
-Capitalised `Min`/`Avg`/`Max`. **Bucketed aggregates, not raw samples** — see the main skill file.
-`heartRateRecovery` has the same shape and is a separate series.
+Capitalised `Min`/`Avg`/`Max`. Bucketed aggregates whose bucket size is **controlled by
+`metadataAggregation`** *(measured)*:
+
+| `metadataAggregation` | Median HR interval | Samples, 35-min ride |
+|---|---|---|
+| `"minutes"` (default) | 60 s | 74 |
+| `"seconds"` | **5 s** | 728 |
+
+5 s is the Apple Watch's native workout sampling rate, so `"seconds"` is effectively lossless — the
+earlier worry that TCX exports would carry coarse heart rate is resolved, provided we ask for it.
+The knob is global: it re-buckets every series (`basalEnergy`, `stepCount`, `cyclingDistance`…), not
+just heart rate, which is what makes it expensive.
+
+`heartRateRecovery` is a separate series with the same shape, ~24 samples at 5 s, recorded after the
+workout ends.
 
 ## Sync paths
 
@@ -78,22 +132,64 @@ All three require an HAE **Premium** subscription. Apple forbids health data acc
 is locked, so *every* path only moves data while the phone is unlocked. That is not a bug to work
 around.
 
-### MCP / TCP server (Mac pulls)
+### MCP server over HTTP (Mac pulls) — the chosen path *(all measured)*
 
-- HTTP (recommended): `POST http://{LAN_IP}:9000/mcp` with `Authorization: Bearer <token>`. Token
-  and IP are shown on HAE's Server screen. HTTPS is available but requires trusting an
-  app-generated local CA.
-- Raw TCP: `{LAN_IP}:9000`, unauthenticated and unencrypted, one request/response per connection.
-- JSON-RPC 2.0: `{"jsonrpc":"2.0","id":"1","method":"callTool","params":{"name":"<tool>", ...}}`.
-- `listTools` is documented as **non-functional** — you cannot discover the contract at runtime that
-  way. Probe by trying tool names.
-- Tool names vary by contract version: v1.1.0 uses `get_*` (`get_workouts`), v1.0.0 uses bare names
-  (`workouts`). Try the newer first and fall back.
-- `workouts` args: `start`, `end` (required), `includeMetadata`, `includeRoutes`,
-  `metadataAggregation`. Other tools: `health_metrics`, `symptoms`, `state_of_mind`, `medications`,
-  `cycle_tracking`, `ecg`, `heart_notifications`.
-- **The server stops when HAE is backgrounded.** Sync must be an explicit, resumable, foreground
-  operation with visible progress — chunk by month so an interruption loses one chunk.
+**The help pages describe the TCP transport's simplified `callTool` shape. The HTTP transport is
+real MCP Streamable HTTP and that shape does not work on it.** A bare `callTool` gets
+`-32600 Missing or invalid Mcp-Session-Id`. The actual sequence:
+
+1. `POST http://{LAN_IP}:9000/mcp`, `method: "initialize"`, params
+   `{protocolVersion: "2025-06-18", capabilities: {}, clientInfo: {...}}`.
+   Headers: `Content-Type: application/json`, `Accept: application/json, text/event-stream`,
+   `Authorization: Bearer <token>`.
+2. Read **`Mcp-Session-Id`** from the *response headers* and send it on every later request.
+3. `POST` the `notifications/initialized` notification.
+4. `tools/list` and `tools/call` — the standard MCP method names, not `listTools`/`callTool`.
+
+`tools/list` **works**, contrary to the docs; the "non-functional" note applies to the TCP
+transport. Use it to resolve the contract instead of guessing tool names. Server identifies itself
+as `Health Auto Export` version `1.1.0`, whose tools are `get_workouts`, `get_health_metrics`,
+`get_symptoms`, `get_medications`, `get_ecg`, and so on.
+
+`get_workouts` schema, with defaults straight from `tools/list`:
+
+| Argument | Type | Default | Notes |
+|---|---|---|---|
+| `start`, `end` | string | — | required; `yyyy-MM-dd HH:mm:ss Z` |
+| `includeRoutes` | bool | **`false`** | must be asked for explicitly |
+| `includeMetadata` | bool | `true` | all the time-series, plus `avgHeartRate`/`maxHeartRate`/`isIndoor`/`location` |
+| `metadataAggregation` | string | `"minutes"` | `"seconds"` for native-fidelity heart rate |
+
+Tool results arrive MCP-wrapped: `result.content[0].text` is a **JSON string** that must be parsed
+again to reach the `{"data": {"workouts": [...]}}` envelope.
+
+**Cost is query time on the phone, not bytes.** Roughly **2.3–2.5 seconds per workout**, essentially
+independent of whether routes or metadata are requested:
+
+| Request | Workouts | Payload | Time |
+|---|---|---|---|
+| summary only (`includeMetadata: false`) | 101 | 0.12 MiB | 234 s |
+| metadata, minutes, no routes | 16 | 0.73 MiB | 41 s |
+| metadata, minutes, **with routes** | 16 | 16.4 MiB | 49 s |
+| metadata, **seconds**, with routes — one 3.5 h hike | 1 | 14.0 MiB | 18 s |
+
+So: ~46 KB per workout of minute-resolution metadata, ~1 MB per workout of route, ~1.5 MB per
+workout of second-resolution metadata. A single long workout tops out around 14 MiB, comfortably
+within one response — no chunking needed *within* a workout.
+
+Do **not** use `includeMetadata: false` to make list sync cheap. It saves little time (time scales
+with workout count regardless) and it drops `avgHeartRate`, `maxHeartRate`, `isIndoor` and
+`location`, all of which the list view wants.
+
+**Therefore, fetch in two tiers** — this also answers the old question of when detail is fetched:
+
+- **List sync:** `includeRoutes: false`, `metadataAggregation: "minutes"` over a date window.
+- **Detail / export:** re-request that one workout with a narrow `start`/`end` window,
+  `includeRoutes: true`, `metadataAggregation: "seconds"`.
+
+**The server stops when HAE is backgrounded**, and at ~2.4 s/workout a multi-year backfill is tens
+of minutes of foreground time. Sync must be explicit, chunked by month, resumable, and show
+progress.
 
 ### REST API (phone pushes)
 

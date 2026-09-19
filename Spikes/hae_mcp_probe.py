@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """Phase 1, probe A: query the Health Auto Export MCP server over HTTP. Throwaway.
 
-Resolves the tool-name contract by trial, because `listTools` is documented as non-functional and
-tool names differ between contract versions (v1.1.0 `get_workouts` vs v1.0.0 `workouts`).
+The help pages describe a simplified `callTool` JSON-RPC shape — that is the *TCP* transport. The
+HTTP transport is real MCP Streamable HTTP: you must `initialize`, carry the returned
+`Mcp-Session-Id` on every later request, and use the standard `tools/list` / `tools/call` methods.
+`tools/list` works fine here, contrary to the docs.
 
-    python3 Spikes/hae_mcp_probe.py --host 192.168.1.42 --token <bearer> --days 30
+    python3 Spikes/hae_mcp_probe.py --host 10.0.0.158 --token <bearer> --days 7
+    python3 Spikes/hae_mcp_probe.py --host ... --token ... --aggregation seconds
 
-Health Auto Export must be running and in the foreground on the phone: the server stops when the
-app is backgrounded.
+Health Auto Export must be foregrounded on the phone: the server stops when it is backgrounded.
 """
 
 from __future__ import annotations
@@ -25,33 +27,73 @@ sys.path.insert(0, str(Path(__file__).parent))
 import hae_analyze  # noqa: E402
 
 CAPTURES = Path(__file__).parent / "captures"
-WORKOUT_TOOL_NAMES = ["get_workouts", "workouts"]  # newest contract first
+PROTOCOL_VERSION = "2025-06-18"
 
 
-def call(url: str, token: str | None, method: str, params: dict, timeout: float) -> tuple[object, int, float]:
-    request_body = json.dumps(
-        {"jsonrpc": "2.0", "id": str(int(time.time() * 1000)), "method": method, "params": params}
-    ).encode()
-    headers = {"Content-Type": "application/json"}
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
+class MCPClient:
+    def __init__(self, host: str, port: int, token: str | None, timeout: float) -> None:
+        self.url = f"http://{host}:{port}/mcp"
+        self.token = token
+        self.timeout = timeout
+        self.session_id: str | None = None
 
-    started = time.monotonic()
-    request = urllib.request.Request(url, data=request_body, headers=headers, method="POST")
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        raw = response.read()
-    elapsed = time.monotonic() - started
-    return json.loads(raw), len(raw), elapsed
+    def _headers(self) -> dict[str, str]:
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+        }
+        if self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
+        if self.session_id:
+            headers["Mcp-Session-Id"] = self.session_id
+        return headers
+
+    def _post(self, message: dict, *, timeout: float | None = None) -> tuple[bytes, dict]:
+        request = urllib.request.Request(
+            self.url, data=json.dumps(message).encode(), headers=self._headers(), method="POST"
+        )
+        with urllib.request.urlopen(request, timeout=timeout or self.timeout) as response:
+            return response.read(), dict(response.headers)
+
+    def connect(self) -> dict:
+        body, headers = self._post(
+            {
+                "jsonrpc": "2.0",
+                "id": "init",
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": PROTOCOL_VERSION,
+                    "capabilities": {},
+                    "clientInfo": {"name": "maxact-spike", "version": "0.1"},
+                },
+            },
+            timeout=30,
+        )
+        self.session_id = headers.get("Mcp-Session-Id")
+        if not self.session_id:
+            raise RuntimeError("server did not return an Mcp-Session-Id")
+        self._post({"jsonrpc": "2.0", "method": "notifications/initialized"}, timeout=15)
+        return json.loads(body).get("result", {})
+
+    def list_tools(self) -> list[dict]:
+        body, _ = self._post({"jsonrpc": "2.0", "id": "tools", "method": "tools/list", "params": {}}, timeout=30)
+        return json.loads(body).get("result", {}).get("tools", [])
+
+    def call_tool(self, name: str, arguments: dict) -> tuple[object, int, float]:
+        started = time.monotonic()
+        body, _ = self._post(
+            {"jsonrpc": "2.0", "id": name, "method": "tools/call",
+             "params": {"name": name, "arguments": arguments}}
+        )
+        elapsed = time.monotonic() - started
+        response = json.loads(body)
+        if "error" in response:
+            raise RuntimeError(f"JSON-RPC error: {response['error']}")
+        return unwrap(response.get("result", response)), len(body), elapsed
 
 
-def unwrap(response: object) -> object:
-    """Peel the JSON-RPC and MCP content envelopes to reach the actual payload."""
-    if not isinstance(response, dict):
-        return response
-    if "error" in response:
-        raise RuntimeError(f"JSON-RPC error: {response['error']}")
-    result = response.get("result", response)
-    # MCP tool results are commonly {"content": [{"type": "text", "text": "<json>"}]}
+def unwrap(result: object) -> object:
+    """MCP tool results arrive as {"content": [{"type": "text", "text": "<json>"}]}."""
     if isinstance(result, dict) and isinstance(result.get("content"), list):
         for item in result["content"]:
             if isinstance(item, dict) and item.get("type") == "text":
@@ -64,66 +106,59 @@ def unwrap(response: object) -> object:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--host", required=True, help="the iPhone's LAN IP, from HAE's Server screen")
+    parser.add_argument("--host", required=True)
     parser.add_argument("--port", type=int, default=9000)
-    parser.add_argument("--token", help="bearer token from HAE's Server screen (omit for plain TCP-style HTTP)")
-    parser.add_argument("--days", type=int, default=30, help="size of the window to request")
-    parser.add_argument("--end", help="window end, yyyy-MM-dd (default: today)")
+    parser.add_argument("--token")
+    parser.add_argument("--days", type=int, default=7)
+    parser.add_argument("--end", help="window end, yyyy-MM-dd (default: now)")
+    parser.add_argument("--aggregation", default="minutes",
+                        help="metadataAggregation: controls heart-rate bucket size")
+    parser.add_argument("--no-routes", action="store_true")
+    parser.add_argument("--no-metadata", action="store_true",
+                        help="drop every time-series; the summary-only case")
     parser.add_argument("--timeout", type=float, default=300.0)
-    parser.add_argument("--no-routes", action="store_true", help="measure the payload without routes")
+    parser.add_argument("--list-tools", action="store_true", help="print the tool schemas and exit")
     args = parser.parse_args()
 
-    url = f"http://{args.host}:{args.port}/mcp"
+    client = MCPClient(args.host, args.port, args.token, args.timeout)
+    info = client.connect()
+    server = info.get("serverInfo", {})
+    print(f"connected: {server.get('name')} {server.get('version')} "
+          f"(protocol {info.get('protocolVersion')}, session {client.session_id})")
+
+    if args.list_tools:
+        for tool in client.list_tools():
+            print(f"\n{tool['name']}: {tool.get('description', '')}")
+            print(json.dumps(tool.get("inputSchema", {}), indent=2))
+        return
+
     end = datetime.strptime(args.end, "%Y-%m-%d") if args.end else datetime.now()
     start = end - timedelta(days=args.days)
     fmt = "%Y-%m-%d %H:%M:%S %z"
-    window = {
+    arguments = {
         "start": start.astimezone().strftime(fmt),
         "end": end.astimezone().strftime(fmt),
+        "includeMetadata": not args.no_metadata,
+        "includeRoutes": not args.no_routes,
+        "metadataAggregation": args.aggregation,
     }
+    print(f"get_workouts {json.dumps(arguments)}")
 
-    print(f"endpoint: {url}")
-    print(f"window:   {window['start']}  ->  {window['end']}  ({args.days} days)")
+    payload, size, elapsed = client.call_tool("get_workouts", arguments)
 
-    # Record what listTools does, since the docs claim it doesn't work.
-    try:
-        tools, _, _ = call(url, args.token, "listTools", {}, timeout=30)
-        print(f"listTools: {json.dumps(tools)[:400]}")
-    except Exception as error:  # noqa: BLE001 - this is a probe; any failure is a finding
-        print(f"listTools: failed ({type(error).__name__}: {error})")
+    CAPTURES.mkdir(exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    path = CAPTURES / f"mcp-workouts-{args.days}d-{args.aggregation}-{stamp}.json"
+    path.write_text(json.dumps(payload, indent=2))
+    print(f"saved: {path}")
 
-    arguments = {**window, "includeMetadata": True, "includeRoutes": not args.no_routes}
-    for tool in WORKOUT_TOOL_NAMES:
-        print(f"\ntrying tool {tool!r} with {json.dumps(arguments)}")
-        try:
-            response, size, elapsed = call(
-                url, args.token, "callTool", {"name": tool, "arguments": arguments}, args.timeout
-            )
-        except urllib.error.HTTPError as error:
-            print(f"  HTTP {error.code}: {error.read()[:300]!r}")
-            continue
-        except Exception as error:  # noqa: BLE001
-            print(f"  {type(error).__name__}: {error}")
-            continue
-
-        try:
-            payload = unwrap(response)
-        except RuntimeError as error:
-            print(f"  {error}")
-            continue
-
-        CAPTURES.mkdir(exist_ok=True)
-        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        path = CAPTURES / f"mcp-{tool}-{stamp}.json"
-        path.write_text(json.dumps(payload, indent=2))
-        print(f"  saved: {path}")
-
-        hae_analyze.analyze(
-            payload, label=f"MCP {tool} ({args.days}d window)", raw_bytes=size, elapsed=elapsed
-        )
-        return
-
-    print("\nNo workout tool name succeeded. Check that HAE is foregrounded and the token is current.")
+    hae_analyze.analyze(
+        payload,
+        label=f"MCP get_workouts — {args.days}d window, aggregation={args.aggregation}, "
+              f"routes={not args.no_routes}",
+        raw_bytes=size,
+        elapsed=elapsed,
+    )
 
 
 if __name__ == "__main__":

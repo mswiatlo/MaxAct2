@@ -3,7 +3,8 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**,
 with batch upload to Strava.
 
-**Status:** Phase 0 complete. Phase 1 not started. **Last updated:** 2026-09-18.
+**Status:** Phase 0 complete. Phase 1 in progress — probe A (MCP) passes; probes B and C pending.
+**Last updated:** 2026-09-18.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first. It carries the
 > Health Auto Export data contract, the Xcode tooling limits we hit, and the Strava API facts —
@@ -261,13 +262,14 @@ interval the heart-rate and route series actually come back at, and whether that
 time for one long (4 h+) activity and for a one-month window; how hands-off it is; whether
 multi-year backfill is practical; and implementation cost on the Mac.
 
-- **A. MCP over HTTP.** Start the server in HAE, read the LAN IP + bearer token off the Server
-  screen. From `RunCodeSnippet` or `curl`, POST
-  `{"jsonrpc":"2.0","id":"1","method":"callTool","params":{"name":"workouts","arguments":{"start":"…","end":"…","includeRoutes":true,"includeMetadata":true}}}`
-  to `http://{IP}:9000/mcp`. Resolve the contract version first (try `get_workouts`, fall back to
-  `workouts`) since `listTools` is documented as non-functional. Record whether `route` and
-  heart-rate arrays are populated, and how the server behaves when the app is backgrounded
-  mid-request.
+- **A. MCP over HTTP — done 2026-09-18. PASSES, and is the presumptive winner.** Full results in
+  `.claude/skills/maxact-development/references/hae-data-contract.md`. Headlines: routes at 1 Hz
+  with ten fields per point; heart rate at a 5 s median once `metadataAggregation: "seconds"` is
+  requested; everything the list view needs is present. The transport is real MCP Streamable HTTP
+  (session handshake, `tools/list` / `tools/call`), not the simplified `callTool` the help pages
+  describe — and `tools/list` works fine. Cost is ~2.4 s of phone time per workout, near enough
+  independent of payload size, which is what makes a two-tier fetch (cheap list sync, per-workout
+  detail on demand) the right shape.
 - **B. REST push.** Use the vendor's reference server as the capture harness rather than writing
   any Swift: `docker compose up` in a clone of `health-auto-export-server`, then point an HAE REST
   automation at `http://<mac-ip>:3001/api/data` with the `api-key` header its `.env` expects.
@@ -423,7 +425,8 @@ batch action.
 |---|---|
 | No HAE path carries full route + HR | Phase 1 tests all three before any of Phases 2–8 depend on one. Manual export (JSON + GPX) is the documented floor and is built regardless. |
 | `.hae` is opaque | Treated as a bonus, not a dependency, and there's no reference implementation to lean on. Time-boxed to an hour in Phase 1, then dropped. |
-| Heart-rate series are bucketed min/avg/max, not raw beats, so uploaded TCX heart-rate tracks may be coarse | Phase 1 measures the achievable interval and whether HAE's time-grouping / `metadataAggregation` setting can tighten it, and records the answer before the TCX writer is built. If the best available interval is too coarse to be useful, say so in the UI rather than shipping a misleading chart. |
+| ~~Heart-rate series are bucketed, so uploaded TCX heart-rate tracks may be coarse~~ | **Retired 2026-09-18.** Measured: `metadataAggregation: "seconds"` yields a 5 s median interval, the Apple Watch's native workout rate. Ask for it on detail fetches. |
+| Backfill is slow: the phone spends ~2.4 s per workout regardless of payload options, and the server dies if HAE is backgrounded | Chunk by month, make sync resumable and idempotent, show progress, and tell the user to keep HAE foregrounded. A 1,000-workout history is ~40 minutes — acceptable once, not per launch. |
 | MCP tool names/contract shift between HAE versions | Probe the contract at connect time and fall back across known names; surface an actionable error rather than failing silently. |
 | MCP server dies when HAE is backgrounded | Sync is an explicit, foreground, resumable operation with visible progress — never a silent background job. Chunk by month so an interruption loses one chunk. |
 | Route-less/indoor workouts | First-class state everywhere: no thumbnail, indoor badge instead of a place, and TCX (not GPX) so the upload still carries HR, laps and calories. |
