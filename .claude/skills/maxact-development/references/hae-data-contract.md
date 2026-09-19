@@ -43,13 +43,18 @@ it does establish:
 3. **One quantity has several spellings meaning exactly the same thing.** The decoder needs a
    synonym table per dimension, not merely a units-aware parse:
 
-   | Dimension | Seen | Also expect |
-   |---|---|---|
-   | energy | `kJ`, `kcal` | `cal`, `J` |
-   | length | `km`, `m` | `mi`, `ft`, `yd` |
-   | speed | `km/hr` | `mi/hr`, `m/s` |
-   | rate | `count/min`, `bpm` | |
-   | count | `count`, `steps` | |
+   | Dimension | Supported |
+   |---|---|
+   | energy | `kJ`, `kcal` |
+   | length | `km`, `m` |
+   | speed | `km/hr` |
+   | rate | `count/min`, `bpm` |
+   | count | `count`, `steps` |
+
+   **Metric only — imperial is deliberately out of scope** (decided 2026-09-18; the user doesn't
+   need it). `mi`, `ft`, `mi/hr` and friends must therefore hit the same hard failure as any other
+   unknown unit. That is the point: if HAE's locale ever flips, sync stops with a clear error
+   instead of quietly reporting miles as kilometres.
 
 An unrecognised unit must be a loud decode failure, never a silent pass-through: a workout showing
 1122 "calories" because `kJ` was read as `kcal` is a plausible-looking wrong number, which is the

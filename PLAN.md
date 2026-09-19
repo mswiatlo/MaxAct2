@@ -3,7 +3,9 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**,
 with batch upload to Strava.
 
-**Status:** Phase 0 complete. Phase 1 in progress — probe A (MCP) passes; probes B and C pending.
+**Status:** Phase 0 complete. Phase 1 in progress — probe A (MCP over HTTP) **passes** and is the
+presumptive winner; probes B (REST push) and C (`.hae`) not started, both need the phone.
+See *Picking this back up* at the end of Phase 1 for exactly how to resume.
 **Last updated:** 2026-09-18.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first. It carries the
@@ -88,6 +90,7 @@ bucket. New apps are in single-player mode (own account only), which is exactly 
 | Minimum OS | macOS 26.0 | Liquid Glass, `MKReverseGeocodingRequest`, Swift-native `Network` API. The current `MACOSX_DEPLOYMENT_TARGET = 26.6.2` is an inherited template artifact, not a choice. |
 | Primary sync | **Undecided by design** — Phase 1 measures all three and records the winner here | The user asked for an evaluation; the docs don't answer whether route/HR survive each path. All ingest sits behind one protocol so the decision is swappable. |
 | Backfill | HAE **manual export** (JSON + GPX) imported from a file/folder, regardless of which live path wins | Manual export has no 30-second background window and no foreground requirement. Years of history land in one pass. |
+| Units | Decode **metric only** (`kJ`/`kcal`, `km`, `m`, `km/hr`, `count/min`/`bpm`, `count`/`steps`), normalise to SI, and treat any other unit — including imperial — as a hard decode failure | HAE's unit strings follow its preferences and are not stable, so decoding must be units-driven regardless. Imperial is explicitly out of scope: the user doesn't need it, and a loud failure beats silently reading `mi` as `km`. If HAE's locale ever flips, sync stops with a clear error rather than showing wrong distances. |
 | Canonical model | Own `Workout` value types in `MaxActCore`, decoded *from* HAE's shape | HAE identifies activity type by display name (`"Running"`), not `HKWorkoutActivityType` raw values — so `ActivityKind` must carry `.other(String)` rather than an integer fallback. |
 | Persistence | SwiftData for summary rows + local state; route/HR series as compressed JSON blobs on disk | A 4-hour ride is thousands of points and must not sit in the table's query path. |
 | Row thumbnails | Pre-rendered, disk-cached `MKMapSnapshotter` images of a simplified polyline — never a live `Map` per row | N live `Map` views in a table is the single easiest way to make this app slow. |
@@ -270,15 +273,16 @@ multi-year backfill is practical; and implementation cost on the Mac.
   describe — and `tools/list` works fine. Cost is ~2.4 s of phone time per workout, near enough
   independent of payload size, which is what makes a two-tier fetch (cheap list sync, per-workout
   detail on demand) the right shape.
-- **B. REST push.** Use the vendor's reference server as the capture harness rather than writing
-  any Swift: `docker compose up` in a clone of `health-auto-export-server`, then point an HAE REST
-  automation at `http://<mac-ip>:3001/api/data` with the `api-key` header its `.env` expects.
-  MongoDB then holds a queryable copy of exactly what the phone sent, and Grafana's bundled
-  `workout-details` dashboard is a free sanity check on route and HR completeness. Also tee one raw
-  request body to disk (a `nc -l` run, or a proxy) — the raw bytes are the fixture our decoder gets
-  tested against, and the parsed Mongo documents are not. Note the achievable HR/route interval at
-  different time-grouping settings, whether batching kicks in, and the size of the largest body.
-- **C. `.hae` / Sync to Mac.** No reference implementation exists — the vendor's server repo doesn't
+- **B. REST push — pending.** The plan originally called for running the vendor's reference server,
+  but this Mac has neither Docker nor Node and the useful output is just the raw request body, so
+  `Spikes/hae_capture.py` does it in stdlib Python instead. Run it, point an HAE REST automation at
+  this Mac, note whether route/HR ride along, whether batching kicks in, and the largest body size.
+  Given what probe A established, B cannot win on fidelity — it carries the same data with less
+  control, since a push can't request one workout at second-resolution on demand. What it could
+  still earn is a supporting role: hands-off incremental capture of *new* workouts, with MCP used
+  for backfill and detail.
+- **C. `.hae` / Sync to Mac — pending, and the only probe that could still change the answer.**
+  No reference implementation exists — the vendor's server repo doesn't
   read these files — so this stays a black-box inspection. Enable Sync to Mac, `Keep Downloaded` on
   the `AutoSync` folder, then inspect one `Workouts/*.hae` and one `Routes/*.hae` with `file`,
   `head -c 64 | xxd`. Decide: plain JSON, gzip/zlib-wrapped JSON, binary plist, or opaque. If it's
@@ -294,6 +298,47 @@ into §2 and the change log, then delete the spike code.
 
 **Verify:** captured fixtures committed under `MaxActCore/Tests/Fixtures/`; the decision recorded
 in `PLAN.md`.
+
+#### Picking this back up
+
+State as of 2026-09-18 evening: probe A done and passing, B and C not started. Nothing is blocked
+on code — both remaining probes need the phone.
+
+Facts you'll need again:
+
+| | |
+|---|---|
+| Mac on the LAN | `10.0.0.206`, hostname `Gondolin-3` |
+| Phone (HAE Server screen) | `10.0.0.158:9000`, bearer token shown on that screen — **it may have been regenerated, re-read it** |
+| HAE must be | foregrounded; the server dies when backgrounded |
+
+**Probe B, REST push.** Start the receiver, then add the automation on the phone:
+
+```
+python3 Spikes/hae_capture.py            # listens on 0.0.0.0:8080, prints a full analysis per POST
+```
+HAE → Automations → new REST API automation → URL `http://10.0.0.206:8080/`, method POST,
+format JSON, with workout routes and metrics enabled. Each POST is saved to `Spikes/captures/`
+and analysed on arrival.
+
+**Probe C, `.hae`.** Enable Sync to Mac in HAE, then in Finder right-click
+`iCloud Drive/Auto Export/AutoSync` → **Keep Downloaded** (otherwise the files are dataless
+placeholders). Once `Workouts/` and `Routes/` have content:
+
+```
+file Workouts/*.hae | head; head -c 64 Workouts/<one>.hae | xxd
+```
+Looking for: plain JSON, gzip/zlib-wrapped JSON, binary plist, or opaque. Time-boxed to an hour.
+
+**Re-running probe A** (its harness is still there and useful for spot checks):
+
+```
+python3 Spikes/hae_mcp_probe.py --host 10.0.0.158 --token <token> --list-tools
+python3 Spikes/hae_mcp_probe.py --host 10.0.0.158 --token <token> --days 7 --aggregation seconds
+```
+
+**Then:** record the decision in §2 and the change log, fold any new payload detail into
+`references/hae-data-contract.md`, delete `Spikes/`, and start Phase 2.
 
 ### Phase 2 — Model + ingest (`MaxActCore`)
 
@@ -498,6 +543,18 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
   Xcode-UI test steps turned out to be scriptable via a checked-in shared scheme plus a
   bundle-identifier launch in the UI test; only the local-package link remains manual. 3/3 app
   tests and 2/2 package tests pass, build clean.
+- **2026-09-18** — Ran Phase 1 probe A (MCP over HTTP): passes, and is the presumptive winner.
+  Routes at 1 Hz; heart rate at a 5 s median with `metadataAggregation: "seconds"`, which retires
+  the coarse-heart-rate risk entirely. The transport turned out to be real MCP Streamable HTTP
+  rather than the simplified `callTool` the help pages document, and `tools/list` works. Cost is
+  ~2.4 s of phone time per workout almost regardless of payload size, so sync should fetch in two
+  tiers — minute-resolution metadata without routes for the list, per-workout re-fetch with routes
+  and second-resolution for detail and export. That also settles the long-standing question of
+  when detail gets fetched. Separately confirmed by experiment that unit strings track HAE's
+  preferences (including a "Localize Units" toggle) while conversion is lossless, so the app
+  normalises whatever arrives and no HAE setting is preferred; decided to support metric only and
+  fail loudly on imperial. Two fixtures committed, one per unit vocabulary. Probes B and C remain.
+
 - **2026-09-18** — `MaxActCore` linked into the app target, completing Phase 0. Captured the
   research and Phase 0 findings as a skill at `.claude/skills/maxact-development/` so the HAE data
   contract, Xcode tooling limits and Strava constraints don't have to be rediscovered each phase;
