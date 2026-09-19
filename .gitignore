@@ -12,3 +12,7 @@ Package.resolved
 
 # macOS
 .DS_Store
+
+# Phase 1 spike output. Real captures contain GPS traces and heart rate — never commit them.
+# Anonymised fixtures belong in MaxActCore/Tests/Fixtures/ instead.
+Spikes/captures/
