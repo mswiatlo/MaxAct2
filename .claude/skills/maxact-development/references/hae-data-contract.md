@@ -251,7 +251,15 @@ progress.
 
 ### Sync to Mac (iCloud `.hae` files)
 
-- `~/Library/Mobile Documents/com~apple~CloudDocs/Auto Export/AutoSync/{Health Metrics,Workouts,Routes}`.
+- **The real path is the app's own ubiquity container, not iCloud Drive proper** *(measured)*:
+  `~/Library/Mobile Documents/iCloud~com~ifunography~HealthExport/Documents/`. The docs' "iCloud
+  Drive → Auto Export" is how Finder and the Files app *present* that container — there is no
+  `Auto Export` folder under `com~apple~CloudDocs`. (`ifunography` is HAE's developer.)
+- Consequence for a sandboxed app: this is **another app's** container, so we cannot read it from
+  our own ubiquity entitlement. It requires the user to pick the folder in an open panel and a
+  retained security-scoped bookmark. Finder does show it under iCloud Drive as "Auto Export", so
+  the user can navigate to it, but it's a real extra step this path carries.
+- Expected layout below that: `AutoSync/{Health Metrics,Workouts,Routes}`.
 - Naming: metrics `yyyyMMdd.hae`; workouts `[name]_[date]_[id].hae`; routes named by workout id.
 - The format is **proprietary and undocumented**, and no reference implementation exists — the
   vendor's server repo does not read these files.
