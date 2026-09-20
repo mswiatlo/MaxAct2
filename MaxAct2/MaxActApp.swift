@@ -6,7 +6,20 @@ struct MaxActApp: App {
     @State private var model: AppModel
     @State private var startupError: String?
 
+    /// UI tests drive the real UI, so they must not drive the real *data*. Under this flag the
+    /// app uses a throwaway defaults domain and an in-memory database, which also makes the tests
+    /// deterministic instead of depending on whatever happens to be synced.
+    static let isUITesting = ProcessInfo.processInfo.arguments.contains("--ui-testing")
+
     init() {
+        if Self.isUITesting {
+            let domain = "com.swiatlowski.MaxAct.uitests"
+            UserDefaults.standard.removePersistentDomain(forName: domain)
+            let settings = SyncSettings(defaults: UserDefaults(suiteName: domain) ?? .standard)
+            _model = State(initialValue: AppModel.inMemoryFallback(settings: settings))
+            return
+        }
+
         let settings = SyncSettings()
         // The stores are the app's foundation. If they can't open there is no useful degraded
         // mode, so fall back to memory and say so plainly rather than crashing at launch.
@@ -58,10 +71,8 @@ struct MaxActCommands: Commands {
             // Opens the panel rather than starting immediately: how much history to import is a
             // per-sync choice, and starting a multi-hour job from a keystroke with no visible
             // range would be a trap.
-            Button("Sync from iPhone…") {
-                NotificationCenter.default.post(name: .maxActShowSyncPanel, object: nil)
-            }
-            .keyboardShortcut("r", modifiers: .command)
+            Button("Sync from iPhone…") { model.isSyncPanelPresented = true }
+                .keyboardShortcut("r", modifiers: .command)
 
             Button("Stop Syncing") { model.cancelSync() }
                 .disabled(!model.syncStatus.isRunning)

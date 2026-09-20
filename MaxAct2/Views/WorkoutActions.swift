@@ -53,15 +53,22 @@ struct WorkoutActions: View {
 /// goes in the Keychain.
 @Observable
 final class SyncSettings {
+    /// Injected rather than reaching for `.standard`, so UI tests can be handed a throwaway
+    /// domain. They type into these fields, and one test run overwriting the real token was
+    /// enough to make this worth doing properly.
+    @ObservationIgnored private let defaults: UserDefaults
+
     var host: String {
-        didSet { UserDefaults.standard.set(host, forKey: "syncHost") }
+        didSet { defaults.set(host, forKey: "syncHost") }
     }
     var token: String {
-        didSet { UserDefaults.standard.set(token, forKey: "syncToken") }
+        didSet { defaults.set(token, forKey: "syncToken") }
     }
-    init() {
-        host = UserDefaults.standard.string(forKey: "syncHost") ?? ""
-        token = UserDefaults.standard.string(forKey: "syncToken") ?? ""
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        host = defaults.string(forKey: "syncHost") ?? ""
+        token = defaults.string(forKey: "syncToken") ?? ""
     }
 
     var isConfigured: Bool { !host.isEmpty && !token.isEmpty }

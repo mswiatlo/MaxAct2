@@ -26,6 +26,9 @@ final class MaxAct2UITests: XCTestCase {
     @MainActor
     private func launchApp() -> XCUIApplication {
         let app = XCUIApplication(bundleIdentifier: Self.appBundleIdentifier)
+        // Isolates the app's defaults and database from the real ones. These tests type into the
+        // connection fields, and without this a test run overwrites the user's own token.
+        app.launchArguments = ["--ui-testing"]
         app.launch()
         addTeardownBlock { await MainActor.run { app.terminate() } }
         XCTAssertTrue(
@@ -126,19 +129,80 @@ final class MaxAct2UITests: XCTestCase {
         let app = launchApp()
         app.buttons["Sync"].click()
 
-        // With no server configured the panel must teach the three steps and provide the route to
-        // Settings that the empty state previously lacked.
+        // The panel must explain where the address and token come from. Matching on "Health Auto
+        // Export" rather than an exact sentence: the copy contains markdown emphasis, which
+        // fragments the accessibility value and makes a phrase match brittle.
         XCTAssertTrue(
             app.staticTexts.containing(
-                NSPredicate(format: "value CONTAINS[c] 'Server screen'")
+                NSPredicate(format: "value CONTAINS[c] 'Health Auto Export'")
             ).firstMatch.waitForExistence(timeout: 5),
-            "Sync panel should explain how to start Health Auto Export's server."
+            "Sync panel should explain where the address and token come from."
         )
         XCTAssertTrue(
             app.buttons.matching(
-                NSPredicate(format: "label CONTAINS[c] 'Server Settings'")
+                NSPredicate(format: "label CONTAINS[c] 'Settings'")
             ).firstMatch.exists,
-            "Sync panel should link to Settings."
+            "Sync panel should still offer a route to Settings."
+        )
+    }
+
+    /// Regression test for the reported bug: pressing Sync or ⌘R opened Settings and never
+    /// synced, because the address had silently stayed empty and the panel's only affordance in
+    /// that state was a link to Settings. The connection fields now live in the panel itself.
+    @MainActor
+    func testSyncPanelHoldsTheConnectionFields() throws {
+        let app = launchApp()
+        app.buttons["Sync"].click()
+
+        let addressField = app.textFields.element(boundBy: 0)
+        XCTAssertTrue(
+            addressField.waitForExistence(timeout: 5),
+            "The sync panel must let you enter the iPhone address without leaving for Settings."
+        )
+        XCTAssertGreaterThanOrEqual(
+            app.textFields.count, 2,
+            "Both the address and the token belong in the panel."
+        )
+        XCTAssertTrue(
+            app.buttons["Start Sync"].exists,
+            "The panel must offer a way to actually start syncing."
+        )
+    }
+
+    @MainActor
+    func testCommandROpensTheSyncPanel() throws {
+        let app = launchApp()
+        app.typeKey("r", modifierFlags: .command)
+
+        XCTAssertTrue(
+            app.buttons["Start Sync"].waitForExistence(timeout: 5),
+            "⌘R should open the sync panel, not do nothing and not open Settings."
+        )
+    }
+
+    /// Typing an address should be enough to make syncing possible — the previous flow left you
+    /// with a permanently disabled action and no indication of what was missing.
+    @MainActor
+    func testEnteringAnAddressEnablesSyncing() throws {
+        let app = launchApp()
+        app.buttons["Sync"].click()
+
+        let startSync = app.buttons["Start Sync"]
+        XCTAssertTrue(startSync.waitForExistence(timeout: 5))
+
+        let address = app.textFields.element(boundBy: 0)
+        address.click()
+        address.typeKey("a", modifierFlags: .command)
+        address.typeText("10.0.0.158")
+
+        let token = app.textFields.element(boundBy: 1)
+        token.click()
+        token.typeKey("a", modifierFlags: .command)
+        token.typeText("test-token")
+
+        XCTAssertTrue(
+            startSync.isEnabled,
+            "With an address and a token entered, Start Sync must be available."
         )
     }
 }

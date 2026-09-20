@@ -116,6 +116,21 @@ the bundle lean. Check `Contents/Frameworks/` after any change here.
 Warnings are reported by `XcodeListNavigatorIssues` with `severity: "warning"`; `BuildProject`
 reports only errors, so a clean build result does not mean a clean build.
 
+## UI tests must be launched with `--ui-testing`
+
+`MaxAct2UITests` drives the real app, which means it also drives the real *data*. A test that typed
+into the sync panel's connection fields overwrote the user's actual Health Auto Export token with
+`test-token`, because `SyncSettings` wrote straight to `UserDefaults.standard`.
+
+`SyncSettings` now takes its store by injection, and `MaxActApp` switches to a throwaway defaults
+domain plus an in-memory database when launched with `--ui-testing`. **Every** `XCUIApplication`
+must set `app.launchArguments = ["--ui-testing"]` before `launch()`. It also makes the tests
+deterministic, since they no longer depend on whatever happens to be synced.
+
+The full UI suite is mildly flaky when several tests launch the same app at once — a run once had
+every test fail on "no window appeared" and passed unchanged on a retry. Re-run before believing a
+sweeping UI-test failure.
+
 ## SwiftPM
 
 - `MaxActCore/Package.swift` needs **`swift-tools-version: 6.2`**. `.macOS(.v26)` was introduced in

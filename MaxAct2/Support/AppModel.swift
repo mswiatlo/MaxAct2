@@ -25,6 +25,11 @@ final class AppModel {
         KeyPathComparator(\.workout.start, order: .reverse)
     ]
 
+    /// Whether the sync popover is showing. Held here rather than in the view so the menu-bar
+    /// command can open it directly — it used to go through a `NotificationCenter` hop, which was
+    /// indirection with no benefit and one more thing that could silently not fire.
+    var isSyncPanelPresented = false
+
     // MARK: Sync
 
     private(set) var syncStatus: SyncStatus = .idle
