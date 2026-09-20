@@ -8,12 +8,40 @@
 
 /* Begin PBXBuildFile section */
 		E40F7DE9305DB72C0002A068 /* MaxActCore in Frameworks */ = {isa = PBXBuildFile; productRef = E40F7DE8305DB72C0002A068 /* MaxActCore */; };
+		E40F7DEB30606B120002A068 /* PLAN.md in Resources */ = {isa = PBXBuildFile; fileRef = E40F7DEA30606B120002A068 /* PLAN.md */; };
+		E40F7DFC30606B310002A068 /* hae_decode.swift in Sources */ = {isa = PBXBuildFile; fileRef = E40F7DF730606B310002A068 /* hae_decode.swift */; };
+		E40F7DFD30606B310002A068 /* make_fixture.py in Resources */ = {isa = PBXBuildFile; fileRef = E40F7DFA30606B310002A068 /* make_fixture.py */; };
+		E40F7DFE30606B310002A068 /* mcp-workouts-90d-minutes-20260918-213300.json in Resources */ = {isa = PBXBuildFile; fileRef = E40F7DF330606B310002A068 /* mcp-workouts-90d-minutes-20260918-213300.json */; };
+		E40F7DFF30606B310002A068 /* mcp-workouts-1d-seconds-20260918-213426.json in Resources */ = {isa = PBXBuildFile; fileRef = E40F7DF030606B310002A068 /* mcp-workouts-1d-seconds-20260918-213426.json */; };
+		E40F7E0030606B310002A068 /* mcp-workouts-1d-seconds-20260918-212837.json in Resources */ = {isa = PBXBuildFile; fileRef = E40F7DEF30606B310002A068 /* mcp-workouts-1d-seconds-20260918-212837.json */; };
+		E40F7E0130606B310002A068 /* mcp-workouts-14d-minutes-20260918-212756.json in Resources */ = {isa = PBXBuildFile; fileRef = E40F7DF130606B310002A068 /* mcp-workouts-14d-minutes-20260918-212756.json */; };
+		E40F7E0230606B310002A068 /* hae_capture.py in Resources */ = {isa = PBXBuildFile; fileRef = E40F7DF630606B310002A068 /* hae_capture.py */; };
+		E40F7E0330606B310002A068 /* mcp-workouts-14d-minutes-20260918-213358.json in Resources */ = {isa = PBXBuildFile; fileRef = E40F7DF230606B310002A068 /* mcp-workouts-14d-minutes-20260918-213358.json */; };
+		E40F7E0430606B310002A068 /* hae_mcp_probe.py in Resources */ = {isa = PBXBuildFile; fileRef = E40F7DF930606B310002A068 /* hae_mcp_probe.py */; };
+		E40F7E0530606B310002A068 /* hae_analyze.cpython-314.pyc in Resources */ = {isa = PBXBuildFile; fileRef = E40F7DEC30606B310002A068 /* hae_analyze.cpython-314.pyc */; };
+		E40F7E0630606B310002A068 /* hae_analyze.py in Resources */ = {isa = PBXBuildFile; fileRef = E40F7DF530606B310002A068 /* hae_analyze.py */; };
+		E40F7E0730606B310002A068 /* hae_file_probe.py in Resources */ = {isa = PBXBuildFile; fileRef = E40F7DF830606B310002A068 /* hae_file_probe.py */; };
+		E40F7E0830606B310002A068 /* mcp-workouts-1d-minutes-20260918-213930.json in Resources */ = {isa = PBXBuildFile; fileRef = E40F7DEE30606B310002A068 /* mcp-workouts-1d-minutes-20260918-213930.json */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		000000000000000000000120 /* MaxAct2.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MaxAct2.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E40F7DCB305DB5750002A068 /* MaxAct2Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MaxAct2Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E40F7DD6305DB5790002A068 /* MaxAct2UITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MaxAct2UITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E40F7DEA30606B120002A068 /* PLAN.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = PLAN.md; sourceTree = "<group>"; };
+		E40F7DEC30606B310002A068 /* hae_analyze.cpython-314.pyc */ = {isa = PBXFileReference; lastKnownFileType = file; path = "hae_analyze.cpython-314.pyc"; sourceTree = "<group>"; };
+		E40F7DEE30606B310002A068 /* mcp-workouts-1d-minutes-20260918-213930.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "mcp-workouts-1d-minutes-20260918-213930.json"; sourceTree = "<group>"; };
+		E40F7DEF30606B310002A068 /* mcp-workouts-1d-seconds-20260918-212837.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "mcp-workouts-1d-seconds-20260918-212837.json"; sourceTree = "<group>"; };
+		E40F7DF030606B310002A068 /* mcp-workouts-1d-seconds-20260918-213426.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "mcp-workouts-1d-seconds-20260918-213426.json"; sourceTree = "<group>"; };
+		E40F7DF130606B310002A068 /* mcp-workouts-14d-minutes-20260918-212756.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "mcp-workouts-14d-minutes-20260918-212756.json"; sourceTree = "<group>"; };
+		E40F7DF230606B310002A068 /* mcp-workouts-14d-minutes-20260918-213358.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "mcp-workouts-14d-minutes-20260918-213358.json"; sourceTree = "<group>"; };
+		E40F7DF330606B310002A068 /* mcp-workouts-90d-minutes-20260918-213300.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "mcp-workouts-90d-minutes-20260918-213300.json"; sourceTree = "<group>"; };
+		E40F7DF530606B310002A068 /* hae_analyze.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = hae_analyze.py; sourceTree = "<group>"; };
+		E40F7DF630606B310002A068 /* hae_capture.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = hae_capture.py; sourceTree = "<group>"; };
+		E40F7DF730606B310002A068 /* hae_decode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = hae_decode.swift; sourceTree = "<group>"; };
+		E40F7DF830606B310002A068 /* hae_file_probe.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = hae_file_probe.py; sourceTree = "<group>"; };
+		E40F7DF930606B310002A068 /* hae_mcp_probe.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = hae_mcp_probe.py; sourceTree = "<group>"; };
+		E40F7DFA30606B310002A068 /* make_fixture.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = make_fixture.py; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -57,6 +85,8 @@
 		000000000000000000000001 = {
 			isa = PBXGroup;
 			children = (
+				E40F7DEA30606B120002A068 /* PLAN.md */,
+				E40F7DFB30606B310002A068 /* Spikes */,
 				000000000000000000000010 /* MaxAct2 */,
 				E40F7DCC305DB5750002A068 /* MaxAct2Tests */,
 				E40F7DD7305DB5790002A068 /* MaxAct2UITests */,
@@ -72,6 +102,42 @@
 				E40F7DD6305DB5790002A068 /* MaxAct2UITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		E40F7DED30606B310002A068 /* __pycache__ */ = {
+			isa = PBXGroup;
+			children = (
+				E40F7DEC30606B310002A068 /* hae_analyze.cpython-314.pyc */,
+			);
+			path = __pycache__;
+			sourceTree = "<group>";
+		};
+		E40F7DF430606B310002A068 /* captures */ = {
+			isa = PBXGroup;
+			children = (
+				E40F7DEE30606B310002A068 /* mcp-workouts-1d-minutes-20260918-213930.json */,
+				E40F7DEF30606B310002A068 /* mcp-workouts-1d-seconds-20260918-212837.json */,
+				E40F7DF030606B310002A068 /* mcp-workouts-1d-seconds-20260918-213426.json */,
+				E40F7DF130606B310002A068 /* mcp-workouts-14d-minutes-20260918-212756.json */,
+				E40F7DF230606B310002A068 /* mcp-workouts-14d-minutes-20260918-213358.json */,
+				E40F7DF330606B310002A068 /* mcp-workouts-90d-minutes-20260918-213300.json */,
+			);
+			path = captures;
+			sourceTree = "<group>";
+		};
+		E40F7DFB30606B310002A068 /* Spikes */ = {
+			isa = PBXGroup;
+			children = (
+				E40F7DED30606B310002A068 /* __pycache__ */,
+				E40F7DF430606B310002A068 /* captures */,
+				E40F7DF530606B310002A068 /* hae_analyze.py */,
+				E40F7DF630606B310002A068 /* hae_capture.py */,
+				E40F7DF730606B310002A068 /* hae_decode.swift */,
+				E40F7DF830606B310002A068 /* hae_file_probe.py */,
+				E40F7DF930606B310002A068 /* hae_mcp_probe.py */,
+				E40F7DFA30606B310002A068 /* make_fixture.py */,
+			);
+			path = Spikes;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -183,6 +249,19 @@
 		000000000000000140000000 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
+				E40F7DFD30606B310002A068 /* make_fixture.py in Resources */,
+				E40F7DFE30606B310002A068 /* mcp-workouts-90d-minutes-20260918-213300.json in Resources */,
+				E40F7DFF30606B310002A068 /* mcp-workouts-1d-seconds-20260918-213426.json in Resources */,
+				E40F7E0030606B310002A068 /* mcp-workouts-1d-seconds-20260918-212837.json in Resources */,
+				E40F7E0130606B310002A068 /* mcp-workouts-14d-minutes-20260918-212756.json in Resources */,
+				E40F7E0230606B310002A068 /* hae_capture.py in Resources */,
+				E40F7E0330606B310002A068 /* mcp-workouts-14d-minutes-20260918-213358.json in Resources */,
+				E40F7E0430606B310002A068 /* hae_mcp_probe.py in Resources */,
+				E40F7E0530606B310002A068 /* hae_analyze.cpython-314.pyc in Resources */,
+				E40F7E0630606B310002A068 /* hae_analyze.py in Resources */,
+				E40F7E0730606B310002A068 /* hae_file_probe.py in Resources */,
+				E40F7E0830606B310002A068 /* mcp-workouts-1d-minutes-20260918-213930.json in Resources */,
+				E40F7DEB30606B120002A068 /* PLAN.md in Resources */,
 			);
 		};
 		E40F7DC9305DB5750002A068 /* Resources */ = {
@@ -201,6 +280,7 @@
 		000000000000000120000000 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
+				E40F7DFC30606B310002A068 /* hae_decode.swift in Sources */,
 			);
 		};
 		E40F7DC7305DB5750002A068 /* Sources */ = {
