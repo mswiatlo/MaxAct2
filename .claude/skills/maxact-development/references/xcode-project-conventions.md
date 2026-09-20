@@ -48,6 +48,32 @@ Xcode's defaults are actively wrong here, and the failure is silent.
   rather than `XCUIApplication()`. The scheme's build action builds the app for testing, so the
   bundle exists when the test runs. Don't "fix" this back to the bare initialiser.
 
+## Xcode silently absorbs new files into the app target
+
+**Anything you create under the project directory while Xcode has the project open gets added to
+the target** — `.swift` into Sources, everything else into Copy Bundle Resources. Not a
+synchronized group: Xcode writes real `PBXFileReference` and `PBXBuildFile` entries.
+
+This bit twice from one directory of throwaway scripts:
+
+1. A `.swift` script went into Sources and broke the build with "Statements are not allowed at the
+   top level".
+2. Far worse, the whole directory went into **Copy Bundle Resources** — Python scripts, a `.pyc`,
+   and six raw captures containing real GPS traces and heart rate. Those are gitignored precisely
+   because they're personal health data, and they would have shipped inside `MaxAct.app`.
+
+So: **after adding any file to the tree, check what the target picked up.**
+
+```
+grep -c '<name>' MaxAct2.xcodeproj/project.pbxproj
+awk '/Begin PBXResourcesBuildPhase/,/End PBXResourcesBuildPhase/' MaxAct2.xcodeproj/project.pbxproj
+```
+
+Remove with `XcodeRM` and **`deleteFiles: false`**, which detaches from the project while leaving
+the files on disk; `recursive: true` for a whole directory. Give standalone Swift scripts a
+non-`.swift` extension — `swift` runs a file whatever it's called, so
+`swift Spikes/hae_decode.swift.txt <args>` still works.
+
 ## SwiftPM
 
 - `MaxActCore/Package.swift` needs **`swift-tools-version: 6.2`**. `.macOS(.v26)` was introduced in

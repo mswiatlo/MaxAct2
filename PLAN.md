@@ -277,7 +277,7 @@ multi-year backfill is practical; and implementation cost on the Mac.
 - **C. `.hae` / Sync to Mac — done 2026-09-20. The format is READABLE, and the schema is in some
   ways better than MCP's.** `.hae` is LZFSE: workouts and routes are bare streams, metric dailies
   use a `HAE1` + `[uint32 length][block]` container. macOS decodes LZFSE natively, so no dependency
-  is needed. Full details in the skill reference; `Spikes/hae_decode.swift` is a working decoder.
+  is needed. Full details in the skill reference; `Spikes/hae_decode.swift.txt` is a working decoder.
 
   What it has that MCP doesn't: `measurements` with explicit **SI** units and provenance, the
   **HKWorkoutActivityType raw code** instead of a display name, **laps/splits/pause events**,
@@ -338,7 +338,7 @@ against the two committed fixtures. The Phase 1 work that feeds directly into it
 
 **`Spikes/` is deliberately still here**, though Phase 1 said to delete it. `hae_mcp_probe.py`
 regenerates fixtures and cross-checks the Swift decoder against a known-good Python one, which is
-worth having while Phase 2 is being written; `hae_decode.swift` is the working `.hae` reader and
+worth having while Phase 2 is being written; `hae_decode.swift.txt` is the working `.hae` reader and
 the only artefact of that reverse engineering. Delete the directory at the end of Phase 2.
 
 Facts you'll need again:
@@ -352,7 +352,7 @@ Facts you'll need again:
 ```
 python3 Spikes/hae_mcp_probe.py --host 10.0.0.158 --token <token> --list-tools
 python3 Spikes/hae_mcp_probe.py --host 10.0.0.158 --token <token> --days 7 --aggregation seconds
-swift Spikes/hae_decode.swift <file.hae>          # if revisiting .hae
+swift Spikes/hae_decode.swift.txt <file.hae>          # if revisiting .hae
 ```
 
 ### Phase 2 — Model + ingest (`MaxActCore`)
