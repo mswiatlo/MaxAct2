@@ -455,8 +455,49 @@ Batch upload: progress sheet with per-item state, continue-on-error, and a "Retr
 Failures are never swallowed — `stravaState = .failed(reason)` and the reason is readable in the
 detail pane.
 
+**Tags — partially possible, and worth building either way.** *(researched 2026-09-20, not yet
+verified against the live API)*
+
+Strava's UI exposes two different things that both look like tags, and only one is reachable
+programmatically:
+
+| | In Strava's UI | In API v3 |
+|---|---|---|
+| **Commute** | checkbox | **`commute`** on `PUT /activities/{id}`, integer `1`/`0` |
+| **Trainer / indoor** | checkbox | **`trainer`**, same shape |
+| **Activity Tags** — With Kid, With Pet, Recovery, For a Cause | tag picker | **No documented field.** Nothing in `UpdatableActivity` or `DetailedActivity`. App/website only. |
+
+Two consequences for the uploader:
+
+- **Flags need a second call.** Multiple reports say the multipart upload body honours `name` and
+  `description` but silently ignores `commute`, `trainer` and `sport_type`. So setting them means
+  upload → poll to completion → `PUT /activities/{id}`. That's an extra **write** per workout on
+  top of the existing POST, against the overall 200/15 min budget, so a tagged batch upload runs
+  meaningfully slower than an untagged one. Only issue the `PUT` when something actually needs
+  setting.
+- **Re-verify before building.** Strava has been adding tags recently and the set is still rolling
+  out unevenly, so a tags field may appear. Check `DetailedActivity` on
+  `developers.strava.com/docs/reference/` at the start of Phase 7 rather than trusting this table.
+
+**Therefore: build tagging as a local feature, and sync the subset Strava accepts.** This is worth
+doing regardless of what the API supports, because tags are how you'd actually want to filter and
+batch-operate on seven years of workouts.
+
+- A `Tag` model with a name and colour, and a many-to-many against `WorkoutRecord`. Local state,
+  so Phase 3's rule applies: a re-sync must never drop tags.
+- Two built-in tags, **Commute** and **Trainer**, marked as mapping to Strava's boolean fields.
+  Everything else is local-only.
+- Batch editing from the list: a Tags submenu in the context menu and the toolbar, applying to the
+  whole selection. This is the feature that makes tagging worth having — tagging 400 commutes one
+  at a time is not a thing anyone will do.
+- Tags become sidebar filters alongside the saved filters, and join the `.searchable` fields.
+- For local-only tags, optionally append them to the Strava **description** on upload (e.g.
+  `#withkid`), behind a setting. That is the only honest way to get them across today, and it is
+  lossy — worth offering, not worth pretending it is real tag support.
+
 **Tests:** golden-file TCX; the rate-limit actor under a simulated 429 and header sequence; the
-duplicate-activity response path; token refresh on 401.
+duplicate-activity response path; token refresh on 401; tags surviving a re-sync; batch tag apply
+and remove over a selection; and that a workout with no flag changes issues no `PUT`.
 
 ### Phase 8 — Polish
 

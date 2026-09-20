@@ -52,3 +52,22 @@ recorded as already-uploaded rather than surfaced as a failure.
   exactly our use case, but it means this app can never be distributed as-is.
 - A new base URL `https://api-v3.strava.com` becomes available 2027-01-04; the current one has no
   announced shutdown.
+
+
+## Tags and flags *(researched 2026-09-20, unverified against the live API)*
+
+Two different things in Strava's UI look like tags; only one is reachable from API v3.
+
+| | UI | API v3 |
+|---|---|---|
+| Commute | checkbox | `commute` on `PUT /activities/{id}`, integer `1`/`0` |
+| Trainer / indoor | checkbox | `trainer`, same shape |
+| Activity Tags — With Kid, With Pet, Recovery, For a Cause | tag picker | **no documented field** in `UpdatableActivity` or `DetailedActivity` |
+
+**The multipart upload body ignores `commute`, `trainer` and `sport_type`**, though it does honour
+`name` and `description`. Setting a flag therefore costs a second call: upload → poll to
+completion → `PUT /activities/{id}`. That is an extra *write* per workout against the overall
+200/15 min budget, so only issue the `PUT` when a flag actually needs changing.
+
+Re-check `DetailedActivity` before building on this. Strava has been adding tags recently and the
+feature is still rolling out unevenly, so a real tags field may land.
