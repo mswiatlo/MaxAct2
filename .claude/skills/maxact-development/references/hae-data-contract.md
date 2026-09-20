@@ -311,9 +311,21 @@ exactly for the same workout (2922), so there is no loss of route fidelity.
 **All timestamps are Apple-epoch doubles** (seconds since 2001-01-01 UTC), not the
 `yyyy-MM-dd HH:mm:ss Z` strings the other transports use. Use `Date(timeIntervalSinceReferenceDate:)`.
 
-**Known gap:** no per-workout heart-rate series. It would have to be joined from
-`HealthMetrics/heart_rate/<date>.hae` and sliced by the workout's time range — unverified, because
-that folder had not synced yet.
+**Heart rate: available, by joining** *(measured)*. The workout file has no series, but slicing
+`HealthMetrics/heart_rate/<date>.hae` by the workout's `start`/`end` gives **728 samples at 5 s
+median — byte-for-byte the same count MCP returns** with `metadataAggregation: "seconds"`. Two
+wrinkles: the daily files are keyed by *local* day, so a workout crossing local midnight needs two;
+and a workout's wall-clock span can far exceed its `duration` (94.7 min vs 35 min in the sample,
+because of pauses), so slice on `start`/`end`, never on `start + duration`.
+
+**Delivery is complete per day, but which days arrive is unpredictable** *(measured)*. Files are
+one workout each — no per-day aggregation. Where a day had synced, it was exactly right: 3 workout
+files for 2026-09-18 against MCP's 3, identical route point counts and heart-rate sample counts.
+The problem is coverage: after a manual one-week sync, `Workouts/` held only two days (09-18, 09-19)
+while `heart_rate/` and `step_count/` held all eight (09-13…09-20). Workouts arrived in a single
+burst and then stopped. This matches HAE's own warning that incremental backfill of existing data
+"will take a long time if left solely to automatic syncing" — and there is no way for us to force
+it, which is the substantive argument against relying on `.hae` alone.
 
 - Sandbox cost: this is **another app's** ubiquity container, so it needs a user-selected folder
   and a retained security-scoped bookmark; we cannot reach it with our own iCloud entitlement.
