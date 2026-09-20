@@ -260,11 +260,57 @@ progress.
   retained security-scoped bookmark. Finder does show it under iCloud Drive as "Auto Export", so
   the user can navigate to it, but it's a real extra step this path carries.
 - Expected layout below that: `AutoSync/{Health Metrics,Workouts,Routes}`.
-- Naming: metrics `yyyyMMdd.hae`; workouts `[name]_[date]_[id].hae`; routes named by workout id.
-- The format is **proprietary and undocumented**, and no reference implementation exists — the
-  vendor's server repo does not read these files.
+- Layout *(measured)*: `AutoSync/Workouts/<code>_<yyyyMMdd>_<UUID>.hae`,
+  `AutoSync/Routes/<workout-UUID>.hae`, `AutoSync/HealthMetrics/<metric_name>/<yyyyMMdd>.hae` —
+  metrics are one file per metric per day.
 - The folder needs Finder's *Keep Downloaded* or the files are dataless cloud placeholders.
-- A sandboxed app needs user-selected read access plus a security-scoped bookmark.
+
+#### The `.hae` container — reverse engineered *(measured)*
+
+Two layouts, both LZFSE, which macOS decodes natively via
+`(data as NSData).decompressed(using: .lzfse)`:
+
+```
+HealthMetrics dailies:   "HAE1" magic, then repeating [uint32 big-endian length][LZFSE block]
+Workouts and Routes:     a bare LZFSE stream (starts "bvx2"), possibly several concatenated
+```
+
+An LZFSE stream ends with the 4-byte marker `bvx$`, which is how to split concatenated streams.
+Each decodes to UTF-8 JSON. Typical ratios: a route went 201 KB → 626 KB, a workout 3.6 KB → 21 KB.
+
+**This is not the REST/MCP schema.** It is a different, richer one, and self-describing:
+`schema: {"name": "workout-cache", "version": 2, "minimumReaderVersion": 2}` (routes say
+`workout-route-cache`). Check `minimumReaderVersion` before parsing and refuse politely if it
+exceeds what we support.
+
+Workout file highlights:
+
+| Field | Note |
+|---|---|
+| `measurements` | The one to use. `{value, unit, origin}` per quantity in **SI** (`kJ`, `m`, `m/s`, `s`), with provenance: `workout`, `metadata`, `routeDerived`, `sampleOverlapEstimate`. |
+| top-level `activeEnergy`, `avgSpeed`, … | Display-unit duplicates of the above (`268.13` kcal vs `measurements.activeEnergy` = `1121.86` kJ). Ignore them. |
+| `activity` | `{code: "cycling", platformType: 13}` — **the HKWorkoutActivityType raw value**, unlike MCP's display name. |
+| `intervals` | `activities`, `laps`, `segments`, `splits`, `events`. Splits carry per-km `distance`/`heartRateMinimum`/`activeEnergy` with `qty`/`units`/`origin`/`sampleCount`. Events are `pause`/`motionPaused`/`motionResumed` with `typeCode` — these explain the multi-minute gaps in route timestamps. |
+| `sourceTimeZone` | IANA identifier (`America/Creston`). MCP only ever gives a UTC offset. |
+| `heartRateStatistics` | `{average, minimum, maximum, unit}` only — **no heart-rate time series.** |
+| `producer`, `source` | App version/build/platform, and the recording app. |
+
+Route file: `{id, workoutID, activityCode, name, schema, units, locations[]}` where `units` declares
+`{speed: "m/s", course: "deg", altitude: "m", accuracy: "m"}` once for the file. Location keys are
+`latitude`, `longitude`, `elevation`, `hAcc`, `vAcc`, `speed`, `time` — note the **different names
+from MCP** (`elevation` not `altitude`, `hAcc` not `horizontalAccuracy`) and **no `course`,
+`courseAccuracy` or `speedAccuracy`**, despite `units` mentioning course. Point count matched MCP
+exactly for the same workout (2922), so there is no loss of route fidelity.
+
+**All timestamps are Apple-epoch doubles** (seconds since 2001-01-01 UTC), not the
+`yyyy-MM-dd HH:mm:ss Z` strings the other transports use. Use `Date(timeIntervalSinceReferenceDate:)`.
+
+**Known gap:** no per-workout heart-rate series. It would have to be joined from
+`HealthMetrics/heart_rate/<date>.hae` and sliced by the workout's time range — unverified, because
+that folder had not synced yet.
+
+- Sandbox cost: this is **another app's** ubiquity container, so it needs a user-selected folder
+  and a retained security-scoped bookmark; we cannot reach it with our own iCloud entitlement.
 
 ### Manual export (the backfill path)
 

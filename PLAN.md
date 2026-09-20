@@ -281,15 +281,24 @@ multi-year backfill is practical; and implementation cost on the Mac.
   control, since a push can't request one workout at second-resolution on demand. What it could
   still earn is a supporting role: hands-off incremental capture of *new* workouts, with MCP used
   for backfill and detail.
-- **C. `.hae` / Sync to Mac — pending, and the only probe that could still change the answer.**
-  No reference implementation exists — the vendor's server repo doesn't
-  read these files — so this stays a black-box inspection. Enable Sync to Mac, `Keep Downloaded` on
-  the `AutoSync` folder, then inspect one `Workouts/*.hae` and one `Routes/*.hae` with `file`,
-  `head -c 64 | xxd`. Decide: plain JSON, gzip/zlib-wrapped JSON, binary plist, or opaque. If it's
-  any of the first three this becomes the strongest option — fully automatic, incremental, no
-  foreground requirement. Time-box it: if the header isn't recognisable in an hour, drop it.
-  A sandboxed app also needs user-selected read access to the folder plus a security-scoped
-  bookmark, which is a small extra cost this option carries even when it works.
+- **C. `.hae` / Sync to Mac — done 2026-09-20. The format is READABLE, and the schema is in some
+  ways better than MCP's.** `.hae` is LZFSE: workouts and routes are bare streams, metric dailies
+  use a `HAE1` + `[uint32 length][block]` container. macOS decodes LZFSE natively, so no dependency
+  is needed. Full details in the skill reference; `Spikes/hae_decode.swift` is a working decoder.
+
+  What it has that MCP doesn't: `measurements` with explicit **SI** units and provenance, the
+  **HKWorkoutActivityType raw code** instead of a display name, **laps/splits/pause events**,
+  an **IANA `sourceTimeZone`**, and a **versioned `schema`** with `minimumReaderVersion`. Route
+  fidelity is identical (2922 points, same as MCP, for the same workout) at a fifth of the bytes.
+
+  What it lacks: **no per-workout heart-rate series** — only `heartRateStatistics` and per-split
+  summaries. It would have to be joined from `HealthMetrics/heart_rate/<date>.hae` and sliced by
+  workout time range. **Unverified**, because that metric had not synced when tested. Route points
+  also drop `course`/`courseAccuracy`/`speedAccuracy`, which MCP provides.
+
+  Also: iCloud delivery is slow and partial. A manual one-week sync produced 4 workouts and 20 of
+  the metric folders (alphabetically `active_energy`→`calcium`) and then stalled. And being another
+  app's ubiquity container, it needs a user-selected folder plus a security-scoped bookmark.
 
 **Decision rule:** pick the path that delivers complete route + HR with the least manual
 interaction; on a tie, prefer the one with a documented, stable format. Manual-export file import is
