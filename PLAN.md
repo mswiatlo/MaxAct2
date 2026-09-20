@@ -3,10 +3,9 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**,
 with batch upload to Strava.
 
-**Status:** Phase 0 complete. Phase 1 in progress — probe A (MCP over HTTP) **passes** and is the
-presumptive winner; probes B (REST push) and C (`.hae`) not started, both need the phone.
-See *Picking this back up* at the end of Phase 1 for exactly how to resume.
-**Last updated:** 2026-09-18.
+**Status:** Phases 0 and 1 complete. **Sync decision: MCP over HTTP**, two passes, weekly chunks,
+resumable — see §2. Phase 2 (model + ingest) is next.
+**Last updated:** 2026-09-20.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first. It carries the
 > Health Auto Export data contract, the Xcode tooling limits we hit, and the Strava API facts —
@@ -88,7 +87,9 @@ bucket. New apps are in single-player mode (own account only), which is exactly 
 |---|---|---|
 | Targets | One macOS app target (`MaxAct2`, display name **MaxAct**) + `MaxActCore` local SwiftPM package + unit and UI test bundles | No iOS companion is needed any more. The package keeps model/ingest/format/Strava logic testable with `swift test`, without booting the app. |
 | Minimum OS | macOS 26.0 | Liquid Glass, `MKReverseGeocodingRequest`, Swift-native `Network` API. The current `MACOSX_DEPLOYMENT_TARGET = 26.6.2` is an inherited template artifact, not a choice. |
-| Primary sync | **Undecided by design** — Phase 1 measures all three and records the winner here | The user asked for an evaluation; the docs don't answer whether route/HR survive each path. All ingest sits behind one protocol so the decision is swappable. |
+| Primary sync | **MCP over HTTP, chunked and resumable** (decided 2026-09-20 after Phase 1) | All three paths carry full route and heart-rate fidelity, so the decision came down to bulk import of ~7 years / ~2,867 workouts. `.hae` is the richer schema but its backfill cannot be forced and was observed to stall after two days' worth. Manual export would have been fastest but writes multi-GB files to a phone with little free space. MCP is the only path the Mac can drive to completion, and it shares the v2 JSON schema with manual export, so one decoder covers both. |
+| Sync shape | **Two passes.** Pass 1: list sync over weekly windows, no routes, `metadataAggregation: "minutes"`. Pass 2: per-workout detail with routes and `"seconds"`, fetched lazily. | Pass 1 is the only blocking cost: ~1.9 h of foregrounded phone for 7 years, 0.13 GB. Fetching every route up front would double that and add 2.9 GB, to populate thumbnails for rows the user may never scroll to. |
+| Resumability | Persisted sync frontier: which windows are listed, which workouts have detail. Weekly chunks. | Requests are independent date windows with no server cursor, and per-request overhead is negligible against the 2.4 s/workout cost, so fine chunks are nearly free: an interruption loses ~20 s. Small chunks also cap peak memory on an old phone, which builds each response in memory (16 MB for a 14-day windowed request with routes). Upsert on the stable workout UUID makes a re-fetched window idempotent. |
 | Backfill | HAE **manual export** (JSON + GPX) imported from a file/folder, regardless of which live path wins | Manual export has no 30-second background window and no foreground requirement. Years of history land in one pass. |
 | Units | Decode **metric only** (`kJ`/`kcal`, `km`, `m`, `km/hr`, `count/min`/`bpm`, `count`/`steps`), normalise to SI, and treat any other unit — including imperial — as a hard decode failure | HAE's unit strings follow its preferences and are not stable, so decoding must be units-driven regardless. Imperial is explicitly out of scope: the user doesn't need it, and a loud failure beats silently reading `mi` as `km`. If HAE's locale ever flips, sync stops with a clear error rather than showing wrong distances. |
 | Canonical model | Own `Workout` value types in `MaxActCore`, decoded *from* HAE's shape | HAE identifies activity type by display name (`"Running"`), not `HKWorkoutActivityType` raw values — so `ActivityKind` must carry `.other(String)` rather than an integer fallback. |
@@ -273,14 +274,6 @@ multi-year backfill is practical; and implementation cost on the Mac.
   describe — and `tools/list` works fine. Cost is ~2.4 s of phone time per workout, near enough
   independent of payload size, which is what makes a two-tier fetch (cheap list sync, per-workout
   detail on demand) the right shape.
-- **B. REST push — pending.** The plan originally called for running the vendor's reference server,
-  but this Mac has neither Docker nor Node and the useful output is just the raw request body, so
-  `Spikes/hae_capture.py` does it in stdlib Python instead. Run it, point an HAE REST automation at
-  this Mac, note whether route/HR ride along, whether batching kicks in, and the largest body size.
-  Given what probe A established, B cannot win on fidelity — it carries the same data with less
-  control, since a push can't request one workout at second-resolution on demand. What it could
-  still earn is a supporting role: hands-off incremental capture of *new* workouts, with MCP used
-  for backfill and detail.
 - **C. `.hae` / Sync to Mac — done 2026-09-20. The format is READABLE, and the schema is in some
   ways better than MCP's.** `.hae` is LZFSE: workouts and routes are bare streams, metric dailies
   use a `HAE1` + `[uint32 length][block]` container. macOS decodes LZFSE natively, so no dependency
@@ -300,10 +293,31 @@ multi-year backfill is practical; and implementation cost on the Mac.
   the metric folders (alphabetically `active_energy`→`calcium`) and then stalled. And being another
   app's ubiquity container, it needs a user-selected folder plus a security-scoped bookmark.
 
-**Decision rule:** pick the path that delivers complete route + HR with the least manual
-interaction; on a tie, prefer the one with a documented, stable format. Manual-export file import is
-built as the backfill path either way. Write the outcome — including the rejected options and why —
-into §2 and the change log, then delete the spike code.
+- **B. REST push — deliberately not run.** Probe A settled that MCP carries everything, and probe C
+  settled the schema comparison. B's only distinct value was hands-off incremental capture, and
+  once it emerged that *no* path runs without HAE open on an unlocked phone, that value largely
+  disappeared — while its cost (an HTTP listener in a sandboxed app, with no HTTP server protocol
+  in the Network framework) stayed high. Not run, and not planned. `Spikes/hae_capture.py` is kept
+  until the spike directory is deleted, in case this is revisited.
+
+**Decision — 2026-09-20.** Primary sync is **MCP over HTTP**, in two passes, chunked weekly and
+resumable; see §2. The deciding factor was the ~2,867-workout bulk import, not fidelity — all three
+paths carry full route and heart-rate detail.
+
+- `.hae` **rejected for v1, not on quality.** It is the better schema (SI units with provenance,
+  HealthKit activity codes, laps/splits/pause events, IANA time zone, a fifth of the bytes) and its
+  data is exact wherever it lands. But its backfill cannot be forced, and was measured stalling
+  after delivering two days of workouts while metrics went back a full week. Seven years arriving
+  on HAE's own schedule is not a migration path. It would also be a *third* schema: the v2 JSON
+  decoder is needed regardless, so `.hae` adds a decoder that serves only the steady state MCP
+  already covers in seconds a day. Worth revisiting once the detail view exists and can use laps
+  and pause events.
+- **Manual export rejected** on a hard constraint: it writes multi-GB files to a phone with little
+  free space. This removed what had looked like the obvious bulk-import answer.
+- **Operational note if Sync to Mac is left on:** with all 113 metrics selected it projects to
+  **6.4 GB** of iCloud over 7 years, dominated by `basal_energy_burned` (2.3 GB) and
+  `active_energy` (1.9 GB), neither of which MaxAct reads. Scoped to workouts, routes and
+  `heart_rate` it is 0.41 GB.
 
 **Verify:** captured fixtures committed under `MaxActCore/Tests/Fixtures/`; the decision recorded
 in `PLAN.md`.
@@ -515,7 +529,7 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 | Phase | Status |
 |---|---|
 | 0 — Project foundation | Complete |
-| 1 — Sync evaluation spike | Not started |
+| 1 — Sync evaluation spike | Complete — MCP chosen |
 | 2 — Model + ingest | Not started |
 | 3 — Persistence | Not started |
 | 4 — List UI | Not started |
@@ -525,6 +539,21 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 | 8 — Polish | Not started |
 
 ### Change log
+
+- **2026-09-20** — Phase 1 closed. Probe C decoded `.hae`: LZFSE, natively decodable, with a
+  versioned self-describing schema that is richer than MCP's (SI units with provenance, HealthKit
+  activity codes, laps/splits/pause events, IANA time zone) and exact wherever it lands — route
+  and heart-rate counts matched MCP exactly for the same workout, heart rate via a join against
+  `HealthMetrics/heart_rate` dailies. Chose MCP anyway, on bulk import rather than fidelity:
+  `.hae` backfill cannot be forced and stalled after two days, manual export writes multi-GB files
+  to a phone short on space, and MCP shares the v2 JSON schema with manual export so one decoder
+  covers both. Sized the job at ~2,867 workouts over 7 years and split sync into a blocking
+  ~1.9 h list pass plus lazy per-workout detail, chunked weekly so an interruption costs ~20 s and
+  peak phone memory stays small. Probe B was deliberately not run — its only distinct value was
+  hands-off capture, which evaporated once it emerged that no path runs without HAE open.
+  Corrected two of my own errors along the way: a claim that heart-rate units varied within one
+  payload, and a claim that `.hae` needed nothing from the user.
+
 
 - **2026-09-18** — Replaced `OLD_PLAN.md`. Dropped the iOS HealthKit companion (developer-program
   cost) in favour of Health Auto Export. Researched all three HAE export paths and found the REST

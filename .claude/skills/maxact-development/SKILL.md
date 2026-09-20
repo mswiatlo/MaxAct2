@@ -50,8 +50,19 @@ charted or exported, and accept the ~30× payload cost.
 fallback is wrong.
 
 **Sync cost is per workout, not per byte.** The phone spends ~2.3–2.5 s answering for each workout
-regardless of how much of it you ask for. Backfill is therefore minutes-to-tens-of-minutes of
-foreground time and must be chunked and resumable; shrinking the payload doesn't help.
+regardless of how much of it you ask for, so shrinking payloads doesn't speed anything up. At the
+real corpus size — ~2,867 workouts over 7 years — that's ~1.9 h of foregrounded phone for a list
+pass. Hence the shape sync has to take, decided in Phase 1:
+
+- **Weekly chunks.** Per-request overhead is negligible next to the per-workout cost, so fine
+  chunks are nearly free and cap both the work lost to an interruption (~20 s) and peak memory on
+  the phone, which builds each response in RAM (16 MB for 14 days with routes).
+- **Two passes.** List sync (no routes, `"minutes"`) for everything; per-workout detail (routes,
+  `"seconds"`) fetched lazily when a workout is opened, exported, or trickled in the background.
+  Fetching every route up front doubles the time and adds ~2.9 GB for thumbnails nobody may view.
+- **Persisted frontier + upsert on the workout UUID.** Requests are independent date windows with
+  no server cursor, so resume is just "continue from the frontier" and a re-fetched window is
+  idempotent.
 
 ## Reference material
 
