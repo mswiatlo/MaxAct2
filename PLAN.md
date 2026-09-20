@@ -3,9 +3,9 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**,
 with batch upload to Strava.
 
-**Status:** Phases 0–3 complete. Sync is **MCP over HTTP**, two passes, weekly chunks, resumable
-(§2), verified against the real phone; persistence is in place and measured at corpus scale.
-Phase 4 (list UI) is next — the first phase with anything on screen.
+**Status:** Phases 0–4 complete. The app runs: three-column browser, sortable multi-select table
+with cached route thumbnails, search, saved filters, and a resumable sync driven from the toolbar.
+Phase 5 (detail view: full map, heart-rate charts, splits) is next.
 **Last updated:** 2026-09-20.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first. It carries the
@@ -527,13 +527,24 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 | 1 — Sync evaluation spike | Complete — MCP chosen |
 | 2 — Model + ingest | Complete |
 | 3 — Persistence | Complete |
-| 4 — List UI | Not started |
+| 4 — List UI | Complete |
 | 5 — Detail view | Not started |
 | 6 — Approximate location | Not started |
 | 7 — TCX + Strava | Not started |
 | 8 — Polish | Not started |
 
 ### Change log
+
+- **2026-09-20** — Phase 4 complete; the app is usable end to end for browsing. `NavigationSplitView`
+  with saved-filter sidebar, a sortable `Table` with persisted column customisation and multi-select,
+  search, an aggregate summary for multi-selection, and sync wired to the toolbar and menu bar.
+  Route thumbnails are pre-rendered bitmaps cached in memory and on disk — never a live `Map` in a
+  row. Getting simplification fast took three measured attempts, 259 ms → 42 ms → 8.1 ms per route.
+  `RouteThumbnailRenderer` ended up `@MainActor` rather than an `actor`, because `NSImage` and
+  `MKMapSnapshotter.Snapshot` are main-actor-isolated in this SDK and an actor would have meant
+  sending non-`Sendable` AppKit types across boundaries. Verified by launching the app and dumping
+  the accessibility hierarchy, which caught a detail column collapsing to 196 pt; screenshots were
+  not possible (no screen-recording permission), so the UI has not been reviewed visually.
 
 - **2026-09-20** — Phase 3 complete. `WorkoutRecord`, `WorkoutStore` (`@ModelActor`) and
   `SeriesStore` added; 65 tests. The imported/local split is the load-bearing idea — a re-synced
