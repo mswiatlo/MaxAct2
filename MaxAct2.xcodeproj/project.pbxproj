@@ -133,6 +133,9 @@
 			);
 			buildRules = (
 			);
+			dependencies = (
+				AC0000000000000000000002 /* PBXTargetDependency */,
+			);
 			fileSystemSynchronizedGroups = (
 				E40F7DCC305DB5750002A068 /* MaxAct2Tests */,
 			);
@@ -160,6 +163,16 @@
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
+
+/* Begin PBXContainerItemProxy section */
+		AC0000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 000000000000000100000000;
+			remoteInfo = MaxAct2;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXProject section */
 		000000000000000000000000 /* Project object */ = {
@@ -240,6 +253,14 @@
 			);
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		AC0000000000000000000002 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 000000000000000100000000 /* MaxAct2 */;
+			targetProxy = AC0000000000000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		000000000000000011000000 /* Debug configuration for PBXProject "MaxAct2" */ = {

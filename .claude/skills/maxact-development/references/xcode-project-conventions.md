@@ -93,6 +93,29 @@ first can leave an empty group behind.
 
 Give standalone Swift scripts a non-`.swift` extension; `swift` runs a file whatever it's called.
 
+## Target dependencies need a hand edit
+
+The Swift explicit-module scanner warns `'MaxAct2Tests' is missing a dependency on 'MaxAct2'`
+whenever a test bundle `@testable import`s the app without a declared `PBXTargetDependency`.
+`TEST_HOST`/`BUNDLE_LOADER` make it *link*, but the graph is still under-specified, which risks
+nondeterministic build ordering.
+
+**No MCP tool can add a target dependency or a package product dependency** — `UpdateTargetBuildSetting`
+only reaches build settings. The options are Xcode's UI (target → General → Frameworks and
+Libraries → **+**) or a hand edit of `project.pbxproj`, which the server otherwise forbids. One was
+authorised on 2026-09-20; the objects added were a `PBXContainerItemProxy`, a `PBXTargetDependency`
+on it, and a `dependencies = (…)` array on `MaxAct2Tests`, with `AC…`-prefixed 24-hex ids so
+hand-added objects are distinguishable from Xcode's. Verify with `plutil -lint` before building.
+
+**The minimal fix is the right one.** Also adding `MaxActCore` as a package product dependency of
+the test target cleared the warnings too, but made SwiftPM link it dynamically and embed
+`MaxActCore_….framework` into both the app and the test bundle. The `PBXTargetDependency` on
+`MaxAct2` alone clears *both* warnings — the `MaxActCore` edge resolves transitively — and leaves
+the bundle lean. Check `Contents/Frameworks/` after any change here.
+
+Warnings are reported by `XcodeListNavigatorIssues` with `severity: "warning"`; `BuildProject`
+reports only errors, so a clean build result does not mean a clean build.
+
 ## SwiftPM
 
 - `MaxActCore/Package.swift` needs **`swift-tools-version: 6.2`**. `.macOS(.v26)` was introduced in
