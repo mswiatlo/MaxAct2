@@ -324,44 +324,36 @@ in `PLAN.md`.
 
 #### Picking this back up
 
-State as of 2026-09-18 evening: probe A done and passing, B and C not started. Nothing is blocked
-on code — both remaining probes need the phone.
+Phase 1 is closed; the decision is in §2. Nothing here is blocked.
+
+**Next: Phase 2** — the canonical model and the HAE **v2 JSON** decoder in `MaxActCore`, built
+against the two committed fixtures. The Phase 1 work that feeds directly into it:
+
+- `MaxActCore/Tests/Fixtures/mcp-workouts-seconds.json` (kcal / bpm / steps) and
+  `mcp-workouts-kJ-countmin.json` (kJ / count-min / count) — the same workout in both unit
+  vocabularies, so the synonym table gets tested both ways. Anonymised; real captures are gitignored.
+- The decoder rules are in `.claude/skills/maxact-development/references/hae-data-contract.md`:
+  normalise to SI via a per-dimension synonym table, metric only, unknown unit is a hard failure,
+  everything but `id`/`name`/`start`/`end`/`duration` optional, tolerate unknown keys.
+
+**`Spikes/` is deliberately still here**, though Phase 1 said to delete it. `hae_mcp_probe.py`
+regenerates fixtures and cross-checks the Swift decoder against a known-good Python one, which is
+worth having while Phase 2 is being written; `hae_decode.swift` is the working `.hae` reader and
+the only artefact of that reverse engineering. Delete the directory at the end of Phase 2.
 
 Facts you'll need again:
 
 | | |
 |---|---|
 | Mac on the LAN | `10.0.0.206`, hostname `Gondolin-3` |
-| Phone (HAE Server screen) | `10.0.0.158:9000`, bearer token shown on that screen — **it may have been regenerated, re-read it** |
-| HAE must be | foregrounded; the server dies when backgrounded |
-
-**Probe B, REST push.** Start the receiver, then add the automation on the phone:
-
-```
-python3 Spikes/hae_capture.py            # listens on 0.0.0.0:8080, prints a full analysis per POST
-```
-HAE → Automations → new REST API automation → URL `http://10.0.0.206:8080/`, method POST,
-format JSON, with workout routes and metrics enabled. Each POST is saved to `Spikes/captures/`
-and analysed on arrival.
-
-**Probe C, `.hae`.** Enable Sync to Mac in HAE, then in Finder right-click
-`iCloud Drive/Auto Export/AutoSync` → **Keep Downloaded** (otherwise the files are dataless
-placeholders). Once `Workouts/` and `Routes/` have content:
-
-```
-file Workouts/*.hae | head; head -c 64 Workouts/<one>.hae | xxd
-```
-Looking for: plain JSON, gzip/zlib-wrapped JSON, binary plist, or opaque. Time-boxed to an hour.
-
-**Re-running probe A** (its harness is still there and useful for spot checks):
+| Phone (HAE Server screen) | `10.0.0.158:9000`; the bearer token may have been regenerated — re-read it |
+| HAE must be | open and foregrounded, phone unlocked; the server dies when backgrounded |
 
 ```
 python3 Spikes/hae_mcp_probe.py --host 10.0.0.158 --token <token> --list-tools
 python3 Spikes/hae_mcp_probe.py --host 10.0.0.158 --token <token> --days 7 --aggregation seconds
+swift Spikes/hae_decode.swift <file.hae>          # if revisiting .hae
 ```
-
-**Then:** record the decision in §2 and the change log, fold any new payload detail into
-`references/hae-data-contract.md`, delete `Spikes/`, and start Phase 2.
 
 ### Phase 2 — Model + ingest (`MaxActCore`)
 
