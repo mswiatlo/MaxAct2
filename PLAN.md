@@ -4,13 +4,37 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 with batch upload to Strava.
 
 **Status:** Phases 0–4 complete. The app runs: three-column browser, sortable multi-select table
-with cached route thumbnails, search, saved filters, and a resumable sync driven from the toolbar.
-Phase 5 (detail view: full map, heart-rate charts, splits) is next.
+with cached route thumbnails, search, saved filters, and resumable sync from the toolbar and menu
+bar. Phase 5 (detail view: full map, heart-rate charts, splits) is next.
 **Last updated:** 2026-09-20.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first. It carries the
 > Health Auto Export data contract, the Xcode tooling limits we hit, and the Strava API facts —
 > the things that cost research to establish and aren't visible in the code.
+
+### Where things stand
+
+| | |
+|---|---|
+| Builds | clean, **zero warnings** (check with `XcodeListNavigatorIssues`, `severity: warning` — `BuildProject` reports only errors) |
+| Tests | 81 in `MaxActCore` (`swift test`), 6 app/UI tests (`RunAllTests`) |
+| Live MCP suite | passes against the phone; skipped unless `MAXACT_LIVE_HOST` and `MAXACT_LIVE_TOKEN` are set |
+| Measured | route simplify 8.1 ms · thumbnail corpus ~23 s · list 2,867 rows 0.108 s · largest route 2465 KB → 168 KB, opens in 55 ms |
+
+**Outstanding, and honest about it:**
+
+1. **The UI has never been looked at.** Phase 4 was verified by launching the app and dumping the
+   accessibility hierarchy — which confirmed the three-column layout, all five sidebar filters and
+   their labels, both empty states and every toolbar control, and caught the detail column
+   collapsing to 196 pt. But screen capture failed for want of screen-recording permission, so
+   nothing has been reviewed *visually*. Layout, spacing, and whether it looks like a Mac app are
+   all unconfirmed.
+2. **No real data has ever been through the UI.** Every run so far has been against an empty
+   database. The table, thumbnails, sorting and filtering are untested against actual workouts;
+   only the ingest layer has seen the phone. First real sync is the next meaningful checkpoint.
+3. **Strava is entirely unbuilt.** The state machine, badges and filters exist and are tested, but
+   nothing uploads. The toolbar button is deliberately disabled.
+4. `Spikes/` is retained on purpose — browsable in Xcode, excluded from every build phase.
 
 ---
 
