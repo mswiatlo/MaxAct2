@@ -59,15 +59,9 @@ final class SyncSettings {
     var token: String {
         didSet { UserDefaults.standard.set(token, forKey: "syncToken") }
     }
-    /// How far back a full sync reaches. Seven years covers the stated corpus.
-    var backfillYears: Int {
-        didSet { UserDefaults.standard.set(backfillYears, forKey: "backfillYears") }
-    }
-
     init() {
         host = UserDefaults.standard.string(forKey: "syncHost") ?? ""
         token = UserDefaults.standard.string(forKey: "syncToken") ?? ""
-        backfillYears = UserDefaults.standard.object(forKey: "backfillYears") as? Int ?? 1
     }
 
     var isConfigured: Bool { !host.isEmpty && !token.isEmpty }
@@ -88,20 +82,18 @@ struct SettingsView: View {
             Section {
                 TextField("iPhone address", text: $settings.host, prompt: Text("10.0.0.158"))
                 TextField("Bearer token", text: $settings.token)
-                Picker("Sync history", selection: $settings.backfillYears) {
-                    Text("1 year").tag(1)
-                    Text("3 years").tag(3)
-                    Text("7 years").tag(7)
-                    Text("10 years").tag(10)
-                }
             } header: {
                 Text("Health Auto Export")
             } footer: {
                 Text("""
                     Open Health Auto Export on your iPhone, go to the Server screen and start the \
-                    server, then copy the address and token shown there. The app must stay open \
-                    and in the foreground while syncing, and the phone unlocked — Apple does not \
-                    allow health data to be read otherwise.
+                    server, then copy the address and token shown there. The token can be \
+                    regenerated there at any time.
+
+                    The app must stay open and in the foreground while syncing, and the phone \
+                    unlocked — Apple does not allow health data to be read otherwise.
+
+                    How much history to import is chosen per sync, in the Sync panel.
                     """)
                 .font(.callout)
                 .foregroundStyle(.secondary)

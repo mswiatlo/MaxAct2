@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(AppModel.self) private var model
+    @State private var showingSyncPanel = false
 
     private var settings: SyncSettings { model.settings }
 
@@ -21,6 +22,7 @@ struct ContentView: View {
         .toolbar { toolbarContent }
         .safeAreaInset(edge: .bottom) { syncBanner }
         .task { await model.load() }
+        .onReceive(of: .maxActShowSyncPanel) { showingSyncPanel = true }
     }
 
     @ViewBuilder
@@ -30,13 +32,15 @@ struct ContentView: View {
                 Label("No Workouts", systemImage: "figure.run")
             } description: {
                 Text(settings.isConfigured
-                     ? "Sync to import workouts from Health Auto Export on your iPhone."
-                     : "Add your iPhone's address in Settings, then sync.")
+                     ? "Import your workouts from Health Auto Export on your iPhone."
+                     : "MaxAct reads your workouts from Health Auto Export on your iPhone.")
             } actions: {
-                if settings.isConfigured {
-                    Button("Sync Now") { model.startSync() }
-                        .buttonStyle(.borderedProminent)
+                // Always an action. The first version showed "Add your iPhone's address in
+                // Settings, then sync" with no button and no route to Settings — a dead end.
+                Button(settings.isConfigured ? "Sync Now…" : "Set Up Sync…") {
+                    showingSyncPanel = true
                 }
+                .buttonStyle(.borderedProminent)
             }
         } else if model.visibleItems.isEmpty {
             ContentUnavailableView.search(text: model.searchText)
@@ -55,18 +59,17 @@ struct ContentView: View {
                 .disabled(model.selection.isEmpty)
 
             Button {
-                model.syncStatus.isRunning ? model.cancelSync() : model.startSync()
+                showingSyncPanel = true
             } label: {
-                Label(
-                    model.syncStatus.isRunning ? "Stop Syncing" : "Sync",
-                    systemImage: model.syncStatus.isRunning
-                        ? "stop.circle" : "arrow.triangle.2.circlepath"
-                )
+                // Title *and* icon: a bare, permanently-disabled icon told people nothing about
+                // what the app wanted from them.
+                Label("Sync", systemImage: "arrow.triangle.2.circlepath")
             }
-            .disabled(!settings.isConfigured && !model.syncStatus.isRunning)
-            .help(settings.isConfigured
-                  ? "Import workouts from Health Auto Export"
-                  : "Set your iPhone's address in Settings first")
+            .labelStyle(.titleAndIcon)
+            .help("Import workouts from Health Auto Export on your iPhone")
+            .popover(isPresented: $showingSyncPanel, arrowEdge: .bottom) {
+                SyncPanel()
+            }
         }
     }
 
@@ -100,5 +103,19 @@ struct ContentView: View {
             .overlay(alignment: .top) { Divider() }
         }
     }
+}
 
+extension Notification.Name {
+    /// Posted by the ⌘R menu command, which can't reach the window's popover state directly.
+    static let maxActShowSyncPanel = Notification.Name("maxActShowSyncPanel")
+}
+
+extension View {
+    func onReceive(of name: Notification.Name, perform action: @escaping () -> Void) -> some View {
+        task {
+            for await _ in NotificationCenter.default.notifications(named: name).map({ _ in () }) {
+                action()
+            }
+        }
+    }
 }

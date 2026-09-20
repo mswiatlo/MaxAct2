@@ -29,8 +29,10 @@ struct SidebarView: View {
     /// list you have to interpret.
     private func row(for selection: SidebarSelection, symbol: String, count: Int? = nil) -> some View {
         let total = count ?? model.count(for: selection)
+        // `.badge(Text(...))` rather than `.badge(Int)`: the integer overload hides itself at
+        // zero, so "Not on Strava: 0" silently became an unexplained empty list.
         return Label(selection.title, systemImage: symbol)
-            .badge(total)
+            .badge(Text(total.formatted()))
             .tag(selection)
             .accessibilityLabel("\(selection.title), \(total) workouts")
     }

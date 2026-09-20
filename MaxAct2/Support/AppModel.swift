@@ -205,12 +205,12 @@ final class AppModel {
 
     // MARK: Task lifecycle
 
-    /// Starts a full list-pass sync over the configured backfill span.
-    func startSync() {
+    /// Starts a list-pass sync back to `start`.
+    ///
+    /// The span is a parameter rather than a stored preference: it's a per-sync decision, since a
+    /// daily top-up wants a week and the initial import wants everything.
+    func startSync(from start: Date) {
         guard let source = settings.makeSource(), !syncStatus.isRunning else { return }
-        let start = Calendar.current.date(
-            byAdding: .year, value: -settings.backfillYears, to: .now
-        ) ?? .now.addingTimeInterval(-365 * 24 * 3600)
         syncTask = Task { await sync(source: source, from: start) }
     }
 

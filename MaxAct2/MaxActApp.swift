@@ -55,11 +55,16 @@ struct MaxActCommands: Commands {
 
     var body: some Commands {
         CommandGroup(after: .newItem) {
-            Button(model.syncStatus.isRunning ? "Stop Syncing" : "Sync from iPhone") {
-                model.syncStatus.isRunning ? model.cancelSync() : model.startSync()
+            // Opens the panel rather than starting immediately: how much history to import is a
+            // per-sync choice, and starting a multi-hour job from a keystroke with no visible
+            // range would be a trap.
+            Button("Sync from iPhone…") {
+                NotificationCenter.default.post(name: .maxActShowSyncPanel, object: nil)
             }
             .keyboardShortcut("r", modifiers: .command)
-            .disabled(!model.settings.isConfigured && !model.syncStatus.isRunning)
+
+            Button("Stop Syncing") { model.cancelSync() }
+                .disabled(!model.syncStatus.isRunning)
 
             Button("Download Detail for Selection") {
                 model.startDetailFetch(for: model.selectedItems)

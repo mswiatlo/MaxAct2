@@ -45,17 +45,20 @@ final class MaxAct2UITests: XCTestCase {
     func testSidebarOffersTheSavedFilters() throws {
         let app = launchApp()
 
-        // Each row's accessibility label is "<title>, <n> workouts", and SwiftUI exposes that as
-        // the element's *value* rather than its label — hence the predicate rather than a
-        // subscript lookup.
+        // Each row exposes label "<title>, <n> workouts" with the count as its value — the right
+        // shape for VoiceOver, and a predicate is needed because the count is part of the label.
         let sidebar = app.outlines["Sidebar"]
         XCTAssertTrue(sidebar.waitForExistence(timeout: 5))
 
         for title in ["All Workouts", "Not on Strava", "Upload Failed", "With Route", "Indoor"] {
             let row = sidebar.staticTexts.containing(
-                NSPredicate(format: "value BEGINSWITH %@", title)
+                NSPredicate(format: "label BEGINSWITH %@", title)
             ).firstMatch
             XCTAssertTrue(row.waitForExistence(timeout: 5), "Sidebar is missing '\(title)'.")
+            XCTAssertTrue(
+                row.label.contains("workouts"),
+                "Sidebar row should announce its count for VoiceOver."
+            )
         }
     }
 
@@ -67,8 +70,9 @@ final class MaxAct2UITests: XCTestCase {
         let fileMenu = app.menuBars.menuBarItems["File"]
         XCTAssertTrue(fileMenu.waitForExistence(timeout: 5))
         fileMenu.click()
+        // Trailing ellipsis: the command opens the sync panel rather than acting immediately.
         XCTAssertTrue(
-            app.menuItems["Sync from iPhone"].waitForExistence(timeout: 3),
+            app.menuItems["Sync from iPhone…"].waitForExistence(timeout: 3),
             "Sync should be in the File menu with a keyboard shortcut."
         )
         XCTAssertTrue(app.menuItems["Download Detail for Selection"].exists)
@@ -94,6 +98,47 @@ final class MaxAct2UITests: XCTestCase {
         XCTAssertTrue(
             explanation.waitForExistence(timeout: 5),
             "Settings should explain that Health Auto Export must stay in the foreground."
+        )
+    }
+
+    /// Regression test for a real dead end: the first version of the empty state read "Add your
+    /// iPhone's address in Settings, then sync" and offered **no button at all** — no way to reach
+    /// Settings, and a permanently-disabled unlabelled toolbar icon as the only other affordance.
+    /// There was literally nothing to click.
+    @MainActor
+    func testThereIsAlwaysAWayToStartSyncing() throws {
+        let app = launchApp()
+
+        // The toolbar button must be labelled and enabled, not a disabled mystery icon.
+        let syncButton = app.buttons["Sync"]
+        XCTAssertTrue(syncButton.waitForExistence(timeout: 5), "Toolbar has no labelled Sync button.")
+        XCTAssertTrue(syncButton.isEnabled, "Sync must be reachable even before configuration.")
+
+        // And the empty state must offer an action rather than describing one.
+        let emptyStateAction = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS[c] 'Sync'")
+        ).count
+        XCTAssertGreaterThan(emptyStateAction, 1, "Empty state offers no button to start syncing.")
+    }
+
+    @MainActor
+    func testSyncPanelExplainsSetupAndOffersSettings() throws {
+        let app = launchApp()
+        app.buttons["Sync"].click()
+
+        // With no server configured the panel must teach the three steps and provide the route to
+        // Settings that the empty state previously lacked.
+        XCTAssertTrue(
+            app.staticTexts.containing(
+                NSPredicate(format: "value CONTAINS[c] 'Server screen'")
+            ).firstMatch.waitForExistence(timeout: 5),
+            "Sync panel should explain how to start Health Auto Export's server."
+        )
+        XCTAssertTrue(
+            app.buttons.matching(
+                NSPredicate(format: "label CONTAINS[c] 'Server Settings'")
+            ).firstMatch.exists,
+            "Sync panel should link to Settings."
         )
     }
 }

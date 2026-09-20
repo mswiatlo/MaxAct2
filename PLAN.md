@@ -17,18 +17,15 @@ bar. Phase 5 (detail view: full map, heart-rate charts, splits) is next.
 | | |
 |---|---|
 | Builds | clean, **zero warnings** (check with `XcodeListNavigatorIssues`, `severity: warning` — `BuildProject` reports only errors) |
-| Tests | 81 in `MaxActCore` (`swift test`), 6 app/UI tests (`RunAllTests`) |
+| Tests | 81 in `MaxActCore` (`swift test`), 8 app/UI tests (`RunAllTests`) |
 | Live MCP suite | passes against the phone; skipped unless `MAXACT_LIVE_HOST` and `MAXACT_LIVE_TOKEN` are set |
 | Measured | route simplify 8.1 ms · thumbnail corpus ~23 s · list 2,867 rows 0.108 s · largest route 2465 KB → 168 KB, opens in 55 ms |
 
 **Outstanding, and honest about it:**
 
-1. **The UI has never been looked at.** Phase 4 was verified by launching the app and dumping the
-   accessibility hierarchy — which confirmed the three-column layout, all five sidebar filters and
-   their labels, both empty states and every toolbar control, and caught the detail column
-   collapsing to 196 pt. But screen capture failed for want of screen-recording permission, so
-   nothing has been reviewed *visually*. Layout, spacing, and whether it looks like a Mac app are
-   all unconfirmed.
+1. **The empty window has been reviewed; the populated one has not.** Screenshots now work. The
+   three-column layout, sidebar with counts, empty states and toolbar all look right. Reviewing
+   the sync panel and anything with actual rows in it still needs a populated database.
 2. **No real data has ever been through the UI.** Every run so far has been against an empty
    database. The table, thumbnails, sorting and filtering are untested against actual workouts;
    only the ingest layer has seen the phone. First real sync is the next meaningful checkpoint.
