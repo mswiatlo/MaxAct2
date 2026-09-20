@@ -13,30 +13,37 @@ import XCTest
 final class MaxAct2UITests: XCTestCase {
     private static let appBundleIdentifier = "com.swiatlowski.MaxAct"
 
-    private var app: XCUIApplication!
-
     override func setUpWithError() throws {
         continueAfterFailure = false
-        app = XCUIApplication(bundleIdentifier: Self.appBundleIdentifier)
     }
 
-    override func tearDown() {
-        app?.terminate()
-    }
-
+    /// Launches the app and registers its termination.
+    ///
+    /// `XCUIApplication` and `terminate()` are main-actor-isolated while `setUp` and `tearDown`
+    /// are not, so holding the app in a stored property and terminating it in `tearDown` warns
+    /// under Swift 6. Creating it inside each `@MainActor` test and tearing down through
+    /// `MainActor.run` keeps every touch of it on the main actor.
     @MainActor
-    func testAppLaunchesAndShowsMainWindow() throws {
+    private func launchApp() -> XCUIApplication {
+        let app = XCUIApplication(bundleIdentifier: Self.appBundleIdentifier)
         app.launch()
+        addTeardownBlock { await MainActor.run { app.terminate() } }
         XCTAssertTrue(
             app.windows.firstMatch.waitForExistence(timeout: 10),
             "The app launched but no window appeared."
         )
+        return app
+    }
+
+    @MainActor
+    func testAppLaunchesAndShowsMainWindow() throws {
+        let app = launchApp()
+        XCTAssertTrue(app.windows.firstMatch.exists)
     }
 
     @MainActor
     func testSidebarOffersTheSavedFilters() throws {
-        app.launch()
-        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
+        let app = launchApp()
 
         // Each row's accessibility label is "<title>, <n> workouts", and SwiftUI exposes that as
         // the element's *value* rather than its label — hence the predicate rather than a
@@ -54,8 +61,7 @@ final class MaxAct2UITests: XCTestCase {
 
     @MainActor
     func testSyncAndSelectionCommandsExistInTheMenus() throws {
-        app.launch()
-        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
+        let app = launchApp()
 
         // Mac convention: every action must be reachable from the menu bar, not just the toolbar.
         let fileMenu = app.menuBars.menuBarItems["File"]
@@ -77,13 +83,11 @@ final class MaxAct2UITests: XCTestCase {
 
     @MainActor
     func testSettingsExplainsTheForegroundRequirement() throws {
-        app.launch()
-        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 10))
-
+        let app = launchApp()
         app.typeKey(",", modifierFlags: .command)
 
         // The foreground/unlocked constraint is the single most confusing thing about this app,
-        // so the settings window must state it rather than leaving people guessing.
+        // so the settings window must state it rather than leaving people to guess.
         let explanation = app.staticTexts.containing(
             NSPredicate(format: "value CONTAINS[c] 'foreground'")
         ).firstMatch
