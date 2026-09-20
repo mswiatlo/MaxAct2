@@ -180,6 +180,12 @@ All three require an HAE **Premium** subscription. Apple forbids health data acc
 is locked, so *every* path only moves data while the phone is unlocked. That is not a bug to work
 around.
 
+**No path is hands-off.** Sync to Mac is often described as "automatic", but it too needs Health
+Auto Export open on the phone — it is automatic in the sense that the Mac doesn't drive it, not in
+the sense that it runs unattended. Treat "the user must have HAE open on an unlocked phone" as a
+fixed constraint of this whole design, and build sync UI that says so plainly rather than implying
+background magic.
+
 ### MCP server over HTTP (Mac pulls) — the chosen path *(all measured)*
 
 **The help pages describe the TCP transport's simplified `callTool` shape. The HTTP transport is
