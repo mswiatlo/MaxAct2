@@ -3,8 +3,9 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**,
 with batch upload to Strava.
 
-**Status:** Phases 0–2 complete. Sync is **MCP over HTTP**, two passes, weekly chunks, resumable
-(§2), and the client is verified against the real phone. Phase 3 (persistence) is next.
+**Status:** Phases 0–3 complete. Sync is **MCP over HTTP**, two passes, weekly chunks, resumable
+(§2), verified against the real phone; persistence is in place and measured at corpus scale.
+Phase 4 (list UI) is next — the first phase with anything on screen.
 **Last updated:** 2026-09-20.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first. It carries the
@@ -322,26 +323,16 @@ paths carry full route and heart-rate detail.
 **Verify:** captured fixtures committed under `MaxActCore/Tests/Fixtures/`; the decision recorded
 in `PLAN.md`.
 
-#### Picking this back up
+#### Spike tooling
 
-Phase 1 is closed; the decision is in §2. Nothing here is blocked.
+`Spikes/` is now a permanent fixture rather than the throwaway Phase 1 said to delete. It is in the
+Xcode navigator for browsing but excluded from every build phase via `EXCLUDED_SOURCE_FILE_NAMES`
+— see `Spikes/README.md` and the conventions reference. `hae_mcp_probe.py` still regenerates
+fixtures and gives a known-good reference to check the Swift client against; `hae_decode.swift.txt`
+is the only artefact of the `.hae` reverse engineering.
 
-**Next: Phase 2** — the canonical model and the HAE **v2 JSON** decoder in `MaxActCore`, built
-against the two committed fixtures. The Phase 1 work that feeds directly into it:
-
-- `MaxActCore/Tests/Fixtures/mcp-workouts-seconds.json` (kcal / bpm / steps) and
-  `mcp-workouts-kJ-countmin.json` (kJ / count-min / count) — the same workout in both unit
-  vocabularies, so the synonym table gets tested both ways. Anonymised; real captures are gitignored.
-- The decoder rules are in `.claude/skills/maxact-development/references/hae-data-contract.md`:
-  normalise to SI via a per-dimension synonym table, metric only, unknown unit is a hard failure,
-  everything but `id`/`name`/`start`/`end`/`duration` optional, tolerate unknown keys.
-
-**`Spikes/` is deliberately still here**, though Phase 1 said to delete it. `hae_mcp_probe.py`
-regenerates fixtures and cross-checks the Swift decoder against a known-good Python one, which is
-worth having while Phase 2 is being written; `hae_decode.swift.txt` is the working `.hae` reader and
-the only artefact of that reverse engineering. Delete the directory at the end of Phase 2.
-
-Facts you'll need again:
+Captures are written to `~/.maxact-spike-captures`, outside the repository, because they contain
+real GPS traces and heart rate.
 
 | | |
 |---|---|
@@ -351,8 +342,7 @@ Facts you'll need again:
 
 ```
 python3 Spikes/hae_mcp_probe.py --host 10.0.0.158 --token <token> --list-tools
-python3 Spikes/hae_mcp_probe.py --host 10.0.0.158 --token <token> --days 7 --aggregation seconds
-swift Spikes/hae_decode.swift.txt <file.hae>          # if revisiting .hae
+MAXACT_LIVE_HOST=10.0.0.158 MAXACT_LIVE_TOKEN=<token> swift test --filter LiveMCPTests
 ```
 
 ### Phase 2 — Model + ingest (`MaxActCore`)
@@ -365,19 +355,32 @@ workouts + per-workout GPX routes) and is always built.
 with no route decodes; unknown extra JSON keys don't throw; `{qty, units}` unwrapping and unit
 conversion; the `yyyy-MM-dd HH:mm:ss Z` parser across a DST boundary and a non-local offset.
 
-### Phase 3 — Persistence
+### Phase 3 — Persistence — **done 2026-09-20**
 
-SwiftData `@Model WorkoutRecord` holding the summary fields plus local state — `placeLabel`,
-`stravaState`, `stravaActivityID`, `stravaUploadID`, `lastUploadedAt`, `thumbnailFileName`,
-`seriesFileName`. Series blobs go to
-`Application Support/com.swiatlowski.MaxAct/Series/<id>.json.zlib` (`NSData.compressed(using:)`).
+SwiftData `@Model WorkoutRecord` holds every field the table sorts, filters or displays, plus the
+local state: `placeLabel`, `stravaState`, `stravaActivityID`, `stravaUploadID`, `lastUploadedAt`,
+`thumbnailFileName`, `hasDetail`. `WorkoutStore` is a `@ModelActor`, so `@Model` objects never
+escape the actor — the UI only ever sees the value type `WorkoutListItem`.
 
-`WorkoutStore` actor: `upsert(_:)` keyed on `id`, strictly idempotent — a re-sync must never
-duplicate a row or overwrite local state with freshly imported data. Sort/filter fields are stored
-denormalized so the table never touches a blob.
+`upsert` matches on the HealthKit UUID and rewrites **only imported fields**, which is what makes a
+retried chunk safe. Three subtleties that tests pin down: `hasRoute` is OR-ed rather than assigned,
+or a list pass (fetched with `includeRoutes: false`) would erase it; absent optionals keep their
+previous value rather than nulling; and an empty series is not saved, or a list pass would replace
+a stored detail blob with nothing.
 
-**Tests:** upsert idempotency; Strava state and place label survive re-import; blob round-trip;
-a missing blob file degrades to "series unavailable" rather than crashing.
+Series blobs live in `Application Support/com.swiatlowski.MaxAct/Series/<id>.json.lzfse`.
+**LZFSE, not the zlib originally planned** — comparable ratio, much faster to decompress, and these
+are read interactively.
+
+Measured at corpus scale rather than assumed:
+
+| | |
+|---|---|
+| Largest real route (3.5 h, 12,645 points) | 2465 KB JSON → **168 KB** (14.7×) |
+| Worst case if every workout were that size | **0.5 GB** |
+| Open one workout (load, decompress, decode) | **55 ms** |
+| List all 2,867 rows | **0.108 s** |
+| Bulk insert 2,867 rows | 8.7 s one-time; a weekly chunk of ~20 is ~60 ms |
 
 ### Phase 4 — List UI
 
@@ -523,7 +526,7 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 | 0 — Project foundation | Complete |
 | 1 — Sync evaluation spike | Complete — MCP chosen |
 | 2 — Model + ingest | Complete |
-| 3 — Persistence | Not started |
+| 3 — Persistence | Complete |
 | 4 — List UI | Not started |
 | 5 — Detail view | Not started |
 | 6 — Approximate location | Not started |
@@ -531,6 +534,15 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 | 8 — Polish | Not started |
 
 ### Change log
+
+- **2026-09-20** — Phase 3 complete. `WorkoutRecord`, `WorkoutStore` (`@ModelActor`) and
+  `SeriesStore` added; 65 tests. The imported/local split is the load-bearing idea — a re-synced
+  window must not cost us `stravaActivityID`, or the next batch upload duplicates work already on
+  Strava. Switched series compression from zlib to LZFSE and measured the result: the largest real
+  route compresses 14.7× to 168 KB, opens in 55 ms, and listing all 2,867 rows takes 0.108 s, so
+  the denormalised-row/blob-on-disk split does what it was chosen for. Also made `Spikes/`
+  permanent but inert — browsable in Xcode, excluded from every build phase — after discovering it
+  (and `PLAN.md`) had been silently copied into the app bundle.
 
 - **2026-09-20** — Phase 2 complete. `MaxActCore` now holds the canonical model (metres, seconds,
   kilocalories, m/s, bpm), the HAE v2 JSON decoder, an MCP Streamable HTTP client, `HAEWorkoutSource`
