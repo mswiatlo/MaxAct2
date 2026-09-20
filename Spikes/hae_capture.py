@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import socket
 import sys
 from datetime import datetime
@@ -27,7 +28,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 import hae_analyze  # noqa: E402
 
-CAPTURES = Path(__file__).parent / "captures"
+# Captures live OUTSIDE the repository. They are raw exports containing real GPS traces and
+# heart rate, and keeping them in the project tree twice caused trouble: Xcode swept them into
+# Copy Bundle Resources, and gitignored files referenced by the project dangle on a fresh clone.
+CAPTURES = Path(os.environ.get("MAXACT_CAPTURES", Path.home() / ".maxact-spike-captures"))
 
 
 class CaptureHandler(BaseHTTPRequestHandler):
@@ -43,7 +47,7 @@ class CaptureHandler(BaseHTTPRequestHandler):
             body += chunk
 
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        CAPTURES.mkdir(exist_ok=True)
+        CAPTURES.mkdir(parents=True, exist_ok=True)
         raw_path = CAPTURES / f"{stamp}.json"
         raw_path.write_bytes(body)
 

@@ -48,31 +48,50 @@ Xcode's defaults are actively wrong here, and the failure is silent.
   rather than `XCUIApplication()`. The scheme's build action builds the app for testing, so the
   bundle exists when the test runs. Don't "fix" this back to the bare initialiser.
 
-## Xcode silently absorbs new files into the app target
+## Xcode silently absorbs new files into the app
 
 **Anything you create under the project directory while Xcode has the project open gets added to
-the target** — `.swift` into Sources, everything else into Copy Bundle Resources. Not a
-synchronized group: Xcode writes real `PBXFileReference` and `PBXBuildFile` entries.
+the `MaxAct2` target** — `.swift` into Sources, everything else into Copy Bundle Resources. The
+three target folders are `PBXFileSystemSynchronizedRootGroup`s, and files at the repo root get
+real `PBXFileReference`/`PBXBuildFile` entries written for them.
 
-This bit twice from one directory of throwaway scripts:
+This bit three times: a `.swift` spike script went into Sources and broke the build; the whole
+`Spikes/` directory went into Copy Bundle Resources, including raw captures of real GPS traces and
+heart rate that would have shipped inside `MaxAct.app`; and `PLAN.md` was quietly being copied in
+too.
 
-1. A `.swift` script went into Sources and broke the build with "Statements are not allowed at the
-   top level".
-2. Far worse, the whole directory went into **Copy Bundle Resources** — Python scripts, a `.pyc`,
-   and six raw captures containing real GPS traces and heart rate. Those are gitignored precisely
-   because they're personal health data, and they would have shipped inside `MaxAct.app`.
-
-So: **after adding any file to the tree, check what the target picked up.**
+**The defence is `EXCLUDED_SOURCE_FILE_NAMES` on the target**, which drops matching files from
+every build phase while leaving them in the navigator — so non-app material stays browsable in
+Xcode without being built or bundled. Current value:
 
 ```
-grep -c '<name>' MaxAct2.xcodeproj/project.pbxproj
-awk '/Begin PBXResourcesBuildPhase/,/End PBXResourcesBuildPhase/' MaxAct2.xcodeproj/project.pbxproj
+Spikes/* Spikes/**/* PLAN.md *.py *.pyc *.swift.txt
 ```
 
-Remove with `XcodeRM` and **`deleteFiles: false`**, which detaches from the project while leaving
-the files on disk; `recursive: true` for a whole directory. Give standalone Swift scripts a
-non-`.swift` extension — `swift` runs a file whatever it's called, so
-`swift Spikes/hae_decode.swift.txt <args>` still works.
+Both path- and basename-style patterns are listed, because which form matches is not worth
+relying on. Extend it whenever non-app files are added.
+
+**Always verify at the bundle, not the build.** A clean build only proves nothing broke; it says
+nothing about what got copied in:
+
+```
+APP=$(find ~/Library/Developer/Xcode/DerivedData/MaxAct2-*/Build/Products/Debug \
+        -maxdepth 1 -name MaxAct2.app | head -1)
+find "$APP" -type f | sed "s|$APP|MaxAct2.app|"
+```
+
+A correct bundle contains only `Info.plist`, `PkgInfo`, `_CodeSignature/`, the binaries under
+`MacOS/`, and the test bundle under `PlugIns/`.
+
+**Adding an existing on-disk folder to the project is awkward.** `XcodeMakeDir` and `XcodeWrite`
+refuse to adopt a directory that already exists — they create `Spikes 2` beside it. The working
+sequence is: move the real folder aside, `XcodeMakeDir` the group, `XcodeWrite` a one-line
+placeholder per file to create the references, then copy the real contents back over the
+placeholders. The project references survive the overwrite. Remove with `XcodeRM` and
+**`deleteFiles: false`** to detach without losing the files, and note it may take two calls — the
+first can leave an empty group behind.
+
+Give standalone Swift scripts a non-`.swift` extension; `swift` runs a file whatever it's called.
 
 ## SwiftPM
 

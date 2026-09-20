@@ -13,6 +13,10 @@ Package.resolved
 # macOS
 .DS_Store
 
-# Phase 1 spike output. Real captures contain GPS traces and heart rate — never commit them.
-# Anonymised fixtures belong in MaxActCore/Tests/Fixtures/ instead.
+# Python bytecode from the spike scripts.
+__pycache__/
+*.pyc
+
+# Spike captures now live outside the repo entirely (~/.maxact-spike-captures), because they hold
+# real GPS traces and heart rate. This rule stays as a guard against them reappearing here.
 Spikes/captures/

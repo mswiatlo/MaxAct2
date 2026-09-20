@@ -16,6 +16,13 @@
 		E40F7DCB305DB5750002A068 /* MaxAct2Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MaxAct2Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E40F7DD6305DB5790002A068 /* MaxAct2UITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MaxAct2UITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E40F7DEA30606B120002A068 /* PLAN.md */ = {isa = PBXFileReference; explicitFileType = net.daringfireball.markdown; path = PLAN.md; sourceTree = "<group>"; };
+		E40F7E2030608A490002A068 /* hae_mcp_probe.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = hae_mcp_probe.py; sourceTree = "<group>"; };
+		E40F7E2130608A490002A068 /* hae_analyze.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = hae_analyze.py; sourceTree = "<group>"; };
+		E40F7E2230608A4D0002A068 /* hae_capture.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = hae_capture.py; sourceTree = "<group>"; };
+		E40F7E2330608A4D0002A068 /* hae_file_probe.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = hae_file_probe.py; sourceTree = "<group>"; };
+		E40F7E2430608A510002A068 /* make_fixture.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = make_fixture.py; sourceTree = "<group>"; };
+		E40F7E2530608A510002A068 /* hae_decode.swift.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = hae_decode.swift.txt; sourceTree = "<group>"; };
+		E40F7E2630608B2C0002A068 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -64,6 +71,7 @@
 				E40F7DCC305DB5750002A068 /* MaxAct2Tests */,
 				E40F7DD7305DB5790002A068 /* MaxAct2UITests */,
 				000000000000000000000020 /* Products */,
+				E40F7E1F30608A460002A068 /* Spikes */,
 			);
 			sourceTree = "<group>";
 		};
@@ -75,6 +83,20 @@
 				E40F7DD6305DB5790002A068 /* MaxAct2UITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		E40F7E1F30608A460002A068 /* Spikes */ = {
+			isa = PBXGroup;
+			children = (
+				E40F7E2030608A490002A068 /* hae_mcp_probe.py */,
+				E40F7E2130608A490002A068 /* hae_analyze.py */,
+				E40F7E2230608A4D0002A068 /* hae_capture.py */,
+				E40F7E2330608A4D0002A068 /* hae_file_probe.py */,
+				E40F7E2430608A510002A068 /* make_fixture.py */,
+				E40F7E2530608A510002A068 /* hae_decode.swift.txt */,
+				E40F7E2630608B2C0002A068 /* README.md */,
+			);
+			path = Spikes;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -361,6 +383,14 @@
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readwrite;
+				EXCLUDED_SOURCE_FILE_NAMES = (
+					"Spikes/*",
+					"Spikes/**/*",
+					PLAN.md,
+					"*.py",
+					"*.pyc",
+					"*.swift.txt",
+				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = MaxAct;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
@@ -401,6 +431,14 @@
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readwrite;
+				EXCLUDED_SOURCE_FILE_NAMES = (
+					"Spikes/*",
+					"Spikes/**/*",
+					PLAN.md,
+					"*.py",
+					"*.pyc",
+					"*.swift.txt",
+				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = MaxAct;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
