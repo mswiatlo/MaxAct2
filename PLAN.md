@@ -3,8 +3,8 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**,
 with batch upload to Strava.
 
-**Status:** Phases 0 and 1 complete. **Sync decision: MCP over HTTP**, two passes, weekly chunks,
-resumable — see §2. Phase 2 (model + ingest) is next.
+**Status:** Phases 0–2 complete. Sync is **MCP over HTTP**, two passes, weekly chunks, resumable
+(§2), and the client is verified against the real phone. Phase 3 (persistence) is next.
 **Last updated:** 2026-09-20.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first. It carries the
@@ -522,7 +522,7 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 |---|---|
 | 0 — Project foundation | Complete |
 | 1 — Sync evaluation spike | Complete — MCP chosen |
-| 2 — Model + ingest | Not started |
+| 2 — Model + ingest | Complete |
 | 3 — Persistence | Not started |
 | 4 — List UI | Not started |
 | 5 — Detail view | Not started |
@@ -531,6 +531,17 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 | 8 — Polish | Not started |
 
 ### Change log
+
+- **2026-09-20** — Phase 2 complete. `MaxActCore` now holds the canonical model (metres, seconds,
+  kilocalories, m/s, bpm), the HAE v2 JSON decoder, an MCP Streamable HTTP client, `HAEWorkoutSource`
+  and the weekly chunker plus `SyncFrontier`. 47 tests, and a live suite gated behind
+  `MAXACT_LIVE_HOST`/`MAXACT_LIVE_TOKEN` that was run against the phone: handshake to
+  Health Auto Export 1.1.0, 13 workouts listed in 28.2 s (2.17 s each, matching the Phase 1
+  estimate), and detail returning 3311 route points with 664 heart-rate samples at a 5.0 s median.
+  Found an HAE bug on the way — `avgSpeed`/`maxSpeed` are km/h labelled `"km"` — adjudicated
+  against the `.hae` `measurements` block and handled for speed-dimension fields only. Also had to
+  detach `Spikes/` from the Xcode target: it had been absorbed automatically, putting raw GPS
+  captures into Copy Bundle Resources.
 
 - **2026-09-20** — Phase 1 closed. Probe C decoded `.hae`: LZFSE, natively decodable, with a
   versioned self-describing schema that is richer than MCP's (SI units with provenance, HealthKit
