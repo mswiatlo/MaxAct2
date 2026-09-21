@@ -37,7 +37,6 @@ final class RouteThumbnailRenderer {
     /// slower and eventually starts failing outright.
     private let concurrencyLimit = 3
     private var running = 0
-    private var waiting: [CheckedContinuation<Void, Never>] = []
 
     init(seriesStore: SeriesStore) throws {
         self.seriesStore = seriesStore
@@ -74,9 +73,9 @@ final class RouteThumbnailRenderer {
         }
         if Task.isCancelled { return nil }
 
-        await acquireSlot()
+        guard await acquireSlot() else { return nil }
         let rendered = await snapshotPNG(prepared.coordinates, bounds: prepared.bounds, key: key)
-        releaseSlot()
+        running -= 1
         if Task.isCancelled { return nil }
 
         let size = NSSize(width: key.width, height: key.height)
@@ -128,7 +127,7 @@ final class RouteThumbnailRenderer {
 
         let snapshotter = MKMapSnapshotter(options: options)
         let size = NSSize(width: key.width, height: key.height)
-        return await withCheckedContinuation { continuation in
+        let png: Data? = await withCheckedContinuation { continuation in
             // The no-queue overload's handler is declared `@MainActor @Sendable`, so calling it
             // from here keeps Snapshot on the main actor and it never crosses a boundary. The
             // `start(with:completionHandler:)` overload does not, and rejects this outright.
@@ -140,6 +139,11 @@ final class RouteThumbnailRenderer {
                 continuation.resume(returning: Self.draw(coordinates, over: snapshot, size: size).pngData)
             }
         }
+        // `start` is the snapshotter's last use, so ARC is free to release it the moment the call
+        // returns — and a deallocated snapshotter never calls back, which left every thumbnail
+        // spinning for ever with an empty Thumbnails directory. Keep it alive across the await.
+        withExtendedLifetime(snapshotter) {}
+        return png
     }
 
     private static func draw(
@@ -208,18 +212,23 @@ final class RouteThumbnailRenderer {
 
     // MARK: - Throttle
 
-    private func acquireSlot() async {
-        if running < concurrencyLimit {
-            running += 1
-            return
+    /// Waits for a rendering slot. Returns `false` if the task was cancelled while waiting.
+    ///
+    /// **Polls rather than queueing continuations, deliberately.** The first version parked
+    /// waiters in `CheckedContinuation`s resumed by whoever finished next. Scrolling cancels
+    /// thumbnail tasks constantly, and a task cancelled while parked never resumed — so once
+    /// waiters outnumbered future completions they hung forever, `running` stayed pinned at the
+    /// limit, and *every* later thumbnail wedged on its spinner. A cancellation-correct semaphore
+    /// is possible but fiddly; a 30 ms poll is trivially correct and costs nothing, because this
+    /// only runs while thumbnails are actually being generated and each one is cached for good.
+    private func acquireSlot() async -> Bool {
+        while running >= concurrencyLimit {
+            if Task.isCancelled { return false }
+            try? await Task.sleep(for: .milliseconds(30))
         }
-        await withCheckedContinuation { waiting.append($0) }
+        if Task.isCancelled { return false }
         running += 1
-    }
-
-    private func releaseSlot() {
-        running -= 1
-        if !waiting.isEmpty { waiting.removeFirst().resume() }
+        return true
     }
 }
 

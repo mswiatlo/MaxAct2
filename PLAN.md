@@ -3,9 +3,9 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**,
 with batch upload to Strava.
 
-**Status:** Phases 0–4 complete. The app runs: three-column browser, sortable multi-select table
-with cached route thumbnails, search, saved filters, and resumable sync from the toolbar and menu
-bar. Phase 5 (detail view: full map, heart-rate charts, splits) is next.
+**Status:** Phases 0–4 complete and exercised against real data — sync, table, detail download
+and route thumbnails all work end to end. **Paused here.** Next: UI tests with seeded fixture data
+(see below), then Phase 5.
 **Last updated:** 2026-09-20.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first. It carries the
@@ -14,24 +14,75 @@ bar. Phase 5 (detail view: full map, heart-rate charts, splits) is next.
 
 ### Where things stand
 
+**Phase 4 is functionally done and has been used against real data.** A week of workouts syncs
+from the phone, the table renders them, detail downloads fill in routes and heart rate, and route
+thumbnails render as real maps with the track drawn on them.
+
 | | |
 |---|---|
-| Builds | clean, **zero warnings** (check with `XcodeListNavigatorIssues`, `severity: warning` — `BuildProject` reports only errors) |
-| Tests | 81 in `MaxActCore` (`swift test`), 8 app/UI tests (`RunAllTests`) |
-| Live MCP suite | passes against the phone; skipped unless `MAXACT_LIVE_HOST` and `MAXACT_LIVE_TOKEN` are set |
-| Measured | route simplify 8.1 ms · thumbnail corpus ~23 s · list 2,867 rows 0.108 s · largest route 2465 KB → 168 KB, opens in 55 ms |
+| Builds | clean, **zero warnings** — check with `XcodeListNavigatorIssues` at `severity: warning`; `BuildProject` reports only errors |
+| Tests | 88 in `MaxActCore` (`swift test`), 12 app/UI tests (`RunAllTests`) |
+| Live MCP suite | passes against the phone; skipped unless `MAXACT_LIVE_HOST`/`MAXACT_LIVE_TOKEN` are set |
+| Verified with real data | 13 workouts synced; detail fetch produced 3311 route points and 664 HR samples; thumbnails written to the sandbox container |
 
-**Outstanding, and honest about it:**
+**Five bugs were found by using it, none of which any test caught.** Each is fixed and each taught
+something now recorded in the skill reference:
 
-1. **The empty window has been reviewed; the populated one has not.** Screenshots now work. The
-   three-column layout, sidebar with counts, empty states and toolbar all look right. Reviewing
-   the sync panel and anything with actual rows in it still needs a populated database.
-2. **No real data has ever been through the UI.** Every run so far has been against an empty
-   database. The table, thumbnails, sorting and filtering are untested against actual workouts;
-   only the ingest layer has seen the phone. First real sync is the next meaningful checkpoint.
-3. **Strava is entirely unbuilt.** The state machine, badges and filters exist and are tested, but
-   nothing uploads. The toolbar button is deliberately disabled.
-4. `Spikes/` is retained on purpose — browsable in Xcode, excluded from every build phase.
+1. `components.url!` on the typed address — pasting the full URL from HAE's Server screen (the
+   natural thing to do) hard-crashed on Start Sync. Now parsed by `MCPEndpoint`, which accepts
+   every sensible form and echoes the resolved URL back in the panel.
+2. `@Environment(AppModel.self)` in a popover — crashed when the window re-laid out. Fixed in the
+   popover only, and then it recurred in a table cell while scrolling. The model is now threaded
+   explicitly everywhere and `@Environment(AppModel.self)` appears nowhere; on macOS, AppKit hosts
+   table cells, toolbars, menus and popovers detached, and none of them reliably inherit it.
+3. The thumbnail placeholder keyed "indoor" off `hasRoute == false`, which after a list pass means
+   *unknown* — so every outdoor ride was labelled indoor.
+4. `.task(id: key)` didn't include `hasDetail`, so the first attempt ran before any route existed,
+   returned nothing, and never retried once Download Detail completed.
+5. `MKMapSnapshotter` was released the moment `start` returned, since that was its last use, so
+   the completion never fired and every thumbnail spun for ever. Held across the await now. Its
+   throttle also parked cancelled tasks on continuations that nothing resumed, which wedged all
+   later renders; it polls instead.
+
+**Outstanding:**
+
+1. **UI tests can't see any of this.** They run against an isolated empty database, so there are
+   no rows, no thumbnails and no detail — every bug above was invisible to them. This is the next
+   thing to fix; see below.
+2. **Strava is unbuilt.** State machine, badges and filters exist and are tested; the toolbar
+   button is deliberately disabled.
+3. **Detail view is a placeholder.** Map, stats and sample counts render, but heart-rate charts
+   and splits are Phase 5.
+4. Performance assertions were loosened after failing spuriously at load average 86. They catch
+   10x regressions; the printed figures are the real measurements.
+
+### Next up: UI tests with seeded fixture data
+
+Five user-visible bugs in a row got through a green test suite, all for the same reason — the
+tests never had data. Worth fixing before Phase 5 adds more surface.
+
+The shape: extend the existing `--ui-testing` flag with `--ui-testing-seed <n>`, which populates
+the in-memory store at launch with synthetic workouts built from the committed fixtures, including
+**synthetic routes** so the thumbnail chain actually runs. That single addition would have caught
+bugs 2 through 5 above:
+
+| Test | Catches |
+|---|---|
+| Scroll a seeded table | the table-cell environment crash (#2) |
+| Assert a row shows the download placeholder, not the indoor one | the indoor mislabel (#3) |
+| Seed a workout *with* a stored series, wait for the image | the snapshotter lifetime bug (#5) |
+| Seed without a series, add one, assert the thumbnail appears | the `.task(id:)` retry bug (#4) |
+| Select several rows, check the aggregate summary | multi-select and batch actions, currently untested |
+
+Two notes on doing it well. The seeded routes should be real coordinates near a real place, or
+`MKMapSnapshotter` returns blank tiles and the thumbnail assertions become vacuous. And the
+snapshotter needs the network, so an assertion that a thumbnail *image* appears will be flaky
+offline — assert on the placeholder state machine, and treat the rendered image as a separate,
+network-dependent test.
+
+Alternatives considered, and why they rank lower: snapshot-testing the rendered PNGs would have
+caught #5 but needs a dependency and is brittle across macOS versions; a `WorkoutSource` fake
+driving a full sync would cover ingest, which is already the best-tested layer.
 
 ---
 
@@ -596,6 +647,17 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 | 8 — Polish | Not started |
 
 ### Change log
+
+- **2026-09-20 (evening)** — Used the app against the real phone for the first time and found five
+  bugs no test caught: a force-unwrapped URL that crashed on a pasted address, two separate
+  `@Environment` crashes in detached AppKit hosting (popover, then table cell), an indoor icon on
+  every outdoor ride, a `.task(id:)` that never retried after Download Detail, and an
+  `MKMapSnapshotter` released before its completion fired. All fixed; the environment one is now
+  structurally impossible since `@Environment(AppModel.self)` no longer exists in the codebase.
+  Confirmed working end to end: 13 workouts synced, 3311 route points and 664 HR samples fetched,
+  thumbnails rendering as real maps. Loosened two performance assertions that failed spuriously at
+  load average 86 — they are regression detectors, not benchmarks. Paused with seeded UI tests as
+  the agreed next step.
 
 - **2026-09-20** — Phase 4 complete; the app is usable end to end for browsing. `NavigationSplitView`
   with saved-filter sidebar, a sortable `Table` with persisted column customisation and multi-select,

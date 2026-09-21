@@ -17,6 +17,9 @@ struct RouteThumbnailView: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var image: NSImage?
+    /// Distinguishes "still working" from "tried and there's nothing to draw". Without it a
+    /// render that legitimately yields no image leaves the spinner up for ever.
+    @State private var didFinishAttempt = false
 
     private var key: RouteThumbnailRenderer.Key {
         RouteThumbnailRenderer.Key(
@@ -25,6 +28,16 @@ struct RouteThumbnailView: View {
             height: Int(size.height),
             isDark: colorScheme == .dark
         )
+    }
+
+    /// The `.task` identity. **Includes `hasDetail`**, which the cache key deliberately doesn't:
+    /// the cache is keyed by what the image looks like, but the *work* has to be retried once the
+    /// series arrives. Without this, the first attempt runs before any route is stored, returns
+    /// nothing, and never runs again — the row sits on its spinner after Download Detail
+    /// completes.
+    private struct RenderIdentity: Hashable {
+        let key: RouteThumbnailRenderer.Key
+        let hasDetail: Bool
     }
 
     var body: some View {
@@ -40,15 +53,22 @@ struct RouteThumbnailView: View {
         }
         .frame(width: size.width, height: size.height)
         .clipShape(.rect(cornerRadius: 6))
-        .task(id: key) {
+        .task(id: RenderIdentity(key: key, hasDetail: hasDetail)) {
             // A cache hit avoids even a frame of placeholder on re-scroll. Synchronous: the
             // renderer is main-actor isolated, same as this view.
             if let hit = renderer.cached(key) {
                 image = hit
+                didFinishAttempt = true
                 return
             }
             image = nil
-            image = await renderer.thumbnail(for: key)
+            didFinishAttempt = false
+            let rendered = await renderer.thumbnail(for: key)
+            // Cancellation means "scrolled away", not "nothing to draw" — leave the attempt
+            // unfinished so it retries when the row comes back.
+            guard !Task.isCancelled else { return }
+            image = rendered
+            didFinishAttempt = true
         }
     }
 
@@ -70,7 +90,7 @@ struct RouteThumbnailView: View {
                 Image(systemName: "arrow.down.circle.dotted")
                     .foregroundStyle(.tertiary)
                     .accessibilityLabel("Route not downloaded yet")
-            } else if !hasRoute {
+            } else if !hasRoute || didFinishAttempt {
                 Image(systemName: "mappin.slash")
                     .foregroundStyle(.tertiary)
                     .accessibilityLabel("No route recorded")

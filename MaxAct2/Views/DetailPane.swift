@@ -80,19 +80,37 @@ struct WorkoutDetailView: View {
         }
     }
 
+    @ViewBuilder
     private func routeMap(_ series: WorkoutSeries) -> some View {
         // Simplified for display too: drawing 12,645 points into a few hundred on-screen pixels
         // costs a great deal and shows nothing extra.
-        let coordinates = RouteSimplifier.simplify(series.route.map(\.coordinate), fittingPixels: 900)
-            .map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
-
-        return Map {
-            MapPolyline(coordinates: coordinates)
-                .stroke(.tint, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+        let simplified = RouteSimplifier.simplify(series.route.map(\.coordinate), fittingPixels: 900)
+        let coordinates = simplified.map {
+            CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
         }
-        .frame(height: 280)
-        .clipShape(.rect(cornerRadius: 10))
-        .accessibilityLabel("Route map with \(coordinates.count) points")
+
+        // The camera has to be aimed at the route. Without an initial position the map opens on
+        // its default region — which rendered as a blank grey rectangle with the route nowhere
+        // in sight, since the polyline was thousands of kilometres off screen.
+        if let bounds = CoordinateBounds(simplified) {
+            Map(initialPosition: .region(MKCoordinateRegion(
+                center: CLLocationCoordinate2D(
+                    latitude: bounds.centre.latitude, longitude: bounds.centre.longitude
+                ),
+                span: MKCoordinateSpan(
+                    // 30% headroom so the track isn't flush against the edges, and a floor so a
+                    // very short route doesn't zoom to maximum.
+                    latitudeDelta: max(bounds.latitudeSpan * 1.3, 0.003),
+                    longitudeDelta: max(bounds.longitudeSpan * 1.3, 0.003)
+                )
+            ))) {
+                MapPolyline(coordinates: coordinates)
+                    .stroke(.tint, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+            }
+            .frame(height: 280)
+            .clipShape(.rect(cornerRadius: 10))
+            .accessibilityLabel("Route map with \(coordinates.count) points")
+        }
     }
 
     private var notDownloadedNotice: some View {
