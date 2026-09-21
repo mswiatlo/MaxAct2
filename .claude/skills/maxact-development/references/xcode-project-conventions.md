@@ -156,6 +156,11 @@ Two things that cost a debugging round each, both found by printing `app.debugDe
 - **`.accessibilityLabel` on a row lands on the element's `label`; a `.badge` becomes its
   `value`.** Predicates must target the right one, and it changed when the badge did.
 
+- **macOS mirrors alert and confirmation-dialog buttons onto the Touch Bar.**
+  `app.buttons["Cancel"].firstMatch` can select the mirror, which fails at click time with
+  *"cannot be called with Touch Bar elements"*. Scope to `app.sheets` / `app.dialogs` instead of
+  querying the application root.
+
 When a query doesn't match, dump the hierarchy instead of guessing — a throwaway test that prints
 `app.debugDescription` answers it in one run.
 

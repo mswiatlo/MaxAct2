@@ -97,6 +97,15 @@ public actor SeriesStore {
         try fileManager.removeItem(at: target)
     }
 
+    /// Removes every stored series. Returns how many files went.
+    @discardableResult
+    public func deleteAll() throws -> Int {
+        let files = try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "lzfse" }
+        for file in files { try fileManager.removeItem(at: file) }
+        return files.count
+    }
+
     /// Total bytes on disk, for a settings screen that reports cache size.
     public func totalBytes() throws -> Int {
         try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.fileSizeKey])

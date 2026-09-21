@@ -38,16 +38,44 @@ final class RouteThumbnailRenderer {
     private let concurrencyLimit = 3
     private var running = 0
 
-    init(seriesStore: SeriesStore) throws {
+    /// - Parameter directory: defaults to `Application Support/com.swiatlowski.MaxAct/Thumbnails`.
+    ///   Injectable because this was previously hardcoded, which meant UI tests — otherwise
+    ///   carefully isolated onto a throwaway database and defaults domain — were still reading
+    ///   and writing the user's real thumbnail cache.
+    init(seriesStore: SeriesStore, directory: URL? = nil) throws {
         self.seriesStore = seriesStore
-        let base = try FileManager.default.url(
-            for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true
-        )
-        directory = base
-            .appending(path: "com.swiatlowski.MaxAct", directoryHint: .isDirectory)
-            .appending(path: "Thumbnails", directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        if let directory {
+            self.directory = directory
+        } else {
+            let base = try FileManager.default.url(
+                for: .applicationSupportDirectory, in: .userDomainMask,
+                appropriateFor: nil, create: true
+            )
+            self.directory = base
+                .appending(path: "com.swiatlowski.MaxAct", directoryHint: .isDirectory)
+                .appending(path: "Thumbnails", directoryHint: .isDirectory)
+        }
+        try FileManager.default.createDirectory(at: self.directory, withIntermediateDirectories: true)
         memory.countLimit = 400
+    }
+
+    /// Clears both cache layers. Thumbnails are derived data, so this is always safe — they
+    /// regenerate from the stored series on next display.
+    @discardableResult
+    func deleteAll() throws -> Int {
+        memory.removeAllObjects()
+        let files = try FileManager.default
+            .contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "png" }
+        for file in files { try FileManager.default.removeItem(at: file) }
+        return files.count
+    }
+
+    func totalBytes() -> Int {
+        let files = (try? FileManager.default.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: [.fileSizeKey]
+        )) ?? []
+        return files.reduce(0) { $0 + ((try? $1.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0) }
     }
 
     /// A synchronous cache peek, so a row re-scrolled into view draws immediately instead of

@@ -150,6 +150,19 @@ public actor WorkoutStore {
         return corrected
     }
 
+    /// Removes every workout. Returns how many were deleted, so the caller can report it.
+    ///
+    /// Series blobs and thumbnails live outside the database and are **not** touched here — the
+    /// caller must clear those too, or the next sync re-imports summaries that silently adopt
+    /// the orphaned blobs of deleted workouts, since both are keyed on the same HealthKit UUID.
+    @discardableResult
+    public func deleteAll() throws -> Int {
+        let records = try modelContext.fetch(FetchDescriptor<WorkoutRecord>())
+        for record in records { modelContext.delete(record) }
+        try modelContext.save()
+        return records.count
+    }
+
     public func delete(id: String) throws {
         guard let record = try record(id: id) else { return }
         modelContext.delete(record)

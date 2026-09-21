@@ -109,14 +109,17 @@ final class AppModel {
     static func inMemoryFallback(settings: SyncSettings, seedCount: Int? = nil) -> AppModel {
         // Force-unwrapped deliberately: an in-memory container and a temp directory failing
         // would mean the process cannot allocate or write anywhere, and there is no recovery.
-        let seriesStore = try! SeriesStore(
-            directory: URL(fileURLWithPath: NSTemporaryDirectory())
-                .appending(path: "MaxActFallback-\(UUID().uuidString)")
-        )
+        let scratch = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appending(path: "MaxActFallback-\(UUID().uuidString)")
+        let seriesStore = try! SeriesStore(directory: scratch.appending(path: "Series"))
         return AppModel(
             store: WorkoutStore(modelContainer: try! WorkoutStore.container(inMemory: true)),
             seriesStore: seriesStore,
-            thumbnails: try! RouteThumbnailRenderer(seriesStore: seriesStore),
+            // Thumbnails go to scratch as well. Without this, UI tests wrote into — and a
+            // delete-all test would have wiped — the user's real thumbnail cache.
+            thumbnails: try! RouteThumbnailRenderer(
+                seriesStore: seriesStore, directory: scratch.appending(path: "Thumbnails")
+            ),
             settings: settings,
             seedCount: seedCount
         )
@@ -274,6 +277,38 @@ final class AppModel {
 
     func dismissSyncStatus() {
         syncStatus = .idle
+    }
+
+    // MARK: Stored data
+
+    /// Bytes held by series blobs and thumbnails. The database itself is small by comparison —
+    /// it holds only the denormalised summary rows.
+    func storageBytes() async -> Int {
+        let series = (try? await seriesStore.totalBytes()) ?? 0
+        return series + thumbnails.totalBytes()
+    }
+
+    /// Deletes every workout, series blob and thumbnail.
+    ///
+    /// Does **not** touch the server address or token — those are settings, not data, and having
+    /// to retype them to clear a test corpus would be a nuisance. Nothing here is irreplaceable:
+    /// everything can be re-synced from the phone, which is the point of making it easy.
+    ///
+    /// Series and thumbnails must go along with the rows. Both are keyed on the HealthKit UUID,
+    /// so leaving them behind would let a later re-sync silently adopt the orphaned blobs of
+    /// deleted workouts.
+    func deleteAllData() async {
+        do {
+            try await store.deleteAll()
+            try await seriesStore.deleteAll()
+            try thumbnails.deleteAll()
+            selection.removeAll()
+            hasSeeded = true   // don't re-seed a store the user just asked to empty
+            await load()
+            syncStatus = .idle
+        } catch {
+            loadError = "Could not delete data: \(error.localizedDescription)"
+        }
     }
 
     // MARK: Task lifecycle

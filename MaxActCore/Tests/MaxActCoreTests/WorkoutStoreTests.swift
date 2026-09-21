@@ -258,4 +258,56 @@ import Testing
         let restored = StravaState(storageKey: state.storageKey, failureReason: state.failureReason)
         #expect(restored == state)
     }
+
+    // MARK: - Deletion
+
+    @Test("deleting everything empties the store")
+    func deleteAllClearsRows() async throws {
+        let store = try makeStore()
+        try await store.upsert((0..<5).map { ingested(workout(id: "W\($0)")) })
+        #expect(try await store.count() == 5)
+
+        #expect(try await store.deleteAll() == 5)
+        #expect(try await store.count() == 0)
+        #expect(try await store.allItems().isEmpty)
+    }
+
+    @Test("deleting everything also clears the series blobs")
+    func deleteAllClearsSeries() async throws {
+        let seriesStore = try makeSeriesStore()
+        try await seriesStore.save(series(id: "A"))
+        try await seriesStore.save(series(id: "B"))
+        #expect(try await seriesStore.totalBytes() > 0)
+
+        #expect(try await seriesStore.deleteAll() == 2)
+        #expect(try await seriesStore.totalBytes() == 0)
+        #expect(await seriesStore.loadIfAvailable("A") == nil)
+    }
+
+    /// Series and rows are both keyed on the HealthKit UUID, so a leftover blob would be silently
+    /// adopted by a re-synced workout with the same id — showing a deleted workout's route on a
+    /// freshly imported one.
+    @Test("a re-sync after deletion does not inherit orphaned series")
+    func reSyncAfterDeletionIsClean() async throws {
+        let store = try makeStore()
+        let seriesStore = try makeSeriesStore()
+        try await store.upsert(
+            [ingested(workout(hasRoute: true), series: series())], seriesStore: seriesStore
+        )
+
+        try await store.deleteAll()
+        try await seriesStore.deleteAll()
+
+        // The same workout arrives again from a list pass, with no series.
+        try await store.upsert([ingested(workout())], seriesStore: seriesStore)
+        let item = try #require(try await store.item(id: "W1"))
+        #expect(item.hasDetail == false, "a deleted workout's route must not come back")
+        #expect(await seriesStore.loadIfAvailable("W1") == nil)
+    }
+
+    @Test("deleting an empty store is a no-op rather than an error")
+    func deleteAllOnEmptyStore() async throws {
+        #expect(try await makeStore().deleteAll() == 0)
+        #expect(try await makeSeriesStore().deleteAll() == 0)
+    }
 }

@@ -65,7 +65,7 @@ struct MaxActApp: App {
         .commands { MaxActCommands(model: model) }
 
         Settings {
-            SettingsView(settings: model.settings)
+            SettingsView(settings: model.settings, model: model)
         }
     }
 }

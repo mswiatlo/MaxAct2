@@ -21,7 +21,7 @@ thumbnails render as real maps with the track drawn on them.
 | | |
 |---|---|
 | Builds | clean, **zero warnings** — check with `XcodeListNavigatorIssues` at `severity: warning`; `BuildProject` reports only errors |
-| Tests | 93 in `MaxActCore` (`swift test`), 22 app/UI tests including 10 seeded (`RunAllTests`) |
+| Tests | 97 in `MaxActCore` (`swift test`), 24 app/UI tests including 12 seeded (`RunAllTests`) |
 | Live MCP suite | passes against the phone; skipped unless `MAXACT_LIVE_HOST`/`MAXACT_LIVE_TOKEN` are set |
 | Verified with real data | 13 workouts synced; detail fetch produced 3311 route points and 664 HR samples; thumbnails written to the sandbox container |
 
@@ -748,6 +748,15 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 | 8 — Polish | Not started |
 
 ### Change log
+
+- **2026-09-20 (later)** — Added "Delete All Workouts" to Settings, with a confirmation naming the
+  count and the cost of re-downloading. Removes rows, series blobs and thumbnails together, since
+  all three are keyed on the HealthKit UUID and a leftover blob would be silently adopted by a
+  re-synced workout with the same id — there's a test for exactly that. Server address and token
+  are deliberately kept. Building it exposed that `RouteThumbnailRenderer`'s cache directory was
+  hardcoded, so UI tests had been reading and writing the real thumbnail cache despite their
+  isolated database and defaults; it is now injected, and the delete test would otherwise have
+  wiped it.
 
 - **2026-09-20 (late)** — Seeded UI tests added: `SampleData` in `MaxActCore`, a
   `--ui-testing-seed` launch argument, and seven tests over the table, scrolling, thumbnails,
