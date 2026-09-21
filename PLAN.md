@@ -12,18 +12,37 @@ Next: Phase 6 (approximate location), then Phase 7 (TCX + Strava). One feature r
 > Health Auto Export data contract, the Xcode tooling limits we hit, and the Strava API facts —
 > the things that cost research to establish and aren't visible in the code.
 
-### Where things stand
+### Where things stand — paused 2026-09-21
 
-**Phase 4 is functionally done and has been used against real data.** A week of workouts syncs
-from the phone, the table renders them, detail downloads fill in routes and heart rate, and route
-thumbnails render as real maps with the track drawn on them.
+**Phases 0–5 are done and the app is genuinely usable.** Workouts sync from the phone, the table
+renders them with map thumbnails, detail downloads fill in routes and heart rate, and selecting a
+workout shows its map, stats, three charts and per-kilometre splits. Everything below is verified
+against real data, not just tests.
 
 | | |
 |---|---|
 | Builds | clean, **zero warnings** — check with `XcodeListNavigatorIssues` at `severity: warning`; `BuildProject` reports only errors |
 | Tests | 143 in `MaxActCore` (`swift test`), 25 app/UI tests including 13 seeded (`RunAllTests`) |
 | Live MCP suite | passes against the phone; skipped unless `MAXACT_LIVE_HOST`/`MAXACT_LIVE_TOKEN` are set |
-| Verified with real data | 13 workouts synced; detail fetch produced 3311 route points and 664 HR samples; thumbnails written to the sandbox container |
+| Verified with real data | 33 workouts synced, 5 with full detail; the largest is 3,311 route points and 664 HR samples. Pace, GPS filtering, splits and elevation gain were each checked against HAE's own figures |
+| Working tree | clean, everything merged to `main` at `5114d39` |
+
+**What to pick up next**, in the order I'd suggest:
+
+1. **Phase 6 — approximate location.** Self-contained, and it fills the empty Place column the
+   table already has. The design is settled in that section.
+2. **Known issue 6 — link the charts and the map.** Also self-contained, sits directly on top of
+   what Phase 5 just landed, and the traps are written up.
+3. **Phase 7 — TCX + Strava.** The largest remaining piece, and the point of the app. Read
+   `references/strava-api.md` first; the two-bucket rate limiting and the `external_id` dedupe are
+   the parts that need care.
+
+**A habit worth keeping.** Four of the last five pieces of work started by *measuring the real
+data*, and in three of them the measurement contradicted the plan: `avgSpeed` turned out to be a
+mean of instantaneous samples rather than a pause problem, the proposed GPS spike detector fired
+only on jitter, and the heart-rate min–max band was degenerate in all 2,580 real samples. An hour
+with the five stored blobs in `/tmp` has repeatedly changed *what got built*, not just confirmed
+it. Do that before implementing anything derived from the series.
 
 **Five bugs were found by using it, none of which any test caught.** Each is fixed and each taught
 something now recorded in the skill reference:
@@ -44,19 +63,28 @@ something now recorded in the skill reference:
    throttle also parked cancelled tasks on continuations that nothing resumed, which wedged all
    later renders; it polls instead.
 
+A sixth was found by running the suite rather than the app, and is worth remembering because it
+looked like everything except what it was: **13 seeded UI tests couldn't launch the app at all**,
+because `--ui-testing-seed 40` as two tokens leaves a stray `40` once `NSUserDefaults` pairs
+arguments, and AppKit reads a stray argument as a file to open — which suppresses `WindowGroup`'s
+window entirely. It is invisible under `open --args`, and raising the timeout doesn't help. Now
+passed as `--ui-testing-seed=40`.
+
 **Outstanding:**
 
-1. ~~UI tests can't see any of this.~~ **Done.** `--ui-testing-seed <n>` plants deterministic
-   synthetic workouts, and seven tests now exercise the table, scrolling, thumbnail placeholder
-   states, rendering, selection and the aggregate summary. Verified by reintroducing a fixed bug:
-   the placeholder test fails without its fix. See the caveat in that section about what is
-   *not* covered.
-2. **Strava is unbuilt.** State machine, badges and filters exist and are tested; the toolbar
-   button is deliberately disabled.
-3. **Detail view is a placeholder.** Map, stats and sample counts render, but heart-rate charts
-   and splits are Phase 5.
-4. Performance assertions were loosened after failing spuriously at load average 86. They catch
+1. **Strava is unbuilt.** The state machine, badges and filters exist and are tested; the toolbar
+   button is deliberately disabled until Phase 7.
+2. **The Place column is always empty** — Phase 6 fills it.
+3. **No `.hae` reader.** Repeatedly the answer to things we currently reconstruct: HealthKit's own
+   splits and laps, and explicit `pause`/`motionResumed` events that would settle moving time
+   exactly instead of by threshold. Worth reconsidering before Phase 7.
+4. **`Spikes/` is still in the tree.** Phase 2 said delete it; it stays for now because the Python
+   probes remain the quickest way to interrogate a stored blob.
+5. Performance assertions were loosened after failing spuriously at load average 86. They catch
    10x regressions; the printed figures are the real measurements.
+6. The seeded UI tests can't see the map camera or chart contents — neither is exposed to
+   accessibility — so those were verified by hand and by decoding rendered PNGs. Anything visual
+   still needs an eye on it.
 
 ### Known issues and requests
 
@@ -863,7 +891,13 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 
 ### Change log
 
-- **2026-09-21 (latest)** — Recorded known issue 6: linking the charts and the map to each other,
+- **2026-09-21 (latest)** — Paused here. Refreshed *Where things stand*, which still described
+  Phase 4 as the frontier: current test counts and real-data coverage, a suggested order for
+  picking up (Phase 6, then known issue 6, then Phase 7), a revised outstanding list, and the
+  habit that has repeatedly earned its keep — measure the stored blobs before building anything
+  derived from the series, because three of the last four designs were contradicted by doing so.
+
+- **2026-09-21** — Recorded known issue 6: linking the charts and the map to each other,
   so clicking a point in either highlights the corresponding point in the other. Written up with
   the shared-key decision (timestamp, not index) and the four traps that follow from Phase 5's
   downsampling, pause handling and pace filtering. Not started.
