@@ -36,7 +36,9 @@ struct MaxActApp: App {
             UserDefaults.standard.removePersistentDomain(forName: domain)
             let settings = AppSettings(defaults: UserDefaults(suiteName: domain) ?? .standard)
             _model = State(initialValue: AppModel.inMemoryFallback(
-                settings: settings, seedCount: Self.uiTestingSeedCount
+                settings: settings,
+                seedCount: Self.uiTestingSeedCount,
+                resolvesPlaces: false
             ))
             return
         }

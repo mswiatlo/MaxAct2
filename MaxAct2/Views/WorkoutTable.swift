@@ -89,9 +89,7 @@ struct WorkoutTable: View {
             .customizationID("heartRate")
 
             TableColumn("Place") { item in
-                // Phase 6 fills this in; an indoor workout will keep the em dash permanently.
-                Text(item.placeLabel ?? WorkoutFormatting.missing)
-                    .foregroundStyle(item.placeLabel == nil ? .secondary : .primary)
+                PlaceCell(item: item)
             }
             .width(min: 100, ideal: 140)
             .customizationID("place")
@@ -159,6 +157,36 @@ struct StravaStateBadge: View {
         case .failed: .orange
         case .queued, .uploading: .accentColor
         case .notUploaded: .secondary
+        }
+    }
+}
+
+/// The Place column.
+///
+/// Three genuinely different states, and conflating any two of them misleads:
+///
+/// - a resolved name;
+/// - **indoor**, which will never have a place, so an em dash that looks like "still loading" is
+///   wrong — this is the same distinction the thumbnail placeholder gets right;
+/// - no place *yet*, either because detail hasn't been downloaded or geocoding hasn't reached it.
+///
+/// Symbol **and** text, never a symbol alone, and an explicit label for the indoor case so it
+/// isn't announced as an unnamed image.
+private struct PlaceCell: View {
+    let item: WorkoutListItem
+
+    var body: some View {
+        if let place = item.placeLabel {
+            Text(place)
+        } else if item.workout.isIndoor == true {
+            Label("Indoor", systemImage: "house")
+                .labelStyle(.titleAndIcon)
+                .foregroundStyle(.secondary)
+                .help("An indoor workout has no route, so it has no place")
+        } else {
+            Text(WorkoutFormatting.missing)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("No place yet")
         }
     }
 }

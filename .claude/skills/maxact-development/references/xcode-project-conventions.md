@@ -135,6 +135,27 @@ that, and both are worth generalising:
   mismatch rules the whole class out structurally, instead of depending on clearing it in the right
   order.
 
+## Reverse geocoding: what the documentation gets wrong, and what leaks
+
+*(macOS 26, measured against the live geocoder)*
+
+- **`MKAddressRepresentations.regionCode` and `.regionName` don't exist**, though both are listed
+  in the documentation. `cityWithContext(_:)` is a **method**, not the documented property. What
+  compiles: `item.addressRepresentations?.cityName` and
+  `item.addressRepresentations?.cityWithContext(.automatic)`.
+- **`cityWithContext(.automatic)` is the one to use.** It returns MapKit's own localized
+  `"Vancouver BC"` — better than assembling city + region yourself, which only reads correctly in
+  the locale you happened to test. `.short` gave the same result; `.full` adds the country.
+- **`name`, `address.shortAddress` and `address.fullAddress` return the street address** —
+  `4629 Haggart St, Vancouver` for a real workout's start. Never read them for a coarse label.
+- **Geocode a snapped coordinate, not a precise one.** The leak above means the precise point
+  shouldn't reach Apple either, not just the database. See `PlaceGrid`.
+- **A location with no city returns an empty string, not `nil`.** Measured over water. Trim and
+  check for empty, or you store a blank label that never retries.
+- **It's fast and didn't rate-limit**: ~0.1 s per request, five back to back with no failures.
+  Apple documents a limit without publishing it, so throttling is still worth having — but cell
+  caching is what actually keeps the count down.
+
 ## Don't add a command that macOS already provides
 
 `CommandGroupPlacement.pasteboard` already includes **Select All** in the Edit menu, and SwiftUI

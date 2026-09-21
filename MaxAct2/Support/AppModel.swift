@@ -88,25 +88,39 @@ final class AppModel {
     /// normal use.
     let seedCount: Int?
 
+    /// Whether to reverse-geocode place names. Off under UI testing: it is a network call, and a
+    /// test suite that depends on Apple's geocoder is a test suite that fails on a train.
+    let resolvesPlaces: Bool
+
     private var syncTask: Task<Void, Never>?
     private var hasSeeded = false
+
+    /// Resolves coarse coordinates into place names. One instance for the app's lifetime, so its
+    /// cache of cell → name survives across loads and syncs.
+    @ObservationIgnored private let placeResolver: PlaceResolver
+    private var placeTask: Task<Void, Never>?
 
     init(
         store: WorkoutStore,
         seriesStore: SeriesStore,
         thumbnails: RouteThumbnailRenderer,
         settings: AppSettings,
-        seedCount: Int? = nil
+        seedCount: Int? = nil,
+        resolvesPlaces: Bool = true
     ) {
         self.store = store
         self.seriesStore = seriesStore
         self.thumbnails = thumbnails
         self.settings = settings
         self.seedCount = seedCount
+        self.resolvesPlaces = resolvesPlaces
+        placeResolver = PlaceResolver(store: store)
     }
 
     /// Used when the on-disk stores can't be opened. Everything works; nothing persists.
-    static func inMemoryFallback(settings: AppSettings, seedCount: Int? = nil) -> AppModel {
+    static func inMemoryFallback(
+        settings: AppSettings, seedCount: Int? = nil, resolvesPlaces: Bool = true
+    ) -> AppModel {
         // Force-unwrapped deliberately: an in-memory container and a temp directory failing
         // would mean the process cannot allocate or write anywhere, and there is no recovery.
         let scratch = URL(fileURLWithPath: NSTemporaryDirectory())
@@ -121,7 +135,8 @@ final class AppModel {
                 seriesStore: seriesStore, directory: scratch.appending(path: "Thumbnails")
             ),
             settings: settings,
-            seedCount: seedCount
+            seedCount: seedCount,
+            resolvesPlaces: resolvesPlaces
         )
     }
 
@@ -192,6 +207,28 @@ final class AppModel {
             loadError = nil
         } catch {
             loadError = "Could not load workouts: \(error.localizedDescription)"
+        }
+        resolvePlaces()
+    }
+
+    /// Fills in the Place column in the background.
+    ///
+    /// Deliberately not awaited by `load()`: on a first import this walks every distinct place at
+    /// one request per second, and the table must be usable long before it finishes. Failures are
+    /// silent by design — an empty Place cell is a cosmetic gap, not something worth an error
+    /// banner over a table that otherwise works.
+    private func resolvePlaces() {
+        guard resolvesPlaces, placeTask == nil else { return }
+        placeTask = Task {
+            // Workouts synced before Phase 6 have a route on disk but no snapped start, so they
+            // would never appear in the pending query without this.
+            _ = try? await store.backfillPlaceCoordinates(seriesStore: seriesStore)
+
+            let stored = await placeResolver.resolvePending()
+            if stored > 0, !Task.isCancelled {
+                items = (try? await store.allItems()) ?? items
+            }
+            placeTask = nil
         }
     }
 

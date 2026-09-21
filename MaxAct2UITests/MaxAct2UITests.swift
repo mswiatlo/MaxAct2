@@ -432,6 +432,30 @@ final class SeededTableUITests: XCTestCase {
         )
     }
 
+    /// The Place column's three states, which are three different claims.
+    ///
+    /// Geocoding is disabled under `--ui-testing`, so this is deterministic and offline: no
+    /// workout has a name, and the column must still distinguish "indoor, so never" from "not
+    /// yet". Conflating those is the same mistake the thumbnail placeholder made, where every
+    /// outdoor ride was labelled indoor.
+    @MainActor
+    func testPlaceColumnSeparatesIndoorFromNotYetKnown() throws {
+        let app = launchSeeded()
+        XCTAssertTrue(app.outlines["WorkoutTable"].waitForExistence(timeout: 15))
+
+        XCTAssertTrue(
+            app.staticTexts["Indoor"].firstMatch.waitForExistence(timeout: 10),
+            "An indoor workout has no route and so can never have a place — say so."
+        )
+        // And an outdoor workout without a resolved name shows the em dash instead.
+        XCTAssertTrue(
+            app.staticTexts.containing(
+                NSPredicate(format: "value == %@", "\u{2014}")
+            ).firstMatch.exists,
+            "An outdoor workout awaiting geocoding is unknown, not indoor."
+        )
+    }
+
     /// Multi-select and the aggregate summary — the reason the table exists — had no coverage.
     ///
     /// Uses the system's ⌘A, which SwiftUI routes to the table's selection binding once a row has

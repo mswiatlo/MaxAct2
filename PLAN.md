@@ -3,9 +3,9 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**,
 with batch upload to Strava.
 
-**Status:** Phases 0–5 complete and exercised against real data, with every known *defect* fixed.
-Next: Phase 6 (approximate location), then Phase 7 (TCX + Strava). One feature request outstanding
-— linking the charts and the map to each other (known issue 6).
+**Status:** Phases 0–6 complete and exercised against real data, with every known *defect* fixed.
+Next: Phase 7 (TCX + Strava), the point of the app. One feature request outstanding — linking the
+charts and the map to each other (known issue 6).
 **Last updated:** 2026-09-21.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first. It carries the
@@ -14,28 +14,27 @@ Next: Phase 6 (approximate location), then Phase 7 (TCX + Strava). One feature r
 
 ### Where things stand — paused 2026-09-21
 
-**Phases 0–5 are done and the app is genuinely usable.** Workouts sync from the phone, the table
-renders them with map thumbnails, detail downloads fill in routes and heart rate, and selecting a
-workout shows its map, stats, three charts and per-kilometre splits. Everything below is verified
-against real data, not just tests.
+**Phases 0–6 are done and the app is genuinely usable.** Workouts sync from the phone, the table
+renders them with map thumbnails and approximate place names, detail downloads fill in routes and
+heart rate, and selecting a workout shows its map, stats, three charts and per-kilometre splits.
+Everything below is verified against real data, not just tests.
 
 | | |
 |---|---|
 | Builds | clean, **zero warnings** — check with `XcodeListNavigatorIssues` at `severity: warning`; `BuildProject` reports only errors |
-| Tests | 143 in `MaxActCore` (`swift test`), 25 app/UI tests including 13 seeded (`RunAllTests`) |
+| Tests | 155 in `MaxActCore` (`swift test`), 26 app/UI tests including 14 seeded (`RunAllTests`) |
 | Live MCP suite | passes against the phone; skipped unless `MAXACT_LIVE_HOST`/`MAXACT_LIVE_TOKEN` are set |
 | Verified with real data | 33 workouts synced, 5 with full detail; the largest is 3,311 route points and 664 HR samples. Pace, GPS filtering, splits and elevation gain were each checked against HAE's own figures |
 | Working tree | clean, everything merged to `main` at `5114d39` |
 
 **What to pick up next**, in the order I'd suggest:
 
-1. **Phase 6 — approximate location.** Self-contained, and it fills the empty Place column the
-   table already has. The design is settled in that section.
-2. **Known issue 6 — link the charts and the map.** Also self-contained, sits directly on top of
-   what Phase 5 just landed, and the traps are written up.
-3. **Phase 7 — TCX + Strava.** The largest remaining piece, and the point of the app. Read
+1. **Phase 7 — TCX + Strava.** The largest remaining piece, and the point of the app. Read
    `references/strava-api.md` first; the two-bucket rate limiting and the `external_id` dedupe are
    the parts that need care.
+2. **Known issue 6 — link the charts and the map.** Self-contained, sits on top of what Phase 5
+   landed, and the traps are written up.
+3. **Phase 8 — polish**, including the first-run onboarding.
 
 **A habit worth keeping.** Four of the last five pieces of work started by *measuring the real
 data*, and in three of them the measurement contradicted the plan: `avgSpeed` turned out to be a
@@ -74,15 +73,14 @@ passed as `--ui-testing-seed=40`.
 
 1. **Strava is unbuilt.** The state machine, badges and filters exist and are tested; the toolbar
    button is deliberately disabled until Phase 7.
-2. **The Place column is always empty** — Phase 6 fills it.
-3. **No `.hae` reader.** Repeatedly the answer to things we currently reconstruct: HealthKit's own
+2. **No `.hae` reader.** Repeatedly the answer to things we currently reconstruct: HealthKit's own
    splits and laps, and explicit `pause`/`motionResumed` events that would settle moving time
    exactly instead of by threshold. Worth reconsidering before Phase 7.
-4. **`Spikes/` is still in the tree.** Phase 2 said delete it; it stays for now because the Python
+3. **`Spikes/` is still in the tree.** Phase 2 said delete it; it stays for now because the Python
    probes remain the quickest way to interrogate a stored blob.
-5. Performance assertions were loosened after failing spuriously at load average 86. They catch
+4. Performance assertions were loosened after failing spuriously at load average 86. They catch
    10x regressions; the printed figures are the real measurements.
-6. The seeded UI tests can't see the map camera or chart contents — neither is exposed to
+5. The seeded UI tests can't see the map camera or chart contents — neither is exposed to
    accessibility — so those were verified by hand and by decoding rendered PNGs. Anything visual
    still needs an eye on it.
 
@@ -732,14 +730,44 @@ Not done, deliberately: **Liquid Glass on floating map overlay controls.** There
 controls yet, and inventing some to have somewhere to put the material would be backwards. Revisit
 if the map gains real controls.
 
-### Phase 6 — Approximate location
+### Phase 6 — Approximate location *(complete)*
 
-Snap the route's first coordinate to a ~1 km grid before storing it, so the list never depends on a
-precise home address. Resolve with `MKReverseGeocodingRequest(location:)` → `await request.mapItems`
-→ `MKAddressRepresentations.cityName` + `regionCode` ("Vancouver, BC"). Serialize through an actor,
-throttle to roughly one request per second, back off on failure, and cache by snapped coordinate —
-repeat rides from the same trailhead then cost nothing. Indoor or route-less workouts show an indoor
-badge or an em dash, never a fabricated place.
+`PlaceGrid` in the package snaps a route's first fix to a ~1 km grid; `PlaceResolver` (an actor in
+the app, where MapKit belongs) turns cells into names and caches them.
+
+**Snapping happens before the request, not just before storage — and that turned out to matter
+more than the plan assumed.** Reverse-geocoding an unsnapped start returns the *street address*:
+measured, a real coordinate came back as `4629 Haggart St, Vancouver`. So the precise point must
+never reach Apple either, and the resolver reads only `cityWithContext(.automatic)`, never
+`name`/`shortAddress`/`fullAddress`, which all leak the address.
+
+The plan's `cityName` + `regionCode` recipe doesn't work: **`regionCode` doesn't exist** on
+`MKAddressRepresentations` despite being documented. `cityWithContext(.automatic)` gives MapKit's
+own localized `"Vancouver BC"` directly, which is better than reassembling parts — it reads
+correctly outside Canada. `cityName` is the fallback, and a start over water returns an **empty
+string** rather than nil, which would otherwise be stored as a blank that never retries.
+
+Measured against the real library: stored cells sit **132–491 m** from the true starts (704 m worst
+case over a sampled grid), and five workouts collapsed to **three distinct cells**, so caching
+already saved two of five requests. That is the mechanism that makes a seven-year corpus cost a
+request per *place* rather than per workout.
+
+Throttling is defensive rather than observed: a request measured ~0.1 s and five back-to-back
+lookups all succeeded with no sign of a limit. Apple documents a limit without publishing it, so
+the resolver still spaces requests a second apart, backs off on failure and gives up after three
+consecutive ones.
+
+Two things the plan didn't anticipate:
+
+- **Everything synced before Phase 6 needed backfilling.** The coordinate is snapped at upsert,
+  when a route is in hand, so existing workouts had routes on disk and no cell.
+  `backfillPlaceCoordinates` reads the stored series for those, which is why the feature worked on
+  the existing 33-workout library without a re-sync.
+- **Geocoding is off under `--ui-testing`.** A test suite that depends on Apple's geocoder fails on
+  a train. The three Place states are still covered offline, since indoor-versus-not-yet is local.
+
+The column distinguishes a resolved name, **indoor** (no route, so never a place — an em dash there
+reads as "still loading"), and not-yet. Same distinction the thumbnail placeholder gets right.
 
 ### Phase 7 — TCX export and Strava
 
@@ -885,13 +913,30 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 | 3 — Persistence | Complete |
 | 4 — List UI | Complete |
 | 5 — Detail view | Complete |
-| 6 — Approximate location | Not started |
+| 6 — Approximate location | Complete |
 | 7 — TCX + Strava | Not started |
 | 8 — Polish | Not started |
 
 ### Change log
 
-- **2026-09-21 (latest)** — Paused here. Refreshed *Where things stand*, which still described
+- **2026-09-21 (latest)** — **Phase 6 complete.** The Place column fills in with coarse names.
+  `PlaceGrid` snaps a route's first fix to a ~1 km cell in the package; `PlaceResolver` is an actor
+  in the app that geocodes cells, caches them, throttles and backs off.
+
+  Measuring the API first changed two things. Reverse-geocoding an *unsnapped* start returns the
+  street address (`4629 Haggart St, Vancouver`), so snapping is a precondition of the request and
+  not merely of storage, and only `cityWithContext(.automatic)` is read — `name`, `shortAddress`
+  and `fullAddress` all leak it. And the plan's `cityName` + `regionCode` recipe is impossible:
+  **`regionCode` does not exist** on `MKAddressRepresentations` despite being documented.
+  `cityWithContext(.automatic)` returns MapKit's own localized "Vancouver BC" instead.
+
+  Verified against the real library: stored cells sit 132–491 m from the true starts, and five
+  workouts collapsed to three cells, so caching already saved two of five requests. Two unplanned
+  pieces were needed: a backfill that snaps from stored series, without which everything synced
+  before today would have needed a re-sync, and disabling geocoding under `--ui-testing`, because
+  a suite that depends on Apple's geocoder fails offline.
+
+- **2026-09-21** — Paused here. Refreshed *Where things stand*, which still described
   Phase 4 as the frontier: current test counts and real-data coverage, a suggested order for
   picking up (Phase 6, then known issue 6, then Phase 7), a revised outstanding list, and the
   habit that has repeatedly earned its keep — measure the stored blobs before building anything

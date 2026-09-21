@@ -58,6 +58,15 @@ public actor WorkoutStore {
                 record.hasDetail = !item.series.route.isEmpty || !item.series.heartRate.isEmpty
                 if !item.series.route.isEmpty { record.hasRoute = true }
                 summary.seriesStored += 1
+
+                // Snapped here, at the one point where a precise route is in hand, so the
+                // database never holds the exact start. Only set when absent: re-snapping an
+                // unchanged route would be churn, and the label is keyed off this value.
+                if record.placeCoordinate == nil,
+                   let start = PlaceGrid.start(of: item.series.route) {
+                    record.placeLatitude = start.latitude
+                    record.placeLongitude = start.longitude
+                }
             }
         }
 
@@ -102,6 +111,44 @@ public actor WorkoutStore {
         return try modelContext.fetch(descriptor).map(WorkoutListItem.init(record:))
     }
 
+    /// Workouts with a coarse start but no resolved name yet, newest first.
+    ///
+    /// Indoor workouts are excluded by having no route to snap in the first place, so there is no
+    /// need to filter on `isIndoor` — and filtering on it would be wrong for an outdoor workout
+    /// the watch happened to mark indoor.
+    public func itemsNeedingPlace(limit: Int? = nil) throws -> [(id: String, coordinate: Coordinate)] {
+        var descriptor = FetchDescriptor<WorkoutRecord>(
+            predicate: #Predicate { $0.placeLabel == nil && $0.placeLatitude != nil }
+        )
+        descriptor.sortBy = [SortDescriptor(\.start, order: .reverse)]
+        if let limit { descriptor.fetchLimit = limit }
+        return try modelContext.fetch(descriptor).compactMap { record in
+            record.placeCoordinate.map { (record.id, $0) }
+        }
+    }
+
+    /// Backfills the snapped start for records that predate it, reading the stored series.
+    ///
+    /// Without this, everything synced before Phase 6 would need a re-sync to get a place. Returns
+    /// how many gained a coordinate.
+    @discardableResult
+    public func backfillPlaceCoordinates(seriesStore: SeriesStore) async throws -> Int {
+        let descriptor = FetchDescriptor<WorkoutRecord>(
+            predicate: #Predicate { $0.placeLatitude == nil && $0.hasDetail == true }
+        )
+        var filled = 0
+        for record in try modelContext.fetch(descriptor) {
+            guard let series = await seriesStore.loadIfAvailable(record.id),
+                  let start = PlaceGrid.start(of: series.route)
+            else { continue }
+            record.placeLatitude = start.latitude
+            record.placeLongitude = start.longitude
+            filled += 1
+        }
+        if filled > 0 { try modelContext.save() }
+        return filled
+    }
+
     // MARK: - Local state
 
     public func setStravaState(
@@ -119,6 +166,12 @@ public actor WorkoutStore {
         if let uploadID { record.stravaUploadID = uploadID }
         if state.isOnStrava { record.lastUploadedAt = now }
         try modelContext.save()
+    }
+
+    /// The workout's coarsened start, if a route has been stored. Already snapped — there is no
+    /// API here that returns the precise one.
+    public func placeCoordinate(for workoutID: String) throws -> Coordinate? {
+        try record(id: workoutID)?.placeCoordinate
     }
 
     public func setPlaceLabel(_ label: String?, for workoutID: String) throws {

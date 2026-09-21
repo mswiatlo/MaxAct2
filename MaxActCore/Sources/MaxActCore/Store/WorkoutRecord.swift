@@ -46,9 +46,20 @@ public final class WorkoutRecord {
 
     // MARK: Local — preserved across re-sync
 
-    /// Coarse place name such as "Vancouver, BC", resolved in Phase 6 and cached here because
-    /// geocoding is rate-limited.
+    /// Coarse place name such as "Vancouver BC", resolved from ``placeCoordinate``.
+    ///
+    /// Cached here because it is the only thing the list needs and geocoding is documented as
+    /// rate-limited. MapKit's own localized form is stored verbatim rather than reassembled from
+    /// parts, so it reads correctly outside Canada too.
     public var placeLabel: String?
+
+    /// The route's first fix, **already snapped to a ~1 km grid** by ``PlaceGrid``.
+    ///
+    /// Stored coarse deliberately: the precise start is where the athlete lives. Kept as two
+    /// optional `Double`s rather than a `Coordinate` because SwiftData stores attributes, and an
+    /// optional pair keeps "never had a route" distinguishable from "on the equator".
+    public var placeLatitude: Double?
+    public var placeLongitude: Double?
     public var stravaStateKey: String
     public var stravaFailureReason: String?
     public var stravaActivityID: Int?
@@ -84,6 +95,8 @@ public final class WorkoutRecord {
         hasRoute = workout.hasRoute
 
         placeLabel = nil
+        placeLatitude = nil
+        placeLongitude = nil
         stravaStateKey = StravaState.notUploaded.storageKey
         stravaFailureReason = nil
         stravaActivityID = nil
@@ -155,6 +168,14 @@ public final class WorkoutRecord {
             sourceName: sourceName,
             hasRoute: hasRoute
         )
+    }
+}
+
+extension WorkoutRecord {
+    /// The snapped start, or `nil` if no route has been stored yet.
+    public var placeCoordinate: Coordinate? {
+        guard let placeLatitude, let placeLongitude else { return nil }
+        return Coordinate(latitude: placeLatitude, longitude: placeLongitude)
     }
 }
 

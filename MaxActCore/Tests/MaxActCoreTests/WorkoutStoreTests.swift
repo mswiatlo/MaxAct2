@@ -91,6 +91,87 @@ import Testing
         #expect(item.workout.distanceMeters == 10_500)
     }
 
+    // MARK: - Place
+
+    @Test("a route's start is stored already coarsened, never precisely")
+    func placeCoordinateIsSnappedOnUpsert() async throws {
+        let store = try makeStore()
+        let seriesStore = try makeSeriesStore()
+        let stored = series(routePoints: 5)
+        try await store.upsert([ingested(workout(hasRoute: true), series: stored)], seriesStore: seriesStore)
+
+        let coordinate = try #require(try await store.placeCoordinate(for: "W1"))
+        let precise = try #require(stored.route.first).coordinate
+        // The privacy property: what landed in the database is the cell, not the fix.
+        #expect(coordinate == PlaceGrid.snap(precise))
+        #expect(coordinate != precise)
+    }
+
+    @Test("workouts awaiting a name are exactly those with a cell and no label")
+    func pendingQueryIsPrecise() async throws {
+        let store = try makeStore()
+        let seriesStore = try makeSeriesStore()
+
+        // One with a route, one without — the second has nothing to snap, so it can never be
+        // pending, which is also how indoor workouts stay out of the queue.
+        try await store.upsert([
+            ingested(workout(id: "withRoute", hasRoute: true), series: series(id: "withRoute")),
+            ingested(workout(id: "noRoute")),
+        ], seriesStore: seriesStore)
+
+        var pending = try await store.itemsNeedingPlace()
+        #expect(pending.map(\.id) == ["withRoute"])
+
+        // Once named, it drops out and is not asked about again.
+        try await store.setPlaceLabel("Vancouver BC", for: "withRoute")
+        pending = try await store.itemsNeedingPlace()
+        #expect(pending.isEmpty)
+    }
+
+    @Test("records synced before places existed gain a cell without a re-sync")
+    func backfillFromStoredSeries() async throws {
+        let store = try makeStore()
+        let seriesStore = try makeSeriesStore()
+
+        // Reproduce the pre-Phase-6 state exactly as it exists on disk: the blob is saved, the
+        // detail flag is reconciled from it, and no coordinate was ever snapped because the code
+        // that snaps didn't exist. Without the backfill these never become pending.
+        try await seriesStore.save(series())
+        try await store.upsert([ingested(workout(hasRoute: true))])
+        #expect(try await store.reconcileDetailFlags(with: seriesStore) == 1)
+        #expect(try await store.placeCoordinate(for: "W1") == nil)
+        #expect(try await store.itemsNeedingPlace().isEmpty)
+
+        let filled = try await store.backfillPlaceCoordinates(seriesStore: seriesStore)
+        #expect(filled == 1)
+        #expect(try await store.itemsNeedingPlace().count == 1)
+
+        // Idempotent: a second pass has nothing left to do.
+        #expect(try await store.backfillPlaceCoordinates(seriesStore: seriesStore) == 0)
+    }
+
+    @Test("a re-sync does not move a cell that is already established")
+    func coordinateSurvivesResync() async throws {
+        let store = try makeStore()
+        let seriesStore = try makeSeriesStore()
+        try await store.upsert([ingested(workout(hasRoute: true), series: series())], seriesStore: seriesStore)
+        let first = try #require(try await store.placeCoordinate(for: "W1"))
+
+        // The same workout re-fetched, with a route that now starts somewhere else entirely.
+        var moved = series()
+        moved = WorkoutSeries(
+            workoutID: "W1",
+            route: [RoutePoint(
+                coordinate: Coordinate(latitude: 48.4, longitude: -123.4),
+                timestamp: Date(timeIntervalSince1970: 1_700_000_000)
+            )] + moved.route,
+            heartRate: moved.heartRate
+        )
+        try await store.upsert([ingested(workout(hasRoute: true), series: moved)], seriesStore: seriesStore)
+
+        #expect(try await store.placeCoordinate(for: "W1") == first, "the label is keyed off this")
+    }
+
     @Test("a list-pass re-sync does not erase the knowledge that a route exists")
     func hasRouteIsNotErasedByListPass() async throws {
         let store = try makeStore()
