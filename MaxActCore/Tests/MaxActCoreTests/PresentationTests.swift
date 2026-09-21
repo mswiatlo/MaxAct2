@@ -190,7 +190,9 @@ import Testing
         #expect(WorkoutFormatting.pace(metersPerSecond: 0.05) == WorkoutFormatting.missing)
     }
 
-    @Test("average speed falls back to distance over duration when HAE omits it")
+    // The preference between distance ÷ duration and HAE's own average, and why, is covered in
+    // `EffectiveSpeedTests`. This only checks the arithmetic.
+    @Test("average speed is distance over duration")
     func derivedSpeed() {
         let workout = Workout(
             id: "x", kind: .running, start: .now, end: .now.addingTimeInterval(3600),

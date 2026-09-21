@@ -4,8 +4,9 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 with batch upload to Strava.
 
 **Status:** Phases 0–4 complete and exercised against real data, plus seeded UI tests, bulk detail
-backfill, a configurable route colour and a detail map that follows the selection. Next: Phase 5
-(detail view — heart-rate charts and splits), with two known issues outstanding.
+backfill, a configurable route colour, a detail map that follows the selection, and correct
+pace/GPS-quality handling. **Every known issue found so far is fixed.** Next: Phase 5 (detail view
+— heart-rate charts and splits).
 **Last updated:** 2026-09-21.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first. It carries the
@@ -21,7 +22,7 @@ thumbnails render as real maps with the track drawn on them.
 | | |
 |---|---|
 | Builds | clean, **zero warnings** — check with `XcodeListNavigatorIssues` at `severity: warning`; `BuildProject` reports only errors |
-| Tests | 105 in `MaxActCore` (`swift test`), 25 app/UI tests including 13 seeded (`RunAllTests`) |
+| Tests | 120 in `MaxActCore` (`swift test`), 25 app/UI tests including 13 seeded (`RunAllTests`) |
 | Live MCP suite | passes against the phone; skipped unless `MAXACT_LIVE_HOST`/`MAXACT_LIVE_TOKEN` are set |
 | Verified with real data | 13 workouts synced; detail fetch produced 3311 route points and 664 HR samples; thumbnails written to the sandbox container |
 
@@ -63,26 +64,32 @@ something now recorded in the skill reference:
 Found by using the app. Not blocking, not yet done — each has a diagnosis or a design sketch so
 picking it up doesn't start from scratch. Items marked *(feature)* are wants, not defects.
 
-Issues 2, 3 and 5 are done; 1 and 4 remain, and should be taken together — see issue 1.
+All five are now done. They are kept here rather than deleted because each records a diagnosis
+worth not rediscovering — in particular, issues 1 and 4 were both *misdiagnosed* in this list
+until the data was measured.
 
-**1. Average speed and pace include time spent stopped.**
+**1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
-`Workout.effectiveSpeedMetersPerSecond` uses HAE's `avgSpeed` when present and otherwise
-`distance / duration`. Neither excludes pauses, so a ride with coffee stops reads slower than it
-felt. The measured walk shows the effect plainly: 3.73 km in 55:20 renders as **19:40 /km**, about
-60% slower than an ordinary walking pace.
+The cause turned out to be nothing to do with pauses, and measuring first saved building the wrong
+thing. `effectiveSpeedMetersPerSecond` preferred HAE's `avgSpeed`, and **`avgSpeed` is the
+arithmetic mean of the per-point instantaneous speeds** — it matched that mean to six significant
+figures in all five measured workouts. That mean includes every sample recorded while stopped
+(6–27% of points), so it is biased low by 13–31%, by a varying amount.
 
-Note `duration` is HAE's own figure and is already shorter than wall-clock time — 35:17 against a
-94.7-minute span for one ride — so it excludes *something*, but evidently not all stopped time.
-Worth establishing what it actually measures before building on it.
+Meanwhile `duration` is *already* moving time: 509–2,154 s against wall-clock spans of
+551–6,240 s, and it agreed with a moving time computed from the route's own speeds to within 3%
+every time. So the fix is simply to prefer **distance ÷ duration**, which needs no series and works
+in the list for every workout immediately. The evidence that it's the unbiased figure: across four
+rides by the same rider it gives 5.37–5.55 m/s, where `avgSpeed` scattered over 3.75–4.87 m/s. The
+measured walk went from 19:40 /km to **14:50 /km**. `avgSpeed` is kept only as a last resort for a
+workout with no distance.
 
-The raw material for a proper figure is already stored: route points carry per-point `speed` and
-timestamps. Moving time can be derived by discarding samples below a speed threshold and gaps
-above a time threshold. Two caveats: thresholds should differ by activity (a walking pause is not
-a cycling pause), and **this needs the series, so it is only available after detail download** —
-the list view would show the elapsed figure until then, which needs to be either labelled or
-backfilled. `.hae` files carry explicit `pause`/`motionPaused` events that would settle it exactly,
-which is one more argument for the `.hae` reader noted in Phase 1.
+Moving time is still computed, as a *refinement* rather than the fix, because activities the watch
+doesn't auto-pause don't benefit from the above — the walk's `duration` equalled its full
+55.3-minute span, with 12.3 minutes of it standing still. The detail pane shows both, labelled
+**Elapsed Pace** and **Moving Pace** (14:50 against 11:30 for that walk); the list shows the
+elapsed figure, which is the one always available. Thresholds are per activity — a cyclist at
+0.6 m/s is stopped at a light, a walker at 0.6 m/s is walking.
 
 **2. ~~The detail map opens on the previously selected workout's region.~~ — done 2026-09-21.**
 
@@ -138,27 +145,39 @@ again; `Delete All Workouts` clears them.
 Verified by decoding a rendered PNG: 605 pixels of `(247, 93, 42)` — the stroke, antialiased over
 real map tiles.
 
-**4. No detection of bad GPS fixes.** *(feature, not a defect — for later)*
+**4. ~~No detection of bad GPS fixes.~~ — done 2026-09-21.** *(feature)*
 
-Apple Watch and phone GPS produce two artifacts worth catching, and they corrupt different things:
+`RouteQuality` in `MaxActCore/Model`, filtering **on read** as planned: the stored series keeps
+exactly what the watch recorded, so thresholds can change without re-syncing and a future TCX
+export can choose which track to carry.
 
-- **Stuck fixes** — the receiver repeats the previous position for a run of samples. Inflates
-  stopped time and drags pace down, so this compounds issue 1: a naive moving-time calculation
-  would read a stuck run as a legitimate pause, and a distance calculation reads it as standing
-  still. Detectable as consecutive identical or near-identical coordinates over a span where
-  time is still advancing.
-- **Outlier spikes** — a single fix lands far away and the next returns. Inflates distance and
-  wrecks the thumbnail's bounding box, since one bad point can zoom the whole map out to nothing.
-  Detectable as an implausible instantaneous speed into and back out of a point.
+The signature was measured, not guessed, and it is not the one sketched above. Every
+kilometre-scale teleport across five real workouts landed on a point with **no
+`speedMetersPerSecond` and a horizontal accuracy above ~30 m** — the worst a 1,826 m jump between
+samples one second apart. Good fixes had a median accuracy of 8–16 m, the bad ones 35–39 m.
+Dropping that combination discards 0.0–0.7% of a route and takes the worst implied speed from
+1,826 m/s to 51 m/s; the remainder are 30–74 m wobbles, too small to distort the track or the
+framing. The rule never looks at movement, so it cannot mistake genuine speed for an artifact.
 
-The inputs are already stored and unused: every route point carries `horizontalAccuracy`, and
-most carry `speed` and `verticalAccuracy` (see the data contract reference). A first pass could
-simply drop points above an accuracy threshold before computing distance or drawing.
+**Two things the sketch above proposed were measured and rejected.**
 
-Worth deciding early whether cleaning is **destructive or a view**. Keeping the raw series and
-filtering on read is preferable: it stays honest about what the watch recorded, it lets the
-thresholds change later without re-syncing, and an exported TCX can then choose whether to carry
-the raw or cleaned track.
+*Implausible instantaneous speed.* At 1 Hz the GPS noise floor is itself several metres per second.
+With a walking ceiling of 3 m/s the detector fired on **3–5 metre steps** — jitter, not
+teleportation. Raised to a ceiling safe from false positives (5 m/s walking, 30 m/s cycling) it
+never fired at all on real data. A knob that either misfires or no-ops is worse than no knob.
+
+*Stuck fixes.* 3–18% of points with runs up to 33 samples, but at a 10 m accuracy floor they are
+indistinguishable from genuinely standing still, and deleting them would delete real pauses.
+`movingTime(for:)` treats them as what they are instead.
+
+Also settled: **don't compute distance from the route.** Summing raw 1 Hz steps inflated a 3.73 km
+walk to 5.55 km and an 11.66 km ride to 17.39 km, because it accumulates every metre of jitter.
+HAE's own distance, from HealthKit's fused sensors, is the trustworthy figure.
+
+The detail pane reports what was dropped — *"7 GPS fixes left out of the map as implausible. The
+recording itself is unchanged."* — rather than quietly changing the numbers. The thumbnail cache
+key gained a `drawingVersion`, because a single bad fix can be a 20-pixel spur on a 96-pixel
+thumbnail and images cached before the filter had to be redrawn.
 
 **5. ~~Backfill detail for everything~~ — done 2026-09-20.** *(feature)*
 
@@ -775,7 +794,28 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 
 ### Change log
 
-- **2026-09-21 (latest)** — Fixed the detail map inheriting the previous selection's region (known
+- **2026-09-21 (latest)** — Fixed the last two known issues, both of which the list had
+  **misdiagnosed**; an hour measuring five real workouts first changed what got built.
+
+  *Pace (issue 1)* was blamed on stopped time. In fact HAE's `avgSpeed` is the mean of
+  instantaneous per-point speeds — matching to six significant figures — and `duration` is
+  already moving time. Preferring `distance ÷ duration` fixes it with no series dependency; the
+  walk went 19:40 → 14:50 /km and the rides tightened from a 3.75–4.87 m/s scatter to 5.37–5.55.
+  Moving time survives as a labelled refinement for activities the watch doesn't auto-pause.
+
+  *Bad GPS fixes (issue 4)* were expected to need an implausible-speed detector. Measured, that
+  detector fires on 3–5 metre jitter at any useful threshold and on nothing at a safe one. The
+  real signature is a fix with **no speed and accuracy above 30 m**; dropping those removes every
+  kilometre-scale teleport for 0.0–0.7% of the points. Filtering is on read, the raw series is
+  untouched, and the detail pane says how many fixes it left out.
+
+  Also fixed, found while running the suite: **13 seeded UI tests could not launch the app at
+  all.** `--ui-testing-seed 40` as two tokens leaves a stray `40` after `NSUserDefaults` pairs
+  arguments, AppKit reads a stray argument as a file to open, and that suppresses `WindowGroup`'s
+  window — `App.body` runs, its content closure never does. Now passed as `--ui-testing-seed=40`.
+  Worth knowing that this is invisible under `open --args`, which launches fine.
+
+- **2026-09-21** — Fixed the detail map inheriting the previous selection's region (known
   issue 2) by driving it from a bound `MapCameraPosition` set after the series loads, rather than
   `initialPosition`, which applies once per view and so never moved on a reused view. The same
   reuse was silently showing the previous workout's route under the new header; the loaded series

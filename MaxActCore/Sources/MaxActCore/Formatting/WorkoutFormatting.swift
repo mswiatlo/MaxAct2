@@ -74,15 +74,40 @@ public enum WorkoutFormatting {
 }
 
 extension Workout {
-    /// Average speed over the workout, derived from distance and duration when HAE didn't supply
-    /// one. `avgSpeed` is frequently absent, and a blank pace column for every run is worse than
-    /// a computed one.
+    /// Average speed over the workout: **distance ÷ duration**, in preference to Health Auto
+    /// Export's own `avgSpeed`.
+    ///
+    /// This used to prefer `avgSpeed`, which made every pace read far too slow — a 3.73 km walk in
+    /// 55:20 showed as 19:40 /km. Measuring five real workouts identified why: `avgSpeed` equals
+    /// the **arithmetic mean of the per-point instantaneous speeds**, matching to six significant
+    /// figures in all five cases. That mean includes every sample taken while stopped (6–27% of
+    /// points), so it is biased low by 13–31% and the bias varies with how much the athlete
+    /// stopped.
+    ///
+    /// `duration` is the better denominator because it is not wall-clock time — it already
+    /// excludes paused segments, measured at 509–2,154 s against spans of 551–6,240 s. The result
+    /// is both unbiased and stable: distance ÷ duration gave 5.37–5.55 m/s across four rides by
+    /// the same rider, where `avgSpeed` scattered over 3.75–4.87 m/s.
+    ///
+    /// `avgSpeed` stays as a last resort for a workout with no distance, where nothing better
+    /// exists; it is biased, but an em dash in every pace cell is worse.
     public var effectiveSpeedMetersPerSecond: Double? {
-        if let averageSpeedMetersPerSecond, averageSpeedMetersPerSecond > 0 {
-            return averageSpeedMetersPerSecond
+        if let distanceMeters, distanceMeters > 0, duration > 0 {
+            return distanceMeters / duration
         }
-        guard let distanceMeters, distanceMeters > 0, duration > 0 else { return nil }
-        return distanceMeters / duration
+        guard let averageSpeedMetersPerSecond, averageSpeedMetersPerSecond > 0 else { return nil }
+        return averageSpeedMetersPerSecond
+    }
+
+    /// Average speed over the time actually spent moving, or `nil` without a stored route.
+    ///
+    /// Only materially different from ``effectiveSpeedMetersPerSecond`` for activities the watch
+    /// doesn't auto-pause — see ``WorkoutSeries/movingTime(for:)``.
+    public func movingSpeedMetersPerSecond(using series: WorkoutSeries) -> Double? {
+        guard let distanceMeters, distanceMeters > 0,
+              let moving = series.movingTime(for: kind), moving > 0
+        else { return nil }
+        return distanceMeters / moving
     }
 }
 

@@ -51,12 +51,16 @@ struct WorkoutDetailView: View {
 
     private var workout: Workout { item.workout }
 
-    /// The series plus everything derived from it that the map needs, computed once per selection
-    /// instead of on every body evaluation.
+    /// The series plus everything derived from it, computed once per selection instead of on every
+    /// body evaluation.
     private struct LoadedSeries {
         let id: String
         let series: WorkoutSeries
         let coordinates: [CLLocationCoordinate2D]
+        /// Spurious fixes dropped from the drawn track. Reported rather than hidden — the map is
+        /// then demonstrably not the raw recording.
+        let discardedFixes: Int
+        let movingSpeedMetersPerSecond: Double?
     }
 
     var body: some View {
@@ -86,15 +90,20 @@ struct WorkoutDetailView: View {
 
         guard let series = await model.seriesStore.loadIfAvailable(item.id) else { return }
 
+        // Cleaned before anything else looks at it: one bad fix draws a kilometres-long spike
+        // across the map, and the stored blob keeps the raw recording either way.
+        let route = series.cleanedRoute
         // Simplified for display too: drawing 12,645 points into a few hundred on-screen pixels
         // costs a great deal and shows nothing extra.
-        let simplified = RouteSimplifier.simplify(series.route.map(\.coordinate), fittingPixels: 900)
+        let simplified = RouteSimplifier.simplify(route.map(\.coordinate), fittingPixels: 900)
         loaded = LoadedSeries(
             id: item.id,
             series: series,
             coordinates: simplified.map {
                 CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
-            }
+            },
+            discardedFixes: series.route.count - route.count,
+            movingSpeedMetersPerSecond: workout.movingSpeedMetersPerSecond(using: series)
         )
 
         // 30% headroom so the track isn't flush against the edges. Set last, once the route is
@@ -147,27 +156,48 @@ struct WorkoutDetailView: View {
     }
 
     private var statsGrid: some View {
-        Grid(alignment: .leading, horizontalSpacing: 28, verticalSpacing: 10) {
-            GridRow {
-                stat("Duration", WorkoutFormatting.duration(workout.duration))
-                stat("Distance", WorkoutFormatting.distance(workout.distanceMeters))
-                stat("Energy", WorkoutFormatting.energy(kilocalories: workout.activeEnergyKilocalories))
-            }
-            GridRow {
-                stat("Avg Pace", WorkoutFormatting.paceOrSpeed(
-                    metersPerSecond: workout.effectiveSpeedMetersPerSecond, for: workout.kind))
-                stat("Avg HR", WorkoutFormatting.heartRate(workout.averageHeartRate))
-                stat("Max HR", WorkoutFormatting.heartRate(workout.maximumHeartRate))
-            }
-            GridRow {
-                stat("Ascent", WorkoutFormatting.elevation(meters: workout.elevationAscendedMeters))
-                stat("Descent", WorkoutFormatting.elevation(meters: workout.elevationDescendedMeters))
-                if let loaded, loaded.id == item.id {
-                    stat(
-                        "Samples",
-                        "\(loaded.series.route.count) pts · \(loaded.series.heartRate.count) HR"
-                    )
+        // Only trust the loaded series when it belongs to the workout on screen.
+        let series = loaded.flatMap { $0.id == item.id ? $0 : nil }
+
+        return VStack(alignment: .leading, spacing: 10) {
+            Grid(alignment: .leading, horizontalSpacing: 28, verticalSpacing: 10) {
+                GridRow {
+                    stat("Duration", WorkoutFormatting.duration(workout.duration))
+                    stat("Distance", WorkoutFormatting.distance(workout.distanceMeters))
+                    stat("Energy", WorkoutFormatting.energy(kilocalories: workout.activeEnergyKilocalories))
                 }
+                GridRow {
+                    // "Elapsed" rather than "Avg", now that a moving figure sits beside it —
+                    // labelling one of two averages simply "Avg" invites reading the wrong one.
+                    stat("Elapsed Pace", WorkoutFormatting.paceOrSpeed(
+                        metersPerSecond: workout.effectiveSpeedMetersPerSecond, for: workout.kind))
+                    if let moving = series?.movingSpeedMetersPerSecond {
+                        stat("Moving Pace", WorkoutFormatting.paceOrSpeed(
+                            metersPerSecond: moving, for: workout.kind))
+                    }
+                    stat("Avg HR", WorkoutFormatting.heartRate(workout.averageHeartRate))
+                    stat("Max HR", WorkoutFormatting.heartRate(workout.maximumHeartRate))
+                }
+                GridRow {
+                    stat("Ascent", WorkoutFormatting.elevation(meters: workout.elevationAscendedMeters))
+                    stat("Descent", WorkoutFormatting.elevation(meters: workout.elevationDescendedMeters))
+                    if let series {
+                        stat(
+                            "Samples",
+                            "\(series.series.route.count) pts · \(series.series.heartRate.count) HR"
+                        )
+                    }
+                }
+            }
+
+            if let discarded = series?.discardedFixes, discarded > 0 {
+                Label(
+                    "\(discarded) GPS \(discarded == 1 ? "fix" : "fixes") left out of the map as "
+                        + "implausible. The recording itself is unchanged.",
+                    systemImage: "antenna.radiowaves.left.and.right.slash"
+                )
+                .font(.callout)
+                .foregroundStyle(.secondary)
             }
         }
     }

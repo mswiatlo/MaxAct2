@@ -11,14 +11,23 @@ struct MaxActApp: App {
     /// deterministic instead of depending on whatever happens to be synced.
     static let isUITesting = ProcessInfo.processInfo.arguments.contains("--ui-testing")
 
-    /// `--ui-testing-seed <n>` plants n synthetic workouts in the in-memory store. Only honoured
+    /// `--ui-testing-seed=<n>` plants n synthetic workouts in the in-memory store. Only honoured
     /// alongside `--ui-testing`, so it can never touch the real database.
+    ///
+    /// **The `=` is load-bearing.** Passed as two tokens — `--ui-testing-seed 40` — the app never
+    /// opens a window at all when launched by anything other than LaunchServices, which is exactly
+    /// how XCUITest launches it. `NSUserDefaults` builds its argument domain by pairing each
+    /// `-key` with the *following* token, so it consumes `--ui-testing-seed` as the value of
+    /// `-ui-testing` and leaves the bare `40` as a stray argument. AppKit reads a stray argument
+    /// as a file to open, and that request — for a document this app can't open, in an app with no
+    /// `DocumentGroup` — suppresses `WindowGroup`'s window. `App.body` runs; its content closure
+    /// never does. Joining the value into one token leaves nothing stray.
     static var uiTestingSeedCount: Int? {
-        let arguments = ProcessInfo.processInfo.arguments
-        guard let flag = arguments.firstIndex(of: "--ui-testing-seed"),
-              arguments.index(after: flag) < arguments.endIndex
+        let prefix = "--ui-testing-seed="
+        guard let argument = ProcessInfo.processInfo.arguments
+            .first(where: { $0.hasPrefix(prefix) })
         else { return nil }
-        return Int(arguments[arguments.index(after: flag)])
+        return Int(argument.dropFirst(prefix.count))
     }
 
     init() {

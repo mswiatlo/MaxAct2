@@ -171,6 +171,39 @@ the bundle lean. Check `Contents/Frameworks/` after any change here.
 Warnings are reported by `XcodeListNavigatorIssues` with `severity: "warning"`; `BuildProject`
 reports only errors, so a clean build result does not mean a clean build.
 
+## A launch argument's value must be `=`-joined, or the app gets no window
+
+This cost an hour and looked like everything except what it was. Thirteen seeded UI tests failed
+with *"no window appeared"* while the twelve non-seeded ones passed, and the app was demonstrably
+healthy: launched with `open -n -a MaxAct2.app --args --ui-testing --ui-testing-seed 10` it came
+up correctly with ten seeded workouts.
+
+The cause is argument parsing, and seeding was irrelevant — `--ui-testing --dummy-flag 10`
+reproduced it exactly. `NSUserDefaults` builds its argument domain by pairing each `-key` with the
+*following* token, so with
+
+```
+--ui-testing --ui-testing-seed 40
+```
+
+it consumes `--ui-testing-seed` as the value of `-ui-testing`, leaving a bare `40`. **AppKit reads
+a stray argument as a file to open**, and that request — for a document this app can't open, in an
+app with no `DocumentGroup` — suppresses `WindowGroup`'s window entirely. `App.body` evaluates;
+its content closure never does; the process sits idle in the event loop at 0% CPU with no window,
+forever. Pass `--ui-testing-seed=40` as one token and there is nothing stray.
+
+Two things that make this hard to find, worth remembering:
+
+- **`open --args` doesn't reproduce it.** LaunchServices doesn't turn leftover arguments into open
+  requests, so the app looks fine exactly when you test it the convenient way. XCUITest's launch
+  does reproduce it, as does exec'ing the binary directly.
+- **Raising the timeout doesn't help**, so it doesn't look like slowness. 60 s fails the same as
+  15 s.
+
+The general rule: any launch argument that carries a *value* should be a single `--key=value`
+token. To diagnose this class of thing, probe whether `WindowGroup`'s content closure runs at all
+— and write the probe to `NSTemporaryDirectory()`, because the sandbox blocks `/tmp`.
+
 ## UI tests must be launched with `--ui-testing`
 
 `MaxAct2UITests` drives the real app, which means it also drives the real *data*. A test that typed

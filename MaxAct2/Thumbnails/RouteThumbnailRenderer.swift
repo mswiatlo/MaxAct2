@@ -30,8 +30,15 @@ final class RouteThumbnailRenderer {
         /// the old colour until something else happened to invalidate it.
         let routeColor: RouteColor
 
+        /// Bump when anything about *how* the track is drawn changes, as opposed to what is drawn
+        /// from. `2` introduced `RouteQuality` filtering: a single spurious fix can be a 20-pixel
+        /// spur on a 96-pixel thumbnail, so images cached before it had to be redrawn rather than
+        /// left showing an artifact the detail map no longer has.
+        static let drawingVersion = 2
+
         var fileName: String {
-            "\(workoutID)-\(width)x\(height)-\(isDark ? "dark" : "light")-\(routeColor.cacheToken).png"
+            "\(workoutID)-\(width)x\(height)-\(isDark ? "dark" : "light")"
+                + "-\(routeColor.cacheToken)-v\(Self.drawingVersion).png"
         }
         var cacheKey: NSString { fileName as NSString }
     }
@@ -103,7 +110,9 @@ final class RouteThumbnailRenderer {
         }
 
         guard let series = await seriesStore.loadIfAvailable(key.workoutID) else { return nil }
-        guard let prepared = Self.prepare(series.route.map(\.coordinate), pixels: key.width) else {
+        guard let prepared = Self.prepare(
+            series.cleanedRoute.map(\.coordinate), pixels: key.width
+        ) else {
             return nil
         }
         if Task.isCancelled { return nil }

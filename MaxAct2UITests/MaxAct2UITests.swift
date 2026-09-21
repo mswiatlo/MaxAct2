@@ -29,7 +29,7 @@ final class MaxAct2UITests: XCTestCase {
         // Isolates the app's defaults and database from the real ones. These tests type into the
         // connection fields, and without this a test run overwrites the user's own token.
         app.launchArguments = ["--ui-testing"]
-        if let seed { app.launchArguments += ["--ui-testing-seed", String(seed)] }
+        if let seed { app.launchArguments.append("--ui-testing-seed=\(seed)") }
         app.launch()
         addTeardownBlock { await MainActor.run { app.terminate() } }
         XCTAssertTrue(
@@ -270,7 +270,7 @@ final class MaxAct2UITests: XCTestCase {
 ///
 /// Every user-visible bug found so far escaped the suite for the same reason: the tests ran
 /// against an empty database, so the table, the thumbnail pipeline and the detail pane had
-/// nothing to go wrong with. These launch with `--ui-testing-seed`, which plants deterministic
+/// nothing to go wrong with. These launch with `--ui-testing-seed=<n>`, which plants deterministic
 /// synthetic workouts — some with a stored route, some awaiting download, some indoor — in the
 /// throwaway in-memory store.
 final class SeededTableUITests: XCTestCase {
@@ -283,7 +283,7 @@ final class SeededTableUITests: XCTestCase {
     @MainActor
     private func launchSeeded(_ count: Int = 40) -> XCUIApplication {
         let app = XCUIApplication(bundleIdentifier: Self.appBundleIdentifier)
-        app.launchArguments = ["--ui-testing", "--ui-testing-seed", String(count)]
+        app.launchArguments = ["--ui-testing", "--ui-testing-seed=\(count)"]
         app.launch()
         addTeardownBlock { await MainActor.run { app.terminate() } }
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 15))
@@ -493,7 +493,7 @@ final class DetailBackfillUITests: XCTestCase {
     @MainActor
     private func launchSeeded(_ count: Int) -> XCUIApplication {
         let app = XCUIApplication(bundleIdentifier: Self.appBundleIdentifier)
-        app.launchArguments = ["--ui-testing", "--ui-testing-seed", String(count)]
+        app.launchArguments = ["--ui-testing", "--ui-testing-seed=\(count)"]
         app.launch()
         addTeardownBlock { await MainActor.run { app.terminate() } }
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 15))
@@ -579,7 +579,7 @@ final class DeleteDataUITests: XCTestCase {
     @MainActor
     private func launchSeeded(_ count: Int) -> XCUIApplication {
         let app = XCUIApplication(bundleIdentifier: Self.appBundleIdentifier)
-        app.launchArguments = ["--ui-testing", "--ui-testing-seed", String(count)]
+        app.launchArguments = ["--ui-testing", "--ui-testing-seed=\(count)"]
         app.launch()
         addTeardownBlock { await MainActor.run { app.terminate() } }
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 15))

@@ -150,7 +150,44 @@ on the phone side, and plenty of reason to downsample before drawing.
 
 Intervals are *not* uniform: median 1 s but individual gaps of 1800–3000 s appear where the workout
 was paused. Never assume evenly spaced samples, and don't interpolate across a long gap — it would
-draw a straight line through a pause.
+draw a straight line through a pause. Point timestamps span the full wall clock: `sum(dt)` equalled
+`last - first` exactly in all five measured workouts, so pauses are visible as gaps rather than
+being elided.
+
+### Bad fixes have a specific signature *(measured over five workouts)*
+
+A point with **no `speed` and `horizontalAccuracy` above ~30 m is not a real position.** Every
+kilometre-scale teleport found — worst case 1,826 m between samples 1 s apart — matched that
+combination. Accuracy separates the populations cleanly: fixes carrying a speed had a median
+accuracy of 8–16 m, fixes missing one 35–39 m. Filtering on it drops 0.0–0.7% of a route.
+
+Either condition alone is *not* grounds for suspicion. Plenty of good fixes carry no speed, and a
+poor-accuracy fix still carries usable position.
+
+Do **not** try to detect artifacts by implausible instantaneous speed. At 1 Hz the noise floor is
+several m/s: a walking ceiling of 3 m/s flags 3–5 metre steps, and a ceiling high enough to avoid
+that never fires. See `RouteQuality` for the full write-up.
+
+### Don't compute distance from the route
+
+Summing raw 1 Hz steps inflated a 3.73 km walk to **5.55 km** and an 11.66 km ride to **17.39 km**
+— roughly +49% in both cases, because every metre of jitter accumulates. HAE's workout-level
+`distance` comes from HealthKit's fused sensors and is the figure to trust.
+
+### `avgSpeed` is a mean of samples, not distance over time
+
+`avgSpeed` equals the **arithmetic mean of the per-point instantaneous speeds**, matched to six
+significant figures on all five workouts. It therefore includes every sample recorded while
+stopped (6–27% of points) and reads 13–31% low, by an amount that varies with how much the athlete
+stopped. Prefer `distance ÷ duration`.
+
+### `duration` is moving time, not elapsed time
+
+Measured: 509–2,154 s of `duration` against wall-clock spans of 551–6,240 s, and `duration` agreed
+with a moving time derived from the route's own speeds to within 3% every time. HealthKit excludes
+auto-paused segments. **But only where the watch auto-pauses** — a measured walk had `duration`
+exactly equal to its 55.3-minute span while containing 12.3 minutes of standing still. So
+`distance ÷ duration` is a true moving average for cycling and an elapsed average for walking.
 
 ## Heart rate
 
