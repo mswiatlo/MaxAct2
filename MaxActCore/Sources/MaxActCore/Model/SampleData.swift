@@ -28,6 +28,26 @@ public enum SampleData {
         kinds[index % kinds.count]
     }
 
+    /// A believable pace for each activity, in metres per second.
+    ///
+    /// Distance is derived from duration and this, rather than chosen independently. Independent
+    /// values produced nonsense the seeded table displayed plainly — a hike covering 16 km in
+    /// 20 minutes, rendered as `1:15 /km`. Sample data you can't sanity-check by eye is worth
+    /// much less, since the whole point is to make wrong output visible.
+    private static func typicalSpeed(_ kind: ActivityKind) -> Double {
+        switch kind {
+        case .running: 3.1          // ~5:20 /km
+        case .walking: 1.4          // ~11:54 /km
+        case .hiking: 1.1           // ~15:09 /km
+        case .cycling: 6.4          // ~23 km/h
+        case .indoorCycling: 7.0    // ~25 km/h
+        case .swimming: 1.0
+        case .rowing: 3.5
+        case .elliptical: 2.5
+        case .strengthTraining, .functionalTraining, .yoga, .other: 0
+        }
+    }
+
     /// `count` workouts, one per day working backwards from `endingAt`, newest first.
     public static func workouts(
         count: Int,
@@ -40,7 +60,12 @@ public enum SampleData {
             // table where every row is identical can't catch a broken sort.
             let minutes = Double(20 + (index * 7) % 70)
             let duration = minutes * 60
-            let distance = kind.isDistanceBased ? Double(3_000 + (index * 1_300) % 22_000) : nil
+            // ±15% around the typical pace, so sorting by pace still varies while every row
+            // stays plausible.
+            let variation = 0.85 + Double((index * 7) % 30) / 100
+            let distance = kind.isDistanceBased
+                ? (duration * typicalSpeed(kind) * variation).rounded()
+                : nil
             let indoor = kind == .indoorCycling || kind == .strengthTraining
 
             return Workout(
@@ -113,7 +138,9 @@ public enum SampleData {
     /// and conflating two of them was a real bug.
     public static func ingested(
         count: Int,
-        withSeriesEvery: Int = 3,
+        // Coprime with the number of activity kinds, so the workouts that get a route aren't
+        // always the same activity. At 3 against 6 kinds, only cycling ever had one.
+        withSeriesEvery: Int = 5,
         endingAt end: Date = Date(timeIntervalSince1970: 1_760_000_000)
     ) -> [IngestedWorkout] {
         workouts(count: count, endingAt: end).enumerated().map { index, workout in

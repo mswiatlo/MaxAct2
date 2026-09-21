@@ -3,9 +3,9 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**,
 with batch upload to Strava.
 
-**Status:** Phases 0–4 complete and exercised against real data. Seeded UI tests are in — the
-table, thumbnails and multi-select now have coverage that can actually see them. Next: bulk
-detail backfill (item 5), then Phase 5.
+**Status:** Phases 0–4 complete and exercised against real data, plus seeded UI tests and bulk
+detail backfill. Next: Phase 5 (detail view — heart-rate charts and splits), with five known
+issues outstanding.
 **Last updated:** 2026-09-20.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first. It carries the
@@ -21,7 +21,7 @@ thumbnails render as real maps with the track drawn on them.
 | | |
 |---|---|
 | Builds | clean, **zero warnings** — check with `XcodeListNavigatorIssues` at `severity: warning`; `BuildProject` reports only errors |
-| Tests | 88 in `MaxActCore` (`swift test`), 19 app/UI tests including 7 seeded (`RunAllTests`) |
+| Tests | 93 in `MaxActCore` (`swift test`), 22 app/UI tests including 10 seeded (`RunAllTests`) |
 | Live MCP suite | passes against the phone; skipped unless `MAXACT_LIVE_HOST`/`MAXACT_LIVE_TOKEN` are set |
 | Verified with real data | 13 workouts synced; detail fetch produced 3311 route points and 664 HR samples; thumbnails written to the sandbox container |
 
@@ -134,40 +134,22 @@ filtering on read is preferable: it stays honest about what the watch recorded, 
 thresholds change later without re-syncing, and an exported TCX can then choose whether to carry
 the raw or cleaned track.
 
-**5. Backfill detail for everything, not one selection at a time.** *(feature)*
+**5. ~~Backfill detail for everything~~ — done 2026-09-20.** *(feature)*
 
-Selecting rows and pressing Download Detail works, but it doesn't scale to a corpus: the
-two-pass design leaves every list-synced workout without a route until someone asks for it by
-hand. Wanted: a "Fill In Missing Detail" action that walks the backlog on its own.
+"Missing Detail" lives in the sync panel beneath Start Sync, as agreed. The button states the
+count and the cost — *"Download 24 Workouts — about 1 minute"* — so the price is visible before
+committing rather than discovered in a progress bar. A scope choice between all workouts and the
+current filter appears **only when the filter actually narrows the backlog**, so it costs nothing
+when it would say the same thing twice. Work proceeds newest-first, refreshes the table every few
+workouts so a long run fills in visibly, and stops cleanly, keeping everything already fetched.
 
-**Most of this already exists.** `WorkoutStore.itemsNeedingDetail(limit:)` is written and tested,
-`AppModel.fetchDetail(for:source:)` already loops workouts and commits each one, and `hasDetail`
-per workout makes the whole thing naturally resumable — finer-grained than the list pass, which
-resumes by week. What's missing is an entry point and a policy.
+Two things fell out of building it. `SyncStatus` now carries which job is running — the banner
+previously said "Syncing week 3 of 8" during a backfill, which counts workouts, not weeks. And the
+per-workout cost moved into `SyncEstimate` in `MaxActCore`, shared with the range picker so the
+two estimates can't drift, with the measured 2.4 s pinned by a test since the UI quotes it.
 
-The cost has to be stated before anyone starts it, because it is not small. From the Phase 1
-measurements: **~2.4 s and ~2.5 MB transferred per workout**, against ~140 KB stored after LZFSE.
-For the full ~2,867-workout corpus that's roughly **1.9 hours of foregrounded phone and ~7 GB
-transferred**, to produce ~0.4 GB on disk. So it needs the same treatment as the list pass —
-progress, a stop button, and resumption — and it should say what it's about to cost up front.
-
-Design, agreed 2026-09-20:
-
-- **It lives in the sync panel**, as a second action beneath Start Sync — not a separate toolbar
-  button. It shares the panel's precondition (HAE open and foregrounded), its progress display and
-  its stop control, and the toolbar already carries four controls. The panel should show the
-  backlog count so the action is self-explaining: *"Fill In Missing Detail (1,204 workouts,
-  about 48 minutes)"*.
-- **Scope is a choice**, mirroring the range picker: everything, or just the current sidebar
-  filter / selection. Filling in one month or one activity type is often what's actually wanted,
-  and the filters already exist.
-- **Newest first**, matching the list pass, so the workouts most likely to be opened arrive first.
-- **Any automatic trickle defaults off**, is visibly on or off, and stops instantly. Quietly
-  occupying the phone for two hours is not acceptable even with a one-time opt-in.
-
-Sequencing note: this is more valuable *after* the seeded UI tests, since it multiplies the amount
-of detail flowing through the thumbnail and detail paths — the two areas where every bug so far
-has been found.
+Not built: the opt-in background trickle. The manual action covers the need, and an automatic one
+that occupies the phone for hours deserves its own design pass rather than being tacked on.
 
 ### Seeded UI tests — done 2026-09-20
 

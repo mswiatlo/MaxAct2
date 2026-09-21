@@ -34,13 +34,10 @@ enum SyncRange: String, CaseIterable, Identifiable {
         end.addingTimeInterval(-years * 365 * 24 * 3600)
     }
 
-    /// Rough duration, from the measured ~2.4 s per workout at ~1.1 workouts a day. Sync is slow
-    /// in a way that surprises people, so say so before they commit to it.
+    /// Rough duration. The per-workout cost lives in `SyncEstimate`, shared with the detail
+    /// backfill so the two can't drift apart.
     var estimate: String {
-        let seconds = years * 365 * 1.12 * 2.4
-        if seconds < 90 { return "about \(Int(seconds.rounded())) seconds" }
-        if seconds < 5400 { return "about \(Int((seconds / 60).rounded())) minutes" }
-        return "about \(String(format: "%.1f", seconds / 3600)) hours"
+        SyncEstimate.describe(SyncEstimate.seconds(forDays: years * 365))
     }
 }
 
@@ -70,6 +67,7 @@ struct SyncPanel: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var range: SyncRange = .month
+    @State private var backfillScope: AppModel.BackfillScope = .everything
 
     var body: some View {
         @Bindable var settings = model.settings
@@ -84,6 +82,8 @@ struct SyncPanel: View {
                 connection(host: $settings.host, token: $settings.token)
                 Divider()
                 importControls(isReady: model.settings.isConfigured)
+                Divider()
+                backfillControls(isReady: model.settings.isConfigured)
             }
         }
         .padding(18)
@@ -181,16 +181,72 @@ struct SyncPanel: View {
         }
     }
 
+    // MARK: - Detail backfill
+
+    /// Fills in routes and second-resolution series for workouts that only have summaries.
+    ///
+    /// Lives here rather than in the toolbar because it shares everything with Start Sync: the
+    /// same precondition (HAE open and foregrounded), the same progress banner, the same stop
+    /// control. The toolbar already carries four controls.
+    ///
+    /// The count and the estimate are in the button itself, so the cost is visible *before*
+    /// committing to it — a full backlog is hours of foregrounded phone.
+    @ViewBuilder
+    private func backfillControls(isReady: Bool) -> some View {
+        let count = model.backlogCount(backfillScope)
+
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Missing Detail")
+                .font(.headline)
+
+            Text("A sync fetches summaries only. Routes and second-by-second heart rate are "
+                 + "downloaded separately, one workout at a time.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            // Only worth offering a scope when the current filter actually narrows things.
+            if model.backlogCount(.visible) != model.backlogCount(.everything) {
+                Picker("Fill in", selection: $backfillScope) {
+                    Text("All workouts (\(model.backlogCount(.everything)))")
+                        .tag(AppModel.BackfillScope.everything)
+                    Text("Current filter (\(model.backlogCount(.visible)))")
+                        .tag(AppModel.BackfillScope.visible)
+                }
+                .pickerStyle(.radioGroup)
+            }
+
+            Button {
+                model.startDetailBackfill(scope: backfillScope)
+                dismiss()
+            } label: {
+                if count == 0 {
+                    Text("Everything Is Downloaded")
+                } else {
+                    Text("Download \(count) Workout\(count == 1 ? "" : "s") — "
+                         + SyncEstimate.describe(workoutCount: count))
+                }
+            }
+            .disabled(!isReady || count == 0)
+        }
+    }
+
     // MARK: - Running
 
     @ViewBuilder
     private var running: some View {
-        if case .running(let completed, let total, let found) = model.syncStatus {
+        if case .running(let activity, let completed, let total, let found) = model.syncStatus {
             VStack(alignment: .leading, spacing: 6) {
                 ProgressView(value: Double(completed), total: Double(max(total, 1)))
-                Text("Week \(completed) of \(total) · \(found) workouts imported")
+                Text(activity == .listing
+                     ? "Week \(completed) of \(total) · \(found) workouts imported"
+                     : "Workout \(completed) of \(total) · \(found) downloaded")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                // The remaining cost, kept live, since a backfill can run for hours.
+                Text("\(SyncEstimate.describe(workoutCount: max(total - completed, 0))) remaining")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
             Text("Keep Health Auto Export in the foreground until this finishes.")
                 .font(.caption)

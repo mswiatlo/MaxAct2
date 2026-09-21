@@ -34,24 +34,47 @@ final class AppModel {
 
     private(set) var syncStatus: SyncStatus = .idle
 
+    /// Which job the progress refers to. Without this the banner said "Syncing week 3 of 8"
+    /// during a detail backfill, which counts workouts rather than weeks.
+    enum SyncActivity: Equatable {
+        case listing
+        case fillingDetail
+    }
+
     enum SyncStatus: Equatable {
         case idle
-        case running(completed: Int, total: Int, found: Int)
-        case finished(found: Int)
+        case running(SyncActivity, completed: Int, total: Int, found: Int)
+        case finished(SyncActivity, found: Int)
         case failed(String)
 
         var isRunning: Bool { if case .running = self { true } else { false } }
 
         var message: String? {
             switch self {
-            case .idle: nil
-            case .running(let done, let total, let found):
+            case .idle:
+                nil
+            case .running(.listing, let done, let total, let found):
                 "Syncing week \(done + 1) of \(total) — \(found) workouts so far"
-            case .finished(let found):
+            case .running(.fillingDetail, let done, let total, _):
+                "Downloading detail — \(done) of \(total)"
+            case .finished(.listing, let found):
                 found == 0 ? "No new workouts" : "Synced \(found) workouts"
-            case .failed(let reason): reason
+            case .finished(.fillingDetail, let found):
+                found == 0 ? "Nothing left to download" : "Downloaded detail for \(found) workouts"
+            case .failed(let reason):
+                reason
             }
         }
+    }
+
+    /// What a detail backfill should cover.
+    enum BackfillScope: Hashable, CaseIterable, Identifiable {
+        /// Everything in the library.
+        case everything
+        /// Only what the sidebar filter and search currently show.
+        case visible
+
+        var id: Self { self }
     }
 
     // MARK: Dependencies
@@ -138,6 +161,23 @@ final class AppModel {
         items.count(where: selection.matches)
     }
 
+    /// Workouts still missing their route and second-resolution series, newest first.
+    ///
+    /// Newest first because those are the ones most likely to be opened, and because a backfill
+    /// of several thousand is going to be interrupted — whatever arrives first should be the
+    /// part that gets used.
+    func backlog(_ scope: BackfillScope) -> [WorkoutListItem] {
+        let pool = scope == .everything ? items : visibleItems
+        return pool
+            .filter { !$0.hasDetail }
+            .sorted { $0.workout.start > $1.workout.start }
+    }
+
+    func backlogCount(_ scope: BackfillScope) -> Int {
+        let pool = scope == .everything ? items : visibleItems
+        return pool.count { !$0.hasDetail }
+    }
+
     // MARK: Actions
 
     func load() async {
@@ -183,7 +223,7 @@ final class AppModel {
     func sync(source: HAEWorkoutSource, from start: Date, to end: Date = .now) async {
         guard !syncStatus.isRunning else { return }
         let windows = SyncPlanner.windowsNewestFirst(from: start, to: end)
-        syncStatus = .running(completed: 0, total: windows.count, found: 0)
+        syncStatus = .running(.listing, completed: 0, total: windows.count, found: 0)
 
         do {
             try await source.connect()
@@ -193,10 +233,10 @@ final class AppModel {
                 let result = try await source.listWorkouts(in: window)
                 try await store.upsert(result.workouts)
                 found += result.workouts.count
-                syncStatus = .running(completed: index + 1, total: windows.count, found: found)
+                syncStatus = .running(.listing, completed: index + 1, total: windows.count, found: found)
                 await load()
             }
-            syncStatus = .finished(found: found)
+            syncStatus = .finished(.listing, found: found)
         } catch {
             // Partial progress is kept: every completed chunk is already committed.
             syncStatus = .failed(Self.describe(error))
@@ -206,20 +246,26 @@ final class AppModel {
     /// Fetches routes and second-resolution series for specific workouts.
     func fetchDetail(for workouts: [WorkoutListItem], source: HAEWorkoutSource) async {
         guard !syncStatus.isRunning else { return }
-        syncStatus = .running(completed: 0, total: workouts.count, found: 0)
+        let pending = workouts.filter { !$0.hasDetail }
+        syncStatus = .running(.fillingDetail, completed: 0, total: pending.count, found: 0)
         do {
             try await source.connect()
             var fetched = 0
-            for (index, item) in workouts.enumerated() where !item.hasDetail {
+            for (index, item) in pending.enumerated() {
                 if Task.isCancelled { break }
                 if let detail = try await source.fetchDetail(for: item.workout) {
                     try await store.upsert([detail], seriesStore: seriesStore)
                     fetched += 1
                 }
-                syncStatus = .running(completed: index + 1, total: workouts.count, found: fetched)
+                syncStatus = .running(
+                    .fillingDetail, completed: index + 1, total: pending.count, found: fetched
+                )
+                // Refresh periodically rather than only at the end: a long backfill should fill
+                // the table in visibly, and an interruption keeps whatever already landed.
+                if index.isMultiple(of: 5) { await load() }
             }
             await load()
-            syncStatus = .finished(found: fetched)
+            syncStatus = .finished(.fillingDetail, found: fetched)
         } catch {
             await load()
             syncStatus = .failed(Self.describe(error))
@@ -239,6 +285,11 @@ final class AppModel {
     func startSync(from start: Date) {
         guard let source = settings.makeSource(), !syncStatus.isRunning else { return }
         syncTask = Task { await sync(source: source, from: start) }
+    }
+
+    /// Walks the whole backlog for a scope, newest first.
+    func startDetailBackfill(scope: BackfillScope) {
+        startDetailFetch(for: backlog(scope))
     }
 
     func startDetailFetch(for items: [WorkoutListItem]) {
