@@ -17,6 +17,20 @@ public struct CoordinateBounds: Hashable, Sendable {
     public var latitudeSpan: Double { maxLatitude - minLatitude }
     public var longitudeSpan: Double { maxLongitude - minLongitude }
 
+    /// The span a map should use to show this route: the bounding box plus headroom, never
+    /// narrower than `minimumSpan`.
+    ///
+    /// The floor is the part that matters. A treadmill or a pool workout has a bounding box of a
+    /// few metres, and without it the map zooms all the way in and renders a meaningless
+    /// close-up of one building. Degrees rather than metres because this feeds
+    /// `MKCoordinateSpan`, and callers pass their own values — a 96×56 thumbnail and a 280pt map
+    /// don't want the same framing.
+    public func displaySpan(
+        headroom: Double, minimumSpan: Double
+    ) -> (latitude: Double, longitude: Double) {
+        (max(latitudeSpan * headroom, minimumSpan), max(longitudeSpan * headroom, minimumSpan))
+    }
+
     public init?(_ coordinates: [Coordinate]) {
         guard let first = coordinates.first else { return nil }
         var minLat = first.latitude, maxLat = first.latitude

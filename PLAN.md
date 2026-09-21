@@ -4,9 +4,9 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 with batch upload to Strava.
 
 **Status:** Phases 0–4 complete and exercised against real data, plus seeded UI tests, bulk detail
-backfill and a configurable route colour. Next: Phase 5 (detail view — heart-rate charts and
-splits), with three known issues outstanding.
-**Last updated:** 2026-09-20.
+backfill, a configurable route colour and a detail map that follows the selection. Next: Phase 5
+(detail view — heart-rate charts and splits), with two known issues outstanding.
+**Last updated:** 2026-09-21.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first. It carries the
 > Health Auto Export data contract, the Xcode tooling limits we hit, and the Strava API facts —
@@ -21,7 +21,7 @@ thumbnails render as real maps with the track drawn on them.
 | | |
 |---|---|
 | Builds | clean, **zero warnings** — check with `XcodeListNavigatorIssues` at `severity: warning`; `BuildProject` reports only errors |
-| Tests | 102 in `MaxActCore` (`swift test`), 24 app/UI tests including 12 seeded (`RunAllTests`) |
+| Tests | 105 in `MaxActCore` (`swift test`), 25 app/UI tests including 13 seeded (`RunAllTests`) |
 | Live MCP suite | passes against the phone; skipped unless `MAXACT_LIVE_HOST`/`MAXACT_LIVE_TOKEN` are set |
 | Verified with real data | 13 workouts synced; detail fetch produced 3311 route points and 664 HR samples; thumbnails written to the sandbox container |
 
@@ -63,6 +63,8 @@ something now recorded in the skill reference:
 Found by using the app. Not blocking, not yet done — each has a diagnosis or a design sketch so
 picking it up doesn't start from scratch. Items marked *(feature)* are wants, not defects.
 
+Issues 2, 3 and 5 are done; 1 and 4 remain, and should be taken together — see issue 1.
+
 **1. Average speed and pace include time spent stopped.**
 
 `Workout.effectiveSpeedMetersPerSecond` uses HAE's `avgSpeed` when present and otherwise
@@ -82,17 +84,32 @@ the list view would show the elapsed figure until then, which needs to be either
 backfilled. `.hae` files carry explicit `pause`/`motionPaused` events that would settle it exactly,
 which is one more argument for the `.hae` reader noted in Phase 1.
 
-**2. The detail map opens on the previously selected workout's region.**
+**2. ~~The detail map opens on the previously selected workout's region.~~ — done 2026-09-21.**
 
-`WorkoutDetailView` uses `Map(initialPosition:)`. The initial position is applied **once, when the
-map view is created** — and SwiftUI reuses the same `Map` across selection changes, so the region
-computed for the first workout sticks and every later selection inherits it.
+`WorkoutDetailView` used `Map(initialPosition:)`. An initial position is applied **once, when the
+map view is created**, and SwiftUI reuses the same `Map` across selection changes, so the region
+computed for the first workout stuck and every later selection inherited it. The map is now driven
+by a bound `@State var camera: MapCameraPosition`, reassigned in the existing `.task(id: item.id)`
+*after* the series loads — the map exists well before the route arrives, so ordering matters. The
+documented semantics are what make this work: passing `MapCameraPosition` as a *binding* has the
+map adjust its camera whenever the value changes, whereas `initialPosition` explicitly does not.
 
-Two fixes, either workable: hold a `@State var camera: MapCameraPosition` and reassign it in the
-existing `.task(id: item.id)` when the series loads, or give the map `.id(item.id)` to force a
-fresh view per workout. The first is cheaper; the second is harder to get wrong. This compounds
-with the series loading asynchronously — the map is built before the route arrives — so whichever
-is chosen must set the camera *after* the series is in hand.
+A second defect of the same family was found while fixing it and is also gone: `series` was plain
+`@State` on a reused view, so between selections the **previous** workout's route stayed drawn
+under the **new** workout's header until the load finished. The loaded series is now tagged with
+the id it belongs to and the body refuses to draw a mismatch, which rules the class of bug out
+structurally rather than by getting the ordering right.
+
+Region framing (bounding box + headroom, with a floor so a treadmill-sized route doesn't zoom to
+one building) moved to `CoordinateBounds.displaySpan(headroom:minimumSpan:)` in `MaxActCore`, with
+an `MKCoordinateRegion(fitting:…)` bridge in `MaxAct2/Support/MapRegion.swift`. The detail map and
+the thumbnail renderer now share it, passing their own values — 1.3/0.003 for the 280pt map,
+1.25/0.002 for a 96×56 thumbnail, where the track needs the pixels more than the breathing room.
+
+Verified by hand against real workouts, since the camera region isn't exposed to accessibility and
+the seeded routes all loop around one origin: a 3.73 km walk framed tightly on Granville Park, an
+11.66 km ride on a much wider view from UBC to Burrard, and a 2.82 km ride zoomed back in on the
+UBC Botanical Garden — re-framing correctly in both directions, not merely tracking the newest.
 
 **3. ~~Route lines are grey.~~ — done 2026-09-20.**
 
@@ -758,7 +775,24 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 
 ### Change log
 
-- **2026-09-20 (latest)** — Fixed the grey route lines (known issue 3). The empty `AccentColor`
+- **2026-09-21 (latest)** — Fixed the detail map inheriting the previous selection's region (known
+  issue 2) by driving it from a bound `MapCameraPosition` set after the series loads, rather than
+  `initialPosition`, which applies once per view and so never moved on a reused view. The same
+  reuse was silently showing the previous workout's route under the new header; the loaded series
+  is now tagged with its workout id and a mismatch can't be drawn. Region framing moved into
+  `CoordinateBounds.displaySpan` and is shared with the thumbnail renderer.
+
+  Two things surfaced on the way, neither related to the map. **Select All:** the app had a custom
+  "Select All Visible" on ⌘⇧A, which Zoom takes globally, so the keystroke never reached the app —
+  and rebinding it to ⌘A would have put two ⌘A items in one menu. The standard `.pasteboard`
+  command group already provides Edit ▸ Select All and SwiftUI wires it to the table's selection,
+  so ⌘A worked all along; the custom command and `AppModel.selectAllVisible` are gone, and a test
+  now asserts there is exactly one Select All. **Seed data:** every routed seed workout landed on
+  an index where the generator's arithmetic coincides, giving them all identical durations and so
+  identical series; route point count is now derived from distance, which also makes the seeded
+  thumbnails distinguishable by eye.
+
+- **2026-09-20** — Fixed the grey route lines (known issue 3). The empty `AccentColor`
   colorset was deleted so the app follows the system accent, and route tracks stopped following the
   accent at all: `RouteColor` in `MaxActCore` holds six saturated choices with Sunset (`#FA590F`)
   as the default, chosen in Settings → Appearance. The colour is part of the thumbnail cache key,

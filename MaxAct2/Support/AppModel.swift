@@ -208,10 +208,8 @@ final class AppModel {
         )
     }
 
-    func selectAllVisible() {
-        selection = Set(visibleItems.map(\.id))
-    }
-
+    // Selecting everything is deliberately *not* here: Edit ▸ Select All is standard and SwiftUI
+    // already routes it to the table's selection binding. Deselecting has no system equivalent.
     func clearSelection() {
         selection.removeAll()
     }

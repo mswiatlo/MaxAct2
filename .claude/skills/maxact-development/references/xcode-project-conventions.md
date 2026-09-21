@@ -118,6 +118,36 @@ is derived from all five. The colour was added when it became configurable: thum
 on disk indefinitely, so omitting it would have left every existing image in the old colour until
 something unrelated invalidated it. The same applies to any future appearance input.
 
+## SwiftUI reuses a detail view across selection changes
+
+The detail pane is the same view type in the same position in the hierarchy for every selected row,
+so SwiftUI keeps one instance and its `@State` survives the selection changing. Two bugs came from
+that, and both are worth generalising:
+
+- **`Map(initialPosition:)` applies its position once, when the map is created.** On a reused view
+  that means the *first* workout's region sticks forever. Use `Map(position: $camera)` with a
+  `@State var camera: MapCameraPosition` — the documented behaviour of the binding form is that the
+  map re-aims whenever the value changes. Set it *after* the async load, because the map is built
+  long before the route arrives.
+- **Async-loaded state must carry the identity it belongs to.** `@State var series: WorkoutSeries?`
+  reassigned in `.task(id:)` leaves the previous workout's route drawn under the new workout's
+  header until the load finishes. Tagging the loaded value with its id and refusing to draw a
+  mismatch rules the whole class out structurally, instead of depending on clearing it in the right
+  order.
+
+## Don't add a command that macOS already provides
+
+`CommandGroupPlacement.pasteboard` already includes **Select All** in the Edit menu, and SwiftUI
+wires it to a `Table`'s selection binding — ⌘A selects every visible row with no code at all. A
+custom "Select All Visible" button was therefore redundant, and it had a second problem: to avoid
+colliding it was bound to ⌘⇧A, which **Zoom claims as a global shortcut**, so the keystroke never
+reached the app and a UI test failed only while Zoom was running. Rebinding it to ⌘A would have put
+two ⌘A items in one menu, where AppKit routes the keystroke to the first — the custom item would
+show a shortcut that never fires.
+
+Check the standard groups (`.pasteboard`, `.undoRedo`, `.textEditing`, `.sidebar`, `.toolbar`)
+before adding a command, and be suspicious of any shortcut chosen to *dodge* a conflict.
+
 ## Target dependencies need a hand edit
 
 The Swift explicit-module scanner warns `'MaxAct2Tests' is missing a dependency on 'MaxAct2'`
@@ -186,8 +216,33 @@ Two things that cost a debugging round each, both found by printing `app.debugDe
   *"cannot be called with Touch Bar elements"*. Scope to `app.sheets` / `app.dialogs` instead of
   querying the application root.
 
+- **`outline.cells` enumerates every column, not every row.** `cells.element(boundBy: 1)` is still
+  in the *first* row, so clicking it never changes the selection — a test comparing two rows'
+  detail silently compared the same row twice. Click one cell to focus the table, then move with
+  `app.typeKey(.downArrow, modifierFlags: [])`.
+
 When a query doesn't match, dump the hierarchy instead of guessing — a throwaway test that prints
 `app.debugDescription` answers it in one run.
+
+## Seeing the running app: screenshots and driving it by script
+
+`DeviceInteractionStartWorkspaceSession` **rejects "My Mac"** — it only supports iOS/watchOS/tvOS
+destinations — so there is no device-interaction path for this app. What works:
+
+- `RunProject`, then `screencapture -o -x -R x,y,w,h file.png`. Check the window is actually on the
+  captured display first: `osascript -e 'tell application "System Events" to tell process "MaxAct2"
+  to get {position, size} of windows'`. It has come back at **x = −1475**, on a second display,
+  which is why plain `screencapture` produced shots with no app window in them and made the app
+  look unlaunched.
+- To change the selection from a script, **System Events `click at {x, y}` does not produce a click
+  SwiftUI honours** — it reports hitting the right element and nothing happens. Set the
+  accessibility selection instead:
+  `set selected of row 5 of outline 1 of scroll area 1 of group 2 of splitter group 1 of group 1 of window 1 to true`.
+- Activate the app immediately before each scripted action; `osascript` and `screencapture` runs in
+  between hand focus back to Xcode.
+
+For anything drawn rather than laid out, a screenshot is still only a sanity check — decoding the
+actual pixels of a written PNG is what settled the route-colour fix.
 
 ## SwiftPM
 

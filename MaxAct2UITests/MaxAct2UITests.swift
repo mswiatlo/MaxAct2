@@ -84,7 +84,13 @@ final class MaxAct2UITests: XCTestCase {
 
         let editMenu = app.menuBars.menuBarItems["Edit"]
         editMenu.click()
-        XCTAssertTrue(app.menuItems["Select All Visible"].waitForExistence(timeout: 3))
+        // Select All is the system's, not ours — asserted here so a stray custom item that would
+        // make ⌘A ambiguous gets noticed.
+        XCTAssertTrue(app.menuItems["Select All"].waitForExistence(timeout: 3))
+        XCTAssertEqual(
+            app.menuItems.matching(NSPredicate(format: "title BEGINSWITH 'Select All'")).count, 1,
+            "Two Select All items would mean two ⌘A entries in one menu."
+        )
         XCTAssertTrue(app.menuItems["Deselect All"].exists)
         app.typeKey(.escape, modifierFlags: [])
     }
@@ -370,7 +376,67 @@ final class SeededTableUITests: XCTestCase {
         )
     }
 
+    /// The detail pane's series must belong to the workout selected *now*.
+    ///
+    /// Context: SwiftUI reuses `WorkoutDetailView` across selection changes — same view type, same
+    /// place in the hierarchy — so its `@State` survives. That is what made the map camera, set
+    /// once through `initialPosition`, keep the first workout's region forever, and what left the
+    /// previous route drawn under the new header while the next series loaded.
+    ///
+    /// Be clear about the limit of this test: it asserts the settled state, which the old code
+    /// also reached once its load finished. The camera region isn't exposed to accessibility and
+    /// the transient is too brief to sample, so neither is asserted here — the camera was checked
+    /// by hand against real workouts in different cities. What this does catch is the series and
+    /// the header disagreeing, which is the failure mode the id tagging rules out structurally.
+    @MainActor
+    func testDetailFollowsTheSelectionRatherThanLagging() throws {
+        let app = launchSeeded()
+        let sidebar = app.outlines["Sidebar"]
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 15))
+
+        // Narrow to workouts that have a stored route, so both rows clicked below definitely have
+        // a series to draw and the test doesn't depend on which seed indices got one.
+        let withRoute = sidebar.staticTexts.containing(
+            NSPredicate(format: "label BEGINSWITH 'With Route'")
+        ).firstMatch
+        XCTAssertTrue(withRoute.waitForExistence(timeout: 10))
+        withRoute.click()
+
+        let table = app.outlines["WorkoutTable"]
+        XCTAssertTrue(table.waitForExistence(timeout: 15))
+
+        let samples = app.staticTexts.containing(
+            NSPredicate(format: "value CONTAINS[c] 'pts ·'")
+        ).firstMatch
+
+        table.cells.element(boundBy: 0).click()
+        XCTAssertTrue(samples.waitForExistence(timeout: 10), "The first selection showed no series.")
+        let first = samples.value as? String
+
+        // Down arrow rather than clicking another cell: `cells` on an outline enumerates every
+        // column, so cell 1 is still the *first* row and the selection would never change.
+        app.typeKey(.downArrow, modifierFlags: [])
+        var second = samples.value as? String
+        // Allow for the load: the assertion is that it *arrives* at the new workout's figures,
+        // not that it changes synchronously.
+        let deadline = Date().addingTimeInterval(10)
+        while second == first, Date() < deadline {
+            usleep(200_000)
+            second = samples.value as? String
+        }
+
+        XCTAssertNotNil(second)
+        XCTAssertNotEqual(
+            first, second,
+            "The detail pane kept the previous workout's series after the selection changed."
+        )
+    }
+
     /// Multi-select and the aggregate summary — the reason the table exists — had no coverage.
+    ///
+    /// Uses the system's ⌘A, which SwiftUI routes to the table's selection binding once a row has
+    /// been clicked and the table has focus. This previously typed ⌘⇧A for a custom command; that
+    /// shortcut is taken globally by Zoom, so the keystroke never reached the app.
     @MainActor
     func testSelectAllShowsAnAggregateSummary() throws {
         let app = launchSeeded()
@@ -378,7 +444,7 @@ final class SeededTableUITests: XCTestCase {
         XCTAssertTrue(table.waitForExistence(timeout: 15))
 
         table.cells.element(boundBy: 0).click()
-        app.typeKey("a", modifierFlags: [.command, .shift])
+        app.typeKey("a", modifierFlags: [.command])
 
         XCTAssertTrue(
             app.staticTexts.containing(

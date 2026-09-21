@@ -96,7 +96,13 @@ public enum SampleData {
     ///
     /// The track is a loop around the origin, sized by the workout's distance, with enough points
     /// to exercise simplification but few enough to seed quickly.
-    public static func series(for workout: Workout, points: Int = 300) -> WorkoutSeries {
+    ///
+    /// - Parameter points: defaults to roughly one point per 20 m travelled, which keeps the
+    ///   density plausible and — more usefully — makes each seeded route *distinguishable*. A
+    ///   fixed count gave every routed row the same "300 pts", so nothing downstream of the
+    ///   series could be told apart by eye or by a test.
+    public static func series(for workout: Workout, points: Int? = nil) -> WorkoutSeries {
+        let points = points ?? min(max(Int((workout.distanceMeters ?? 5_000) / 20), 80), 400)
         let radius = min(max((workout.distanceMeters ?? 5_000) / 250_000, 0.004), 0.05)
         let route = (0..<points).map { step -> RoutePoint in
             let t = Double(step) / Double(points) * 2 * .pi

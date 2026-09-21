@@ -103,6 +103,47 @@ import Testing
         #expect(route.allSatisfy { $0.longitude >= bounds.minLongitude && $0.longitude <= bounds.maxLongitude })
         #expect(CoordinateBounds([]) == nil)
     }
+
+    @Test("the display span adds headroom around the route")
+    func displaySpanAddsHeadroom() throws {
+        let bounds = try #require(CoordinateBounds([
+            Coordinate(latitude: 49.20, longitude: -123.20),
+            Coordinate(latitude: 49.30, longitude: -123.00),
+        ]))
+        let span = bounds.displaySpan(headroom: 1.3, minimumSpan: 0.003)
+        #expect(abs(span.latitude - 0.13) < 1e-9)
+        #expect(abs(span.longitude - 0.26) < 1e-9)
+    }
+
+    @Test("a treadmill-sized route is floored rather than zoomed to maximum")
+    func displaySpanHasFloor() throws {
+        // A pool or a treadmill: the whole "route" is GPS jitter a few metres across. Without the
+        // floor the map opens as a close-up of one building.
+        let bounds = try #require(CoordinateBounds([
+            Coordinate(latitude: 49.2000, longitude: -123.1000),
+            Coordinate(latitude: 49.2001, longitude: -123.1001),
+        ]))
+        let span = bounds.displaySpan(headroom: 1.3, minimumSpan: 0.003)
+        #expect(span.latitude == 0.003)
+        #expect(span.longitude == 0.003)
+    }
+
+    @Test("each route gets its own span, so one selection can't inherit another's framing")
+    func displaySpanVariesByRoute() throws {
+        // The regression this guards: the detail map used to keep the first workout's region for
+        // every workout selected afterwards.
+        let short = try #require(CoordinateBounds([
+            Coordinate(latitude: 49.20, longitude: -123.10),
+            Coordinate(latitude: 49.21, longitude: -123.09),
+        ]))
+        let long = try #require(CoordinateBounds([
+            Coordinate(latitude: 49.20, longitude: -123.10),
+            Coordinate(latitude: 49.60, longitude: -122.60),
+        ]))
+        #expect(short.displaySpan(headroom: 1.3, minimumSpan: 0.003).latitude
+                < long.displaySpan(headroom: 1.3, minimumSpan: 0.003).latitude)
+        #expect(short.centre != long.centre)
+    }
 }
 
 @Suite struct WorkoutFormattingTests {

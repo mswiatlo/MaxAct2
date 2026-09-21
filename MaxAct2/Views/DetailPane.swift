@@ -36,17 +36,36 @@ struct WorkoutDetailView: View {
     let model: AppModel
     let item: WorkoutListItem
 
-    @State private var series: WorkoutSeries?
+    /// The loaded series, tagged with the workout it belongs to.
+    ///
+    /// Tagged rather than stored bare because SwiftUI **reuses this view** across selection
+    /// changes — same view type in the same position, so the instance and its `@State` survive.
+    /// Carrying the id means a series can never be drawn under the wrong header, not even for
+    /// the frame or two before the new one finishes loading.
+    @State private var loaded: LoadedSeries?
+
+    /// Bound rather than `Map(initialPosition:)`. An initial position is applied once, when the
+    /// map view is created, and because the map is reused the *first* workout's region stuck for
+    /// every selection after it.
+    @State private var camera: MapCameraPosition = .automatic
 
     private var workout: Workout { item.workout }
+
+    /// The series plus everything derived from it that the map needs, computed once per selection
+    /// instead of on every body evaluation.
+    private struct LoadedSeries {
+        let id: String
+        let series: WorkoutSeries
+        let coordinates: [CLLocationCoordinate2D]
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
 
-                if let series, !series.route.isEmpty {
-                    routeMap(series)
+                if let loaded, loaded.id == item.id, !loaded.coordinates.isEmpty {
+                    routeMap(loaded.coordinates)
                 } else if workout.hasRoute && !item.hasDetail {
                     notDownloadedNotice
                 }
@@ -56,8 +75,32 @@ struct WorkoutDetailView: View {
             .padding(20)
         }
         .navigationTitle(workout.kind.displayName)
-        .task(id: item.id) {
-            series = await model.seriesStore.loadIfAvailable(item.id)
+        .task(id: item.id) { await load() }
+    }
+
+    private func load() async {
+        // Cleared before the await, not after: otherwise the previous workout's route stays on
+        // screen underneath the new workout's header until the load finishes.
+        loaded = nil
+        camera = .automatic
+
+        guard let series = await model.seriesStore.loadIfAvailable(item.id) else { return }
+
+        // Simplified for display too: drawing 12,645 points into a few hundred on-screen pixels
+        // costs a great deal and shows nothing extra.
+        let simplified = RouteSimplifier.simplify(series.route.map(\.coordinate), fittingPixels: 900)
+        loaded = LoadedSeries(
+            id: item.id,
+            series: series,
+            coordinates: simplified.map {
+                CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
+            }
+        )
+
+        // 30% headroom so the track isn't flush against the edges. Set last, once the route is
+        // actually in hand — the map exists well before the series arrives.
+        if let region = MKCoordinateRegion(fitting: simplified, headroom: 1.3, minimumSpan: 0.003) {
+            camera = .region(region)
         }
     }
 
@@ -80,40 +123,17 @@ struct WorkoutDetailView: View {
         }
     }
 
-    @ViewBuilder
-    private func routeMap(_ series: WorkoutSeries) -> some View {
-        // Simplified for display too: drawing 12,645 points into a few hundred on-screen pixels
-        // costs a great deal and shows nothing extra.
-        let simplified = RouteSimplifier.simplify(series.route.map(\.coordinate), fittingPixels: 900)
-        let coordinates = simplified.map {
-            CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
-        }
-
-        // The camera has to be aimed at the route. Without an initial position the map opens on
-        // its default region — which rendered as a blank grey rectangle with the route nowhere
-        // in sight, since the polyline was thousands of kilometres off screen.
-        if let bounds = CoordinateBounds(simplified) {
-            Map(initialPosition: .region(MKCoordinateRegion(
-                center: CLLocationCoordinate2D(
-                    latitude: bounds.centre.latitude, longitude: bounds.centre.longitude
-                ),
-                span: MKCoordinateSpan(
-                    // 30% headroom so the track isn't flush against the edges, and a floor so a
-                    // very short route doesn't zoom to maximum.
-                    latitudeDelta: max(bounds.latitudeSpan * 1.3, 0.003),
-                    longitudeDelta: max(bounds.longitudeSpan * 1.3, 0.003)
+    private func routeMap(_ coordinates: [CLLocationCoordinate2D]) -> some View {
+        Map(position: $camera) {
+            MapPolyline(coordinates: coordinates)
+                .stroke(
+                    Color(model.settings.routeColor),
+                    style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round)
                 )
-            ))) {
-                MapPolyline(coordinates: coordinates)
-                    .stroke(
-                        Color(model.settings.routeColor),
-                        style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round)
-                    )
-            }
-            .frame(height: 280)
-            .clipShape(.rect(cornerRadius: 10))
-            .accessibilityLabel("Route map with \(coordinates.count) points")
         }
+        .frame(height: 280)
+        .clipShape(.rect(cornerRadius: 10))
+        .accessibilityLabel("Route map with \(coordinates.count) points")
     }
 
     private var notDownloadedNotice: some View {
@@ -142,8 +162,11 @@ struct WorkoutDetailView: View {
             GridRow {
                 stat("Ascent", WorkoutFormatting.elevation(meters: workout.elevationAscendedMeters))
                 stat("Descent", WorkoutFormatting.elevation(meters: workout.elevationDescendedMeters))
-                if let series {
-                    stat("Samples", "\(series.route.count) pts · \(series.heartRate.count) HR")
+                if let loaded, loaded.id == item.id {
+                    stat(
+                        "Samples",
+                        "\(loaded.series.route.count) pts · \(loaded.series.heartRate.count) HR"
+                    )
                 }
             }
         }

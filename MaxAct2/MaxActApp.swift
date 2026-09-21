@@ -96,9 +96,12 @@ struct MaxActCommands: Commands {
                       || !model.settings.isConfigured)
         }
 
+        // No Select All here on purpose. The standard `.pasteboard` group already provides
+        // Edit ▸ Select All, and SwiftUI wires it to the table's selection binding — ⌘A selects
+        // every visible row for free. A second item would mean two ⌘A entries in one menu, where
+        // AppKit routes the keystroke to the first and ours would show a shortcut that never
+        // fires. (It also had to be ⌘⇧A to avoid that, which Zoom takes globally.)
         CommandGroup(after: .pasteboard) {
-            Button("Select All Visible") { model.selectAllVisible() }
-                .keyboardShortcut("a", modifiers: [.command, .shift])
             Button("Deselect All") { model.clearSelection() }
                 .keyboardShortcut("d", modifiers: .command)
                 .disabled(model.selection.isEmpty)

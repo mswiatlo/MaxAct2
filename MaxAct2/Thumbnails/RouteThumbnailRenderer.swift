@@ -146,17 +146,9 @@ final class RouteThumbnailRenderer {
         _ coordinates: [Coordinate], bounds: CoordinateBounds, key: Key
     ) async -> Data? {
         let options = MKMapSnapshotter.Options()
-        // 25% padding, with a floor on the span so a treadmill-sized route doesn't zoom all the
-        // way in and render as a meaningless close-up of one building.
-        options.region = MKCoordinateRegion(
-            center: CLLocationCoordinate2D(
-                latitude: bounds.centre.latitude, longitude: bounds.centre.longitude
-            ),
-            span: MKCoordinateSpan(
-                latitudeDelta: max(bounds.latitudeSpan * 1.25, 0.002),
-                longitudeDelta: max(bounds.longitudeSpan * 1.25, 0.002)
-            )
-        )
+        // Tighter framing than the detail map: at 96×56 the track needs the pixels more than it
+        // needs breathing room.
+        options.region = MKCoordinateRegion(fitting: bounds, headroom: 1.25, minimumSpan: 0.002)
         options.size = NSSize(width: key.width, height: key.height)
         options.mapType = .standard
         options.showsBuildings = false
