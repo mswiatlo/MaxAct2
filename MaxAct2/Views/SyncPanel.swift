@@ -59,14 +59,22 @@ enum SyncRange: String, CaseIterable, Identifiable {
 /// So the fields are here, the panel says which one is missing, and one press of Sync reaches a
 /// running sync. Settings keeps the same fields for later editing.
 struct SyncPanel: View {
-    @Environment(AppModel.self) private var model
+    /// Passed in rather than read from the environment. A popover is a separate `NSWindow`, and
+    /// its content does **not** reliably inherit `.environment(...)` — when the main window
+    /// re-laid out (which pressing Start Sync causes, since the progress banner appears) the
+    /// popover's body was re-evaluated without it and the app trapped with "No Observable object
+    /// of type AppModel found". An explicit dependency cannot fail that way, and `@Observable`
+    /// still tracks it because tracking keys off property access, not off how the reference
+    /// arrived.
+    @Bindable var model: AppModel
+
     @Environment(\.dismiss) private var dismiss
     @State private var range: SyncRange = .month
 
     var body: some View {
         @Bindable var settings = model.settings
 
-        VStack(alignment: .leading, spacing: 14) {
+        return VStack(alignment: .leading, spacing: 14) {
             Text("Sync from iPhone")
                 .font(.headline)
 

@@ -100,7 +100,9 @@ struct WorkoutTable: View {
         }
         .tableStyle(.inset)
         .contextMenu(forSelectionType: WorkoutListItem.ID.self) { ids in
-            WorkoutActions(ids: ids)
+            // Re-injected for the same reason the sync popover takes its model explicitly: menu
+            // content is hosted detached from this hierarchy and does not reliably inherit it.
+            WorkoutActions(ids: ids).environment(model)
         } primaryAction: { ids in
             // Double-click opens the detail for a single row.
             if let id = ids.first, ids.count == 1 { model.selection = [id] }

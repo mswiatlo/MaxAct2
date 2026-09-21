@@ -205,4 +205,56 @@ final class MaxAct2UITests: XCTestCase {
             "With an address and a token entered, Start Sync must be available."
         )
     }
+
+    /// Smoke test for the Start Sync path: enter a connection, start a sync, and keep poking the
+    /// window while it runs.
+    ///
+    /// **This does not reproduce the "No Observable object of type AppModel found" crash** that
+    /// prompted the fix in `SyncPanel`. That was seen once against a real, reachable phone; this
+    /// test was checked against the pre-fix code and still passed, so treat it as coverage of the
+    /// path rather than proof the crash is gone.
+    @MainActor
+    func testStartingASyncDoesNotCrash() throws {
+        let app = launchApp()
+        app.buttons["Sync"].click()
+
+        let address = app.textFields.element(boundBy: 0)
+        XCTAssertTrue(address.waitForExistence(timeout: 5))
+        address.click()
+        address.typeText("10.255.255.1")     // unroutable: the sync stays "running"
+
+        let token = app.textFields.element(boundBy: 1)
+        token.click()
+        token.typeText("irrelevant")
+
+        let startSync = app.buttons["Start Sync"]
+        XCTAssertTrue(startSync.isEnabled)
+        startSync.click()
+
+        // The crash happened here, as the banner appeared and the popover was torn down.
+        XCTAssertTrue(
+            app.windows.firstMatch.waitForExistence(timeout: 10),
+            "The app crashed while starting a sync."
+        )
+        XCTAssertTrue(app.buttons["Sync"].waitForExistence(timeout: 10), "The app is gone.")
+
+        // Keep the window busy while the sync is in its running state: the crash happened during
+        // a main-window re-layout with the popover hierarchy still alive.
+        for _ in 0..<5 {
+            app.buttons["Sync"].click()
+            Thread.sleep(forTimeInterval: 0.4)
+            app.typeKey(.escape, modifierFlags: [])
+            Thread.sleep(forTimeInterval: 0.4)
+            XCTAssertTrue(app.windows.firstMatch.exists, "The app crashed during re-layout.")
+        }
+
+        // And the failure should be reported rather than swallowed.
+        let banner = app.staticTexts.containing(
+            NSPredicate(format: "value CONTAINS[c] 'Health Auto Export' OR value CONTAINS[c] 'reach'")
+        ).firstMatch
+        XCTAssertTrue(
+            banner.waitForExistence(timeout: 20),
+            "A failed sync should explain itself in the banner."
+        )
+    }
 }

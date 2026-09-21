@@ -69,7 +69,7 @@ struct ContentView: View {
             .labelStyle(.titleAndIcon)
             .help("Import workouts from Health Auto Export on your iPhone")
             .popover(isPresented: $model.isSyncPanelPresented, arrowEdge: .bottom) {
-                SyncPanel()
+                SyncPanel(model: model)
             }
         }
     }

@@ -131,6 +131,21 @@ The full UI suite is mildly flaky when several tests launch the same app at once
 every test fail on "no window appeared" and passed unchanged on a retry. Re-run before believing a
 sweeping UI-test failure.
 
+## Detached presentations lose `.environment(...)`
+
+A `.popover` is a separate `NSWindow`, and its content does **not** reliably inherit environment
+objects injected further up. `SyncPanel` read the model with `@Environment(AppModel.self)` and the
+app trapped with *"No Observable object of type AppModel found"* when the main window re-laid out
+while the popover was alive — pressing Start Sync does exactly that, because the progress banner
+appears.
+
+**Pass the model explicitly to anything presented detached.** `@Observable` tracking still works,
+because it keys off property access rather than off how the reference arrived. The same applies to
+`.contextMenu` content, which is hosted detached too.
+
+Note the crash did **not** reproduce under XCUIAutomation, verified by re-running the smoke test
+against the pre-fix code. Don't assume a UI test covers this class of bug.
+
 ## SwiftPM
 
 - `MaxActCore/Package.swift` needs **`swift-tools-version: 6.2`**. `.macOS(.v26)` was introduced in
