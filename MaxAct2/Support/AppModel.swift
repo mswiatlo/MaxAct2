@@ -82,7 +82,7 @@ final class AppModel {
     let store: WorkoutStore
     let seriesStore: SeriesStore
     let thumbnails: RouteThumbnailRenderer
-    let settings: SyncSettings
+    let settings: AppSettings
 
     /// Number of synthetic workouts to plant on first load, for UI tests and previews. `nil` in
     /// normal use.
@@ -95,7 +95,7 @@ final class AppModel {
         store: WorkoutStore,
         seriesStore: SeriesStore,
         thumbnails: RouteThumbnailRenderer,
-        settings: SyncSettings,
+        settings: AppSettings,
         seedCount: Int? = nil
     ) {
         self.store = store
@@ -106,7 +106,7 @@ final class AppModel {
     }
 
     /// Used when the on-disk stores can't be opened. Everything works; nothing persists.
-    static func inMemoryFallback(settings: SyncSettings, seedCount: Int? = nil) -> AppModel {
+    static func inMemoryFallback(settings: AppSettings, seedCount: Int? = nil) -> AppModel {
         // Force-unwrapped deliberately: an in-memory container and a temp directory failing
         // would mean the process cannot allocate or write anywhere, and there is no recovery.
         let scratch = URL(fileURLWithPath: NSTemporaryDirectory())

@@ -13,6 +13,7 @@ struct RouteThumbnailView: View {
     let hasRoute: Bool
     let hasDetail: Bool
     let isIndoor: Bool?
+    let routeColor: RouteColor
     var size = CGSize(width: 96, height: 56)
 
     @Environment(\.colorScheme) private var colorScheme
@@ -26,7 +27,8 @@ struct RouteThumbnailView: View {
             workoutID: workoutID,
             width: Int(size.width),
             height: Int(size.height),
-            isDark: colorScheme == .dark
+            isDark: colorScheme == .dark,
+            routeColor: routeColor
         )
     }
 

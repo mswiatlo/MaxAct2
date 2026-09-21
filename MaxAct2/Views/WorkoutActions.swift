@@ -10,7 +10,7 @@ struct WorkoutActions: View {
     let model: AppModel
     let ids: Set<String>
 
-    private var settings: SyncSettings { model.settings }
+    private var settings: AppSettings { model.settings }
 
     private var items: [WorkoutListItem] {
         model.items.filter { ids.contains($0.id) }
@@ -44,14 +44,14 @@ struct WorkoutActions: View {
     }
 }
 
-/// Connection settings, persisted in `UserDefaults`.
+/// User settings, persisted in `UserDefaults`.
 ///
-/// The bearer token is *not* a long-lived secret — it is regenerated from Health Auto Export's
-/// Server screen at will, and only grants access to a server that must be foregrounded on an
-/// unlocked phone on the same LAN. Strava's client secret in Phase 8 is a different matter and
-/// goes in the Keychain.
+/// Named for the app rather than for sync because it now carries appearance too. The bearer token
+/// is *not* a long-lived secret — it is regenerated from Health Auto Export's Server screen at
+/// will, and only grants access to a server that must be foregrounded on an unlocked phone on the
+/// same LAN. Strava's client secret in Phase 8 is a different matter and goes in the Keychain.
 @Observable
-final class SyncSettings {
+final class AppSettings {
     /// Injected rather than reaching for `.standard`, so UI tests can be handed a throwaway
     /// domain. They type into these fields, and one test run overwriting the real token was
     /// enough to make this worth doing properly.
@@ -64,10 +64,16 @@ final class SyncSettings {
         didSet { defaults.set(token, forKey: "syncToken") }
     }
 
+    /// Colour of route tracks on thumbnails and the detail map.
+    var routeColor: RouteColor {
+        didSet { defaults.set(routeColor.rawValue, forKey: "routeColor") }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         host = defaults.string(forKey: "syncHost") ?? ""
         token = defaults.string(forKey: "syncToken") ?? ""
+        routeColor = RouteColor(storageKey: defaults.string(forKey: "routeColor"))
     }
 
     /// The address as actually parsed, or `nil` if it can't be. Shown in the UI so there is no
@@ -87,7 +93,7 @@ final class SyncSettings {
 struct SettingsView: View {
     /// Only the settings object: this is presented in its own scene, which is another detached
     /// hosting context.
-    @Bindable var settings: SyncSettings
+    @Bindable var settings: AppSettings
 
     /// Optional so the scene still builds without it; the data section is omitted when absent.
     var model: AppModel?
@@ -118,6 +124,8 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
             }
 
+            appearanceSection
+
             if let model {
                 dataSection(model)
             }
@@ -127,6 +135,31 @@ struct SettingsView: View {
         .padding()
         .task {
             if let model { storageDescription = Self.describeBytes(await model.storageBytes()) }
+        }
+    }
+
+    /// Swatches rather than colour names alone: the names are arbitrary, and the only thing that
+    /// matters is what the track will look like.
+    @ViewBuilder
+    private var appearanceSection: some View {
+        Section {
+            Picker("Route colour", selection: $settings.routeColor) {
+                ForEach(RouteColor.allCases) { color in
+                    Label {
+                        Text(color.displayName)
+                    } icon: {
+                        Circle().fill(Color(color))
+                    }
+                    .tag(color)
+                }
+            }
+        } header: {
+            Text("Appearance")
+        } footer: {
+            Text("Used for route tracks on the map and in the list. Thumbnails already drawn are "
+                 + "redrawn in the new colour as they come back into view.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
         }
     }
 

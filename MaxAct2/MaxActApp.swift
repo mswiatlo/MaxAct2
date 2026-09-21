@@ -25,14 +25,14 @@ struct MaxActApp: App {
         if Self.isUITesting {
             let domain = "com.swiatlowski.MaxAct.uitests"
             UserDefaults.standard.removePersistentDomain(forName: domain)
-            let settings = SyncSettings(defaults: UserDefaults(suiteName: domain) ?? .standard)
+            let settings = AppSettings(defaults: UserDefaults(suiteName: domain) ?? .standard)
             _model = State(initialValue: AppModel.inMemoryFallback(
                 settings: settings, seedCount: Self.uiTestingSeedCount
             ))
             return
         }
 
-        let settings = SyncSettings()
+        let settings = AppSettings()
         // The stores are the app's foundation. If they can't open there is no useful degraded
         // mode, so fall back to memory and say so plainly rather than crashing at launch.
         do {

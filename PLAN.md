@@ -3,9 +3,9 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**,
 with batch upload to Strava.
 
-**Status:** Phases 0–4 complete and exercised against real data, plus seeded UI tests and bulk
-detail backfill. Next: Phase 5 (detail view — heart-rate charts and splits), with five known
-issues outstanding.
+**Status:** Phases 0–4 complete and exercised against real data, plus seeded UI tests, bulk detail
+backfill and a configurable route colour. Next: Phase 5 (detail view — heart-rate charts and
+splits), with three known issues outstanding.
 **Last updated:** 2026-09-20.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first. It carries the
@@ -21,7 +21,7 @@ thumbnails render as real maps with the track drawn on them.
 | | |
 |---|---|
 | Builds | clean, **zero warnings** — check with `XcodeListNavigatorIssues` at `severity: warning`; `BuildProject` reports only errors |
-| Tests | 97 in `MaxActCore` (`swift test`), 24 app/UI tests including 12 seeded (`RunAllTests`) |
+| Tests | 102 in `MaxActCore` (`swift test`), 24 app/UI tests including 12 seeded (`RunAllTests`) |
 | Live MCP suite | passes against the phone; skipped unless `MAXACT_LIVE_HOST`/`MAXACT_LIVE_TOKEN` are set |
 | Verified with real data | 13 workouts synced; detail fetch produced 3311 route points and 664 HR samples; thumbnails written to the sandbox container |
 
@@ -94,23 +94,32 @@ fresh view per workout. The first is cheaper; the second is harder to get wrong.
 with the series loading asynchronously — the map is built before the route arrives — so whichever
 is chosen must set the camera *after* the series is in hand.
 
-**3. Route lines are grey.**
+**3. ~~Route lines are grey.~~ — done 2026-09-20.**
 
-Two separate causes, and the first is a straightforward defect. `Assets.xcassets/AccentColor`
-is **empty** — it declares a `universal` idiom with no colour components — so
-`NSColor.controlAccentColor` in the thumbnail renderer and `.tint` in the detail map both resolve
-to a default grey.
+Two separate causes, and both are fixed.
 
-The second is a design mistake of mine: a route line shouldn't follow the system accent colour
-at all. The accent is user-configurable (graphite is a legitimate choice), and a track has to stay
-legible over parkland, water and dense city blocks in both light and dark map tiles. That calls
-for a deliberate, saturated colour held constant regardless of the user's accent — the existing
-dark casing underneath already does the heavy lifting for contrast, so the line itself mainly
-needs to be vivid and consistent. Setting the accent asset alone would fix the symptom while
-leaving the line at the mercy of a system preference.
+The defect: `Assets.xcassets/AccentColor` was **empty** — it declared a `universal` idiom with no
+colour components — so `NSColor.controlAccentColor` in the thumbnail renderer and `.tint` in the
+detail map both resolved to a default grey. There is no
+`ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME` in the project, so the asset was being picked up
+purely by naming convention; the colorset is deleted, and the app now follows the user's system
+accent like any other Mac app.
 
-Both places draw the line, so whatever is chosen belongs in one shared constant rather than being
-duplicated between `RouteThumbnailRenderer` and `WorkoutDetailView`.
+The design mistake: a route line shouldn't follow the system accent at all. The accent is
+user-configurable (graphite is a legitimate choice), and a track has to stay legible over parkland,
+water and dense city blocks in both map appearances. `RouteColor` in `MaxActCore/Model` now holds
+six deliberately saturated choices — default **Sunset** (`#FA590F`), a vivid orange-red — as sRGB
+components rather than a SwiftUI `Color`, so it stays in the model layer and is testable. Picked in
+Settings → Appearance, with swatches.
+
+One subtlety worth keeping in mind for anything else cached: thumbnails live on disk indefinitely,
+so the colour had to become part of `RouteThumbnailRenderer.Key` and therefore of the filename
+(`…-dark-sunset.png`). Without that, changing the setting would have left every existing thumbnail
+in the old colour until something unrelated invalidated it. Old-format files are simply never read
+again; `Delete All Workouts` clears them.
+
+Verified by decoding a rendered PNG: 605 pixels of `(247, 93, 42)` — the stroke, antialiased over
+real map tiles.
 
 **4. No detection of bad GPS fixes.** *(feature, not a defect — for later)*
 
@@ -748,6 +757,14 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 | 8 — Polish | Not started |
 
 ### Change log
+
+- **2026-09-20 (latest)** — Fixed the grey route lines (known issue 3). The empty `AccentColor`
+  colorset was deleted so the app follows the system accent, and route tracks stopped following the
+  accent at all: `RouteColor` in `MaxActCore` holds six saturated choices with Sunset (`#FA590F`)
+  as the default, chosen in Settings → Appearance. The colour is part of the thumbnail cache key,
+  so changing it redraws rather than leaving stale images in the old colour. Renamed `SyncSettings`
+  to `AppSettings`, since it now carries appearance too. Confirmed by decoding a rendered
+  thumbnail, not just by eye.
 
 - **2026-09-20 (later)** — Added "Delete All Workouts" to Settings, with a confirmation naming the
   count and the cost of re-downloading. Removes rows, series blobs and thumbnails together, since

@@ -93,6 +93,31 @@ first can leave an empty group behind.
 
 Give standalone Swift scripts a non-`.swift` extension; `swift` runs a file whatever it's called.
 
+## An empty `AccentColor` colorset greys out the whole app
+
+The multiplatform template ships `Assets.xcassets/AccentColor.colorset` containing a `universal`
+idiom with **no colour components at all**. It is picked up by *naming convention* — there is no
+`ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME` in the project to point at, and nothing warns —
+so `.tint` and `NSColor.controlAccentColor` resolve to a default grey app-wide. This is what made
+every route line render grey, and it would have been easy to misread as a MapKit problem.
+
+Either fill the colorset or delete it. Deleting is usually right on the Mac: the app then follows
+the user's system accent, which is what people expect. Asset catalogs are folder-synchronized, so
+`git rm -r` on the colorset needs no project edit.
+
+Separately: **don't draw content in the accent colour.** The accent is a user preference and
+graphite is a legitimate choice, so anything that needs to stay legible — a route over map tiles,
+a chart series — needs its own colour. `RouteColor` in `MaxActCore/Model` is the pattern: sRGB
+components (not a SwiftUI `Color`) so it lives in the model layer and is testable, with thin
+`NSColor`/`Color` bridges at the one place each is needed.
+
+## Cached artwork must key on everything that affects its appearance
+
+`RouteThumbnailRenderer.Key` is `(workoutID, width, height, isDark, routeColor)` and the filename
+is derived from all five. The colour was added when it became configurable: thumbnails are cached
+on disk indefinitely, so omitting it would have left every existing image in the old colour until
+something unrelated invalidated it. The same applies to any future appearance input.
+
 ## Target dependencies need a hand edit
 
 The Swift explicit-module scanner warns `'MaxAct2Tests' is missing a dependency on 'MaxAct2'`

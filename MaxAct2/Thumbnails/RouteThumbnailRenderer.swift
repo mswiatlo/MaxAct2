@@ -1,6 +1,7 @@
 import AppKit
 import MapKit
 import MaxActCore
+import SwiftUI
 
 /// Renders and caches the little route maps shown in the table.
 ///
@@ -24,8 +25,14 @@ final class RouteThumbnailRenderer {
         let width: Int
         let height: Int
         let isDark: Bool
+        /// Part of the identity, not merely a draw parameter: thumbnails are cached on disk
+        /// indefinitely, so without this a colour change would leave every existing thumbnail in
+        /// the old colour until something else happened to invalidate it.
+        let routeColor: RouteColor
 
-        var fileName: String { "\(workoutID)-\(width)x\(height)-\(isDark ? "dark" : "light").png" }
+        var fileName: String {
+            "\(workoutID)-\(width)x\(height)-\(isDark ? "dark" : "light")-\(routeColor.cacheToken).png"
+        }
         var cacheKey: NSString { fileName as NSString }
     }
 
@@ -110,7 +117,10 @@ final class RouteThumbnailRenderer {
         // Tiles are a nicety; the shape is the point. Offline, or with the snapshotter refusing
         // under load, draw the line alone rather than showing nothing.
         let image = rendered.flatMap(NSImage.init(data:))
-            ?? polylineOnly(prepared.coordinates, bounds: prepared.bounds, size: size, isDark: key.isDark)
+            ?? polylineOnly(
+                prepared.coordinates, bounds: prepared.bounds, size: size,
+                isDark: key.isDark, color: key.routeColor
+            )
         guard let image else { return nil }
 
         memory.setObject(image, forKey: key.cacheKey)
@@ -164,7 +174,11 @@ final class RouteThumbnailRenderer {
                     continuation.resume(returning: nil)
                     return
                 }
-                continuation.resume(returning: Self.draw(coordinates, over: snapshot, size: size).pngData)
+                continuation.resume(
+                    returning: Self.draw(
+                        coordinates, over: snapshot, size: size, color: key.routeColor
+                    ).pngData
+                )
             }
         }
         // `start` is the snapshotter's last use, so ARC is free to release it the moment the call
@@ -180,7 +194,8 @@ final class RouteThumbnailRenderer {
     }
 
     private static func draw(
-        _ coordinates: [Coordinate], over snapshot: MKMapSnapshotter.Snapshot, size: NSSize
+        _ coordinates: [Coordinate], over snapshot: MKMapSnapshotter.Snapshot, size: NSSize,
+        color: RouteColor
     ) -> NSImage {
         let image = NSImage(size: size)
         image.lockFocus()
@@ -201,7 +216,7 @@ final class RouteThumbnailRenderer {
         NSColor.black.withAlphaComponent(0.35).setStroke()
         path.stroke()
         path.lineWidth = 2
-        NSColor.controlAccentColor.setStroke()
+        NSColor(color).setStroke()
         path.stroke()
 
         image.unlockFocus()
@@ -209,7 +224,8 @@ final class RouteThumbnailRenderer {
     }
 
     private func polylineOnly(
-        _ coordinates: [Coordinate], bounds: CoordinateBounds, size: NSSize, isDark: Bool
+        _ coordinates: [Coordinate], bounds: CoordinateBounds, size: NSSize, isDark: Bool,
+        color: RouteColor
     ) -> NSImage? {
         guard coordinates.count >= 2 else { return nil }
         let scale = cos(bounds.centre.latitude * .pi / 180)
@@ -236,7 +252,7 @@ final class RouteThumbnailRenderer {
         path.lineWidth = 2
         path.lineJoinStyle = .round
         path.lineCapStyle = .round
-        NSColor.controlAccentColor.setStroke()
+        NSColor(color).setStroke()
         path.stroke()
 
         image.unlockFocus()
@@ -272,5 +288,21 @@ extension NSImage {
             return nil
         }
         return bitmap.representation(using: .png, properties: [:])
+    }
+}
+
+extension NSColor {
+    /// Bridges the model's colour choice into AppKit. Here so the components are converted in
+    /// exactly one place, shared by the thumbnail renderer and the detail map.
+    convenience init(_ routeColor: RouteColor) {
+        let (red, green, blue) = routeColor.components
+        self.init(srgbRed: red, green: green, blue: blue, alpha: 1)
+    }
+}
+
+extension Color {
+    init(_ routeColor: RouteColor) {
+        let (red, green, blue) = routeColor.components
+        self.init(.sRGB, red: red, green: green, blue: blue)
     }
 }

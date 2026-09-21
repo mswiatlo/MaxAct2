@@ -25,7 +25,8 @@ struct WorkoutTable: View {
                     workoutID: item.id,
                     hasRoute: item.workout.hasRoute,
                     hasDetail: item.hasDetail,
-                    isIndoor: item.workout.isIndoor
+                    isIndoor: item.workout.isIndoor,
+                    routeColor: model.settings.routeColor
                 )
             }
             .width(104)

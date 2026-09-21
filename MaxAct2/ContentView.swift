@@ -13,7 +13,7 @@ import SwiftUI
 struct ContentView: View {
     @Bindable var model: AppModel
 
-    private var settings: SyncSettings { model.settings }
+    private var settings: AppSettings { model.settings }
 
     var body: some View {
         NavigationSplitView {

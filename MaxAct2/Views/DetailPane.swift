@@ -105,7 +105,10 @@ struct WorkoutDetailView: View {
                 )
             ))) {
                 MapPolyline(coordinates: coordinates)
-                    .stroke(.tint, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                    .stroke(
+                        Color(model.settings.routeColor),
+                        style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round)
+                    )
             }
             .frame(height: 280)
             .clipShape(.rect(cornerRadius: 10))
