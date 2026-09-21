@@ -7,13 +7,12 @@ import SwiftUI
 /// across, and multi-selection with ⌘A, shift-click and range-drag comes free and behaves the way
 /// Mac users expect.
 struct WorkoutTable: View {
-    @Environment(AppModel.self) private var model
+    @Bindable var model: AppModel
+
     @AppStorage("workoutTableColumns") private var columnCustomizationData = Data()
     @State private var columnCustomization = TableColumnCustomization<WorkoutListItem>()
 
     var body: some View {
-        @Bindable var model = model
-
         Table(
             model.visibleItems,
             selection: $model.selection,
@@ -22,7 +21,11 @@ struct WorkoutTable: View {
         ) {
             TableColumn("Route") { item in
                 RouteThumbnailView(
-                    workoutID: item.id, hasRoute: item.workout.hasRoute, hasDetail: item.hasDetail
+                    renderer: model.thumbnails,
+                    workoutID: item.id,
+                    hasRoute: item.workout.hasRoute,
+                    hasDetail: item.hasDetail,
+                    isIndoor: item.workout.isIndoor
                 )
             }
             .width(104)
@@ -100,9 +103,7 @@ struct WorkoutTable: View {
         }
         .tableStyle(.inset)
         .contextMenu(forSelectionType: WorkoutListItem.ID.self) { ids in
-            // Re-injected for the same reason the sync popover takes its model explicitly: menu
-            // content is hosted detached from this hierarchy and does not reliably inherit it.
-            WorkoutActions(ids: ids).environment(model)
+            WorkoutActions(model: model, ids: ids)
         } primaryAction: { ids in
             // Double-click opens the detail for a single row.
             if let id = ids.first, ids.count == 1 { model.selection = [id] }

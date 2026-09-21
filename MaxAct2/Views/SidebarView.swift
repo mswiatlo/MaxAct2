@@ -2,11 +2,9 @@ import MaxActCore
 import SwiftUI
 
 struct SidebarView: View {
-    @Environment(AppModel.self) private var model
+    @Bindable var model: AppModel
 
     var body: some View {
-        @Bindable var model = model
-
         List(selection: $model.sidebarSelection) {
             Section("Library") {
                 ForEach(WorkoutFilter.allCases) { filter in

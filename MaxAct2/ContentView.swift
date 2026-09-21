@@ -1,21 +1,28 @@
 import MaxActCore
 import SwiftUI
 
+/// The model is threaded through explicitly rather than via `@Environment`.
+///
+/// On macOS, AppKit hosts plenty of SwiftUI content in *detached* `NSHostingView`s — table cells,
+/// toolbars, menus, popovers — and those do not reliably inherit environment objects injected up
+/// the main hierarchy. Relying on the environment crashed this app twice with "No Observable
+/// object of type AppModel found": once in the sync popover when the window re-laid out, and once
+/// in a table cell while scrolling. Passing the object removes the whole class of failure, and
+/// `@Observable` tracking is unaffected because it keys off property access, not off how the
+/// reference arrived.
 struct ContentView: View {
-    @Environment(AppModel.self) private var model
+    @Bindable var model: AppModel
 
     private var settings: SyncSettings { model.settings }
 
     var body: some View {
-        @Bindable var model = model
-
         NavigationSplitView {
-            SidebarView()
+            SidebarView(model: model)
         } content: {
             workoutList
                 .navigationSplitViewColumnWidth(min: 560, ideal: 820)
         } detail: {
-            DetailPane()
+            DetailPane(model: model)
         }
         .searchable(text: $model.searchText, prompt: "Activity, place or app")
         .toolbar { toolbarContent }
@@ -43,7 +50,7 @@ struct ContentView: View {
         } else if model.visibleItems.isEmpty {
             ContentUnavailableView.search(text: model.searchText)
         } else {
-            WorkoutTable()
+            WorkoutTable(model: model)
                 .navigationTitle(model.sidebarSelection?.title ?? "Workouts")
                 .navigationSubtitle("\(model.visibleItems.count) workouts")
         }
@@ -51,11 +58,8 @@ struct ContentView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        // `$model` from `body` isn't in scope here, so rebind locally.
-        @Bindable var model = model
-
         ToolbarItemGroup {
-            WorkoutActions(ids: model.selection)
+            WorkoutActions(model: model, ids: model.selection)
                 .labelStyle(.iconOnly)
                 .disabled(model.selection.isEmpty)
 

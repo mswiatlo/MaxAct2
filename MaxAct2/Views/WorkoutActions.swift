@@ -7,9 +7,8 @@ import SwiftUI
 /// that every action is reachable all three ways, and defining them once is the only way that
 /// stays true as actions are added.
 struct WorkoutActions: View {
+    let model: AppModel
     let ids: Set<String>
-
-    @Environment(AppModel.self) private var model
 
     private var settings: SyncSettings { model.settings }
 
@@ -86,10 +85,11 @@ final class SyncSettings {
 }
 
 struct SettingsView: View {
-    @Environment(AppModel.self) private var model
+    /// Only the settings object: this is presented in its own scene, which is another detached
+    /// hosting context.
+    @Bindable var settings: SyncSettings
 
     var body: some View {
-        @Bindable var settings = model.settings
 
         Form {
             Section {

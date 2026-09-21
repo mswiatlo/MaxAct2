@@ -39,8 +39,7 @@ struct MaxActApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environment(model)
+            ContentView(model: model)
                 .alert(
                     "MaxAct couldn't open its database",
                     isPresented: .constant(startupError != nil)
@@ -54,7 +53,7 @@ struct MaxActApp: App {
         .commands { MaxActCommands(model: model) }
 
         Settings {
-            SettingsView().environment(model)
+            SettingsView(settings: model.settings)
         }
     }
 }

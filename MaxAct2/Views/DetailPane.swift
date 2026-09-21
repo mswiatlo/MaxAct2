@@ -4,7 +4,7 @@ import SwiftUI
 
 /// The third column: nothing, one workout, or an aggregate of many.
 struct DetailPane: View {
-    @Environment(AppModel.self) private var model
+    let model: AppModel
 
     var body: some View {
         content
@@ -23,9 +23,9 @@ struct DetailPane: View {
                 description: Text("Select a workout to see its route and heart rate.")
             )
         case 1:
-            WorkoutDetailView(item: model.selectedItems[0])
+            WorkoutDetailView(model: model, item: model.selectedItems[0])
         default:
-            SelectionSummaryView(items: model.selectedItems)
+            SelectionSummaryView(model: model, items: model.selectedItems)
         }
     }
 }
@@ -33,9 +33,9 @@ struct DetailPane: View {
 /// Phase 5 replaces this with the full map, charts and splits. For now it shows the stats we
 /// already have and the route if one has been downloaded.
 struct WorkoutDetailView: View {
+    let model: AppModel
     let item: WorkoutListItem
 
-    @Environment(AppModel.self) private var model
     @State private var series: WorkoutSeries?
 
     private var workout: Workout { item.workout }
@@ -138,6 +138,7 @@ struct WorkoutDetailView: View {
 
 /// Multi-selection: totals plus the batch actions, which is the whole point of selecting many.
 struct SelectionSummaryView: View {
+    let model: AppModel
     let items: [WorkoutListItem]
 
     private var aggregate: WorkoutAggregate { WorkoutAggregate(items.map(\.workout)) }
@@ -169,7 +170,7 @@ struct SelectionSummaryView: View {
             .font(.callout)
             .foregroundStyle(.secondary)
 
-            WorkoutActions(ids: Set(items.map(\.id)))
+            WorkoutActions(model: model, ids: Set(items.map(\.id)))
                 .buttonStyle(.bordered)
 
             Spacer()
