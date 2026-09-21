@@ -135,6 +135,19 @@ that, and both are worth generalising:
   mismatch rules the whole class out structurally, instead of depending on clearing it in the right
   order.
 
+## `NavigationSplitView` cannot hide its detail column
+
+`columnVisibility` controls only the **leading** columns. On a three-column split view,
+`.doubleColumn` means "content + detail" — it hides the *sidebar*. `.detailOnly` hides both
+leading columns. **No value hides the detail column**, so "start with the trailing pane closed"
+is not expressible, and setting `.doubleColumn` hides the wrong thing.
+
+Use `.inspector(isPresented:)` for a trailing pane that should come and go. It gives a standard
+View ▸ Show Inspector item (add `InspectorCommands()` to the app's `commands` to get it and its
+shortcut), `inspectorColumnWidth(min:ideal:max:)` for a real minimum, and the framework restores
+whether it was open. Reveal it when there's something to show, then leave it alone — toggling it
+shut on every deselect makes it flap as someone arrows down a list.
+
 ## Reverse geocoding: what the documentation gets wrong, and what leaks
 
 *(macOS 26, measured against the live geocoder)*

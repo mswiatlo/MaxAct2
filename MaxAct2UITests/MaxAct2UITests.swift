@@ -432,6 +432,31 @@ final class SeededTableUITests: XCTestCase {
         )
     }
 
+    /// The detail column starts hidden and appears on the first selection.
+    ///
+    /// Worth a test because the alternative is a third of the window given over to "No Workout
+    /// Selected" at launch, and because hiding it without revealing it on selection would look
+    /// like clicking a row did nothing.
+    @MainActor
+    func testDetailPaneIsHiddenUntilSomethingIsSelected() throws {
+        let app = launchSeeded()
+        let table = app.outlines["WorkoutTable"]
+        XCTAssertTrue(table.waitForExistence(timeout: 15))
+
+        XCTAssertFalse(
+            app.staticTexts["No Workout Selected"].exists,
+            "The detail column should not be taking space before there is anything to show."
+        )
+
+        table.cells.element(boundBy: 0).click()
+        XCTAssertTrue(
+            app.staticTexts.containing(
+                NSPredicate(format: "value CONTAINS[c] 'Duration'")
+            ).firstMatch.waitForExistence(timeout: 10),
+            "Selecting a row must reveal the detail column."
+        )
+    }
+
     /// The Place column's three states, which are three different claims.
     ///
     /// Geocoding is disabled under `--ui-testing`, so this is deterministic and offline: no

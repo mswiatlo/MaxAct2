@@ -22,7 +22,7 @@ Everything below is verified against real data, not just tests.
 | | |
 |---|---|
 | Builds | clean, **zero warnings** — check with `XcodeListNavigatorIssues` at `severity: warning`; `BuildProject` reports only errors |
-| Tests | 155 in `MaxActCore` (`swift test`), 26 app/UI tests including 14 seeded (`RunAllTests`) |
+| Tests | 155 in `MaxActCore` (`swift test`), 27 app/UI tests including 15 seeded (`RunAllTests`) |
 | Live MCP suite | passes against the phone; skipped unless `MAXACT_LIVE_HOST`/`MAXACT_LIVE_TOKEN` are set |
 | Verified with real data | 33 workouts synced, 5 with full detail; the largest is 3,311 route points and 664 HR samples. Pace, GPS filtering, splits and elevation gain were each checked against HAE's own figures |
 | Working tree | clean, everything merged to `main` at `5114d39` |
@@ -919,7 +919,19 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 
 ### Change log
 
-- **2026-09-21 (latest)** — **Phase 6 complete.** The Place column fills in with coarse names.
+- **2026-09-21 (latest)** — Two layout defaults. **Place is now the third column**, beside the
+  date, since where a workout happened helps identify it. And the **detail pane starts hidden**,
+  with a 440pt minimum instead of 300 — at 300 a splits row's six columns wrapped and collided.
+
+  It is an **inspector** rather than a third `NavigationSplitView` column, because the split view
+  cannot express this: `columnVisibility` controls only the *leading* columns, and `.doubleColumn`
+  on a three-column view hides the **sidebar**. There is no value that hides the detail, and
+  trying it hid the wrong thing — caught by a test. An inspector is the macOS control for a
+  trailing pane that comes and goes: standard View ▸ Show Inspector toggle with its shortcut (now
+  wired up via `InspectorCommands`), a resizable width with a real minimum, and presentation state
+  restored by the framework. It reveals itself on the first selection and is then left alone.
+
+- **2026-09-21** — **Phase 6 complete.** The Place column fills in with coarse names.
   `PlaceGrid` snaps a route's first fix to a ~1 km cell in the package; `PlaceResolver` is an actor
   in the app that geocodes cells, caches them, throttles and backs off.
 

@@ -73,7 +73,12 @@ struct MaxActApp: App {
                 }
         }
         .defaultSize(width: 1240, height: 780)
-        .commands { MaxActCommands(model: model) }
+        .commands {
+            MaxActCommands(model: model)
+            // View ▸ Show/Hide Inspector with its standard shortcut. The detail pane starts
+            // hidden, so there has to be a way to open it that isn't "select something".
+            InspectorCommands()
+        }
 
         Settings {
             SettingsView(settings: model.settings, model: model)

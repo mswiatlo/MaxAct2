@@ -134,7 +134,7 @@ struct SplitsTable: View {
                     .font(.headline)
                     .foregroundStyle(.secondary)
 
-                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
+                Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 6) {
                     ForEach(splits) { split in
                         GridRow {
                             Text(label(for: split))
@@ -180,12 +180,38 @@ struct SplitsTable: View {
             : "km \(split.index)"
     }
 
+    /// Full scale is deliberately modest: the row has six columns and has to fit the detail
+    /// pane's 440pt minimum without wrapping, and the bar is for comparison between rows rather
+    /// than for reading a value off.
+    private static let barWidth: Double = 90
+
     private func bar(for split: Split) -> some View {
         let fraction = (split.speedMetersPerSecond ?? 0) / fastest
         return RoundedRectangle(cornerRadius: 2)
             .fill(tint.opacity(split.isPartial ? 0.35 : 0.75))
-            .frame(width: max(2, 120 * fraction), height: 8)
+            .frame(width: max(2, Self.barWidth * fraction), height: 8)
             // Already spoken by the row's other columns; a bar adds nothing to hear.
             .accessibilityHidden(true)
     }
+}
+
+// A splits table at the detail pane's *minimum* width, which is the case that has to hold: at the
+// previous 300pt minimum these six columns wrapped and collided.
+#Preview("Splits at minimum width") {
+    SplitsTable(
+        splits: [
+            Split(index: 1, distanceMeters: 1000, movingTime: 150,
+                  elevationGainMeters: 0, averageHeartRate: 115),
+            Split(index: 2, distanceMeters: 1000, movingTime: 116,
+                  elevationGainMeters: 29, averageHeartRate: 134),
+            Split(index: 3, distanceMeters: 1000, movingTime: 252,
+                  elevationGainMeters: 137, averageHeartRate: 159),
+            Split(index: 4, distanceMeters: 663, movingTime: 148,
+                  elevationGainMeters: 4, averageHeartRate: 103, isPartial: true),
+        ],
+        kind: .cycling,
+        tint: Color(RouteColor.default)
+    )
+    .padding(20)
+    .frame(width: 440)
 }

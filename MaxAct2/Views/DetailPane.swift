@@ -8,9 +8,11 @@ struct DetailPane: View {
 
     var body: some View {
         content
-            // Without a minimum the split view squeezes this to ~196pt, which is too narrow for
-            // a map or a stats grid.
-            .navigationSplitViewColumnWidth(min: 300, ideal: 360)
+            // Sized by the widest thing in here, which is a splits row: label, pace, bar, time,
+            // heart rate and climb across six columns. At the old 300pt minimum those wrapped and
+            // collided; 440 fits a row with room to spare, verified by rendering the table at
+            // exactly that width. Capped so a wide inspector can't squeeze the table away.
+            .inspectorColumnWidth(min: 440, ideal: 560, max: 760)
     }
 
     @ViewBuilder

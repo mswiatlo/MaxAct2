@@ -15,14 +15,31 @@ struct ContentView: View {
 
     private var settings: AppSettings { model.settings }
 
+    /// Whether the detail pane is showing. Starts **hidden**, so the table gets the whole window
+    /// until there is something to put in it.
+    @State private var showsDetail = false
+
+    /// An **inspector**, not a third `NavigationSplitView` column.
+    ///
+    /// The split view can't express this: `columnVisibility` controls only the *leading* columns,
+    /// and `.doubleColumn` on a three-column view hides the **sidebar**. There is no value that
+    /// hides the detail. An inspector is the macOS control for a trailing pane that comes and
+    /// goes — it has a standard toggle, a resizable width with a real minimum, and the framework
+    /// restores whether it was open.
     var body: some View {
         NavigationSplitView {
             SidebarView(model: model)
-        } content: {
-            workoutList
-                .navigationSplitViewColumnWidth(min: 560, ideal: 820)
         } detail: {
+            workoutList
+        }
+        .inspector(isPresented: $showsDetail) {
             DetailPane(model: model)
+        }
+        // Revealed on the first selection, and then left alone. Collapsing it again on every
+        // deselect would make the pane flap in and out as someone clicks down a list, and once
+        // it's open the user has told us they want it.
+        .onChange(of: model.selection.isEmpty) { _, isEmpty in
+            if !isEmpty { showsDetail = true }
         }
         .searchable(text: $model.searchText, prompt: "Activity, place or app")
         .toolbar { toolbarContent }

@@ -44,6 +44,15 @@ struct WorkoutTable: View {
             .width(min: 100, ideal: 120)
             .customizationID("date")
 
+            // Third, beside the date: where a workout happened is part of identifying it, and it
+            // reads better next to when than stranded past the numbers. A saved column
+            // arrangement wins over this, since `customizationID` is what restoration keys on.
+            TableColumn("Place") { item in
+                PlaceCell(item: item)
+            }
+            .width(min: 100, ideal: 140)
+            .customizationID("place")
+
             TableColumn("Activity", value: \.workout.kind.displayName) { item in
                 Label(item.workout.kind.displayName, systemImage: item.workout.kind.symbolName)
             }
@@ -87,12 +96,6 @@ struct WorkoutTable: View {
             }
             .width(min: 70, ideal: 80)
             .customizationID("heartRate")
-
-            TableColumn("Place") { item in
-                PlaceCell(item: item)
-            }
-            .width(min: 100, ideal: 140)
-            .customizationID("place")
 
             TableColumn("Strava") { item in
                 StravaStateBadge(state: item.stravaState)
