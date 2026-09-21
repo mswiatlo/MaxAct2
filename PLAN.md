@@ -4,8 +4,10 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 with batch upload to Strava.
 
 **Status:** Phases 0–6 complete and exercised against real data, with every known *defect* fixed.
-Next: Phase 7 (TCX + Strava), the point of the app. One feature request outstanding — linking the
-charts and the map to each other (known issue 6).
+Next: Phase 7 (TCX + Strava), the point of the app. Three feature requests outstanding: linking the
+charts and the map (6), TrainingPeaks as a second sync destination (7), and summary statistics (8).
+The last two are speculative — 7 in particular is blocked on whether the TrainingPeaks API is even
+open to us, but it has one consequence for Phase 7's design worth reading before starting it.
 **Last updated:** 2026-09-21.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first. It carries the
@@ -34,7 +36,14 @@ Everything below is verified against real data, not just tests.
    the parts that need care.
 2. **Known issue 6 — link the charts and the map.** Self-contained, sits on top of what Phase 5
    landed, and the traps are written up.
-3. **Phase 8 — polish**, including the first-run onboarding.
+3. **Known issue 8 — summary statistics.** Also self-contained, and mostly grouping on top of the
+   `WorkoutAggregate` that already exists.
+4. **Phase 8 — polish**, including the first-run onboarding.
+
+Known issue 7 (TrainingPeaks) is deliberately not in that order: it starts with a question about
+API access that may close it off entirely. But **read its note before building Phase 7** — upload
+state is currently Strava-shaped, and a `WorkoutDestination` protocol costs nothing now and a
+schema migration later.
 
 **A habit worth keeping.** Four of the last five pieces of work started by *measuring the real
 data*, and in three of them the measurement contradicted the plan: `avgSpeed` turned out to be a
@@ -86,12 +95,17 @@ passed as `--ui-testing-seed=40`.
 
 ### Known issues and requests
 
+> These are numbered independently of the phases in §4, so "known issue 8" (summary statistics) is
+> a different thing from "Phase 8" (polish). Both are referred to by their full name below.
+
 Found by using the app. Not blocking, not yet done — each has a diagnosis or a design sketch so
 picking it up doesn't start from scratch. Items marked *(feature)* are wants, not defects.
 
 Issues 1–5 are all done, and are kept here rather than deleted because each records a diagnosis
 worth not rediscovering — in particular, issues 1 and 4 were both *misdiagnosed* in this list
-until the data was measured. Item 6 is an open feature request.
+until the data was measured. Items 6–8 are open feature requests; 7 and 8 are speculative and
+unresearched, written down so the constraints already learned elsewhere aren't rediscovered when
+someone picks them up.
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -258,6 +272,60 @@ nearest-by-coordinate is one linear pass per click over a few thousand points. P
 `MaxActCore` alongside `WorkoutCharts` so the snapping tolerance is testable rather than tuned by
 eye. And decide what a screen reader hears — a silently drawn crosshair is no use, so the
 highlight should update the charts' `accessibilityValue` with the values at that instant.
+
+**7. Sync to TrainingPeaks as well as Strava.** *(feature, speculative — not researched)*
+
+The TCX writer from Phase 7 is the reusable half: TrainingPeaks accepts TCX, and also FIT, GPX and
+its own PWX. So the file is probably free and the work is all in the transport and the accounting.
+
+**Establish API access before designing anything.** Strava's API is self-serve — you create an app
+and get a client ID. TrainingPeaks' public API is understood to be partner-gated, i.e. you apply
+and may be refused, which would make this feature impossible rather than merely hard. That
+question is cheap to answer and decides whether the rest is worth thinking about. If the API is
+closed, the fallback is exporting a TCX to disk and letting the user upload it — which argues for
+a plain "Export TCX…" command regardless, since that also serves Garmin, Runalyze and an archive.
+
+**The thing to get right in Phase 7, before this exists.** Upload state is currently
+Strava-shaped: `WorkoutRecord` has `stravaStateKey`, `stravaActivityID`, `stravaUploadID`,
+`stravaFailureReason` and `lastUploadedAt`, and the sidebar has a "Not on Strava" filter. A second
+destination means **per-destination** state, which is a schema change and a UI change. Worth
+shaping Phase 7's uploader behind a `WorkoutDestination` protocol — authorise, upload, poll,
+report — and keeping the rate-limit budget per destination, so adding a second service is a new
+conformance rather than a migration. Not worth *building* the second one speculatively; worth not
+painting ourselves into a corner while the first is being written.
+
+**8. Summary statistics: weekly, monthly, yearly, all-time.** *(feature, speculative)*
+
+Totals and counts over a period — distance, moving time, energy, elevation, workout count — broken
+down by activity kind, with the obvious chart of "distance per month" beside them. The library
+already holds seven years; nothing currently answers "how much did I ride last year".
+
+`WorkoutAggregate` in `MaxActCore` already reduces a collection into exactly these totals, so the
+work is grouping and presentation rather than arithmetic. It belongs in the package next to it, so
+the period boundaries are testable.
+
+Four things that will bite, three of them already established elsewhere in this plan:
+
+- **Summing `duration` mixes two meanings.** It is moving time for activities the watch
+  auto-pauses and elapsed time for ones it doesn't — measured, a walk's duration equalled its full
+  wall-clock span. A season total is therefore "moving time for rides plus elapsed for walks".
+  Either label it plainly or derive moving time per workout, which needs the series and so is only
+  available after detail download.
+- **Missing values must not silently read as zero.** `distanceMeters` and the energies are
+  optional, and `WorkoutAggregate` treats absent as 0 — correct for a total, but a total that
+  quietly understates because some workouts lack distance is worse than one that says how many it
+  couldn't count.
+- **Week boundaries are a locale setting, not a constant.** `Calendar.current.firstWeekday` is
+  Sunday in the US and Monday in much of the world, and a training week is conventionally Monday.
+  Use `Calendar.dateInterval(of:for:)` rather than arithmetic on 604,800 seconds, and decide
+  explicitly whose week it is — this is exactly the kind of thing that silently differs between
+  the app and whatever the user compares it against.
+- **Time zones and DST.** Workouts are stored as instants; bucketing them into calendar months
+  needs a zone, and a ride that started at 23:40 belongs to the day it started in *somewhere*.
+  Pick the current zone and say so, rather than letting UTC decide.
+
+Performance is a non-issue: a few thousand value-type rows group in memory well inside a frame,
+which is already how the sidebar counts work. No need for SwiftData aggregation.
 
 ### Seeded UI tests — done 2026-09-20
 
@@ -919,7 +987,18 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 
 ### Change log
 
-- **2026-09-21 (latest)** — Two layout defaults. **Place is now the third column**, beside the
+- **2026-09-21 (latest)** — Recorded two speculative features: **TrainingPeaks** as a second sync
+  destination (7) and **summary statistics** by week, month, year and all time (8). Both are
+  unresearched wants rather than plans, written up mainly to capture constraints already
+  established elsewhere: that TrainingPeaks' API may be partner-gated and so the feature could be
+  impossible rather than hard; that upload state in `WorkoutRecord` is currently Strava-shaped, so
+  Phase 7 should put its uploader behind a `WorkoutDestination` protocol to avoid a later
+  migration; and that summing `duration` mixes moving time with elapsed time, which makes a naive
+  season total two different measurements added together.
+
+  Also noted where things stand: everything is merged, and Phase 7 is the next real build step.
+
+- **2026-09-21** — Two layout defaults. **Place is now the third column**, beside the
   date, since where a workout happened helps identify it. And the **detail pane starts hidden**,
   with a 440pt minimum instead of 300 — at 300 a splits row's six columns wrapped and collided.
 
