@@ -92,6 +92,46 @@ fresh view per workout. The first is cheaper; the second is harder to get wrong.
 with the series loading asynchronously — the map is built before the route arrives — so whichever
 is chosen must set the camera *after* the series is in hand.
 
+**3. Route lines are grey.**
+
+Two separate causes, and the first is a straightforward defect. `Assets.xcassets/AccentColor`
+is **empty** — it declares a `universal` idiom with no colour components — so
+`NSColor.controlAccentColor` in the thumbnail renderer and `.tint` in the detail map both resolve
+to a default grey.
+
+The second is a design mistake of mine: a route line shouldn't follow the system accent colour
+at all. The accent is user-configurable (graphite is a legitimate choice), and a track has to stay
+legible over parkland, water and dense city blocks in both light and dark map tiles. That calls
+for a deliberate, saturated colour held constant regardless of the user's accent — the existing
+dark casing underneath already does the heavy lifting for contrast, so the line itself mainly
+needs to be vivid and consistent. Setting the accent asset alone would fix the symptom while
+leaving the line at the mercy of a system preference.
+
+Both places draw the line, so whatever is chosen belongs in one shared constant rather than being
+duplicated between `RouteThumbnailRenderer` and `WorkoutDetailView`.
+
+**4. No detection of bad GPS fixes.** *(feature, not a defect — for later)*
+
+Apple Watch and phone GPS produce two artifacts worth catching, and they corrupt different things:
+
+- **Stuck fixes** — the receiver repeats the previous position for a run of samples. Inflates
+  stopped time and drags pace down, so this compounds issue 1: a naive moving-time calculation
+  would read a stuck run as a legitimate pause, and a distance calculation reads it as standing
+  still. Detectable as consecutive identical or near-identical coordinates over a span where
+  time is still advancing.
+- **Outlier spikes** — a single fix lands far away and the next returns. Inflates distance and
+  wrecks the thumbnail's bounding box, since one bad point can zoom the whole map out to nothing.
+  Detectable as an implausible instantaneous speed into and back out of a point.
+
+The inputs are already stored and unused: every route point carries `horizontalAccuracy`, and
+most carry `speed` and `verticalAccuracy` (see the data contract reference). A first pass could
+simply drop points above an accuracy threshold before computing distance or drawing.
+
+Worth deciding early whether cleaning is **destructive or a view**. Keeping the raw series and
+filtering on read is preferable: it stays honest about what the watch recorded, it lets the
+thresholds change later without re-syncing, and an exported TCX can then choose whether to carry
+the raw or cleaned track.
+
 ### Next up: UI tests with seeded fixture data
 
 Five user-visible bugs in a row got through a green test suite, all for the same reason — the
