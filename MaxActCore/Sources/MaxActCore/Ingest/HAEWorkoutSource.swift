@@ -26,8 +26,15 @@ public struct HAEWorkoutSource: WorkoutSource {
         self.toolName = toolName
     }
 
-    public init(host: String, port: Int = 9000, token: String?) {
-        self.init(client: MCPClient(host: host, port: port, token: token))
+    public init(endpoint: MCPEndpoint, token: String?) {
+        self.init(client: MCPClient(endpoint: endpoint, token: token))
+    }
+
+    /// Convenience for anything holding raw user input. `nil` when the text can't be parsed —
+    /// the caller reports that rather than the app trapping.
+    public init?(address: String, token: String?) {
+        guard let endpoint = MCPEndpoint(address) else { return nil }
+        self.init(endpoint: endpoint, token: token)
     }
 
     /// Handshake, and confirm the server actually offers the tool we intend to call. Better a

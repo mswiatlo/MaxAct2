@@ -71,11 +71,17 @@ final class SyncSettings {
         token = defaults.string(forKey: "syncToken") ?? ""
     }
 
-    var isConfigured: Bool { !host.isEmpty && !token.isEmpty }
+    /// The address as actually parsed, or `nil` if it can't be. Shown in the UI so there is no
+    /// question about what will be contacted.
+    var endpoint: MCPEndpoint? { MCPEndpoint(host) }
+
+    var isConfigured: Bool {
+        endpoint != nil && !token.trimmingCharacters(in: .whitespaces).isEmpty
+    }
 
     func makeSource() -> HAEWorkoutSource? {
-        guard isConfigured else { return nil }
-        return HAEWorkoutSource(host: host, token: token)
+        guard let endpoint, !token.isEmpty else { return nil }
+        return HAEWorkoutSource(endpoint: endpoint, token: token.trimmingCharacters(in: .whitespaces))
     }
 }
 

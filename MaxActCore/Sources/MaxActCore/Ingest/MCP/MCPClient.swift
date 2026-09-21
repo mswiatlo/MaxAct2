@@ -45,8 +45,8 @@ public actor MCPClient {
         self.token = token
     }
 
-    public init(host: String, port: Int = 9000, token: String?, timeout: TimeInterval = 600) {
-        self.init(transport: URLSessionMCPTransport(host: host, port: port, timeout: timeout), token: token)
+    public init(endpoint: MCPEndpoint, token: String?, timeout: TimeInterval = 600) {
+        self.init(transport: URLSessionMCPTransport(endpoint: endpoint, timeout: timeout), token: token)
     }
 
     public struct ServerInfo: Sendable, Equatable {

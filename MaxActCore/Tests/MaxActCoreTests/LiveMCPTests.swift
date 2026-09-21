@@ -34,7 +34,7 @@ enum LiveConfiguration {
 struct LiveMCPTests {
     private func source() throws -> HAEWorkoutSource {
         let credentials = try #require(LiveConfiguration.credentials)
-        return HAEWorkoutSource(host: credentials.host, token: credentials.token)
+        return try #require(HAEWorkoutSource(address: credentials.host, token: credentials.token))
     }
 
     @Test("the handshake succeeds and the server offers get_workouts")

@@ -26,13 +26,8 @@ public struct URLSessionMCPTransport: MCPTransport {
     /// - Parameter timeout: generous by necessity. The phone answers at ~2.4 s per workout, so a
     ///   90-day window measured 234 s — far past `URLSession`'s 60 s default, which would abort
     ///   every large request.
-    public init(host: String, port: Int = 9000, timeout: TimeInterval = 600) {
-        var components = URLComponents()
-        components.scheme = "http"
-        components.host = host
-        components.port = port
-        components.path = "/mcp"
-        endpoint = components.url!
+    public init(endpoint: MCPEndpoint, timeout: TimeInterval = 600) {
+        self.endpoint = endpoint.url
 
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = timeout
