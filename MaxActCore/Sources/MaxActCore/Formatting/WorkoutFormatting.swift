@@ -39,6 +39,18 @@ public enum WorkoutFormatting {
         return String(format: "%d:%02d /km", minutes, seconds)
     }
 
+    /// A pace already expressed in seconds per kilometre, as `12:26 /km`.
+    ///
+    /// Unlike ``pace(metersPerSecond:)`` this has **no upper cutoff**. That guard exists so a
+    /// summary stat never claims an absurd pace for someone standing still, but an axis label is
+    /// not a claim about the workout — suppressing it just left the bottom of the pace chart
+    /// labelled with an em dash.
+    public static func paceLabel(secondsPerKilometer seconds: Double?) -> String {
+        guard let seconds, seconds.isFinite, seconds > 0 else { return missing }
+        let total = Int(seconds.rounded())
+        return String(format: "%d:%02d /km", total / 60, total % 60)
+    }
+
     /// Kilometres per hour, as `19.3 km/h`. The natural reading for wheeled sports.
     public static func speed(metersPerSecond: Double?) -> String {
         guard let speed = metersPerSecond, speed.isFinite, speed > 0 else { return missing }
@@ -46,15 +58,14 @@ public enum WorkoutFormatting {
     }
 
     /// Pace for foot sports, speed for wheeled ones — whichever the athlete actually thinks in.
+    ///
+    /// Defers to ``ActivityKind/isPaceBased`` so a chart axis and this cannot disagree about which
+    /// unit a sport reads in.
     public static func paceOrSpeed(metersPerSecond: Double?, for kind: ActivityKind) -> String {
-        switch kind {
-        case .cycling, .indoorCycling, .rowing, .elliptical:
-            speed(metersPerSecond: metersPerSecond)
-        case .running, .walking, .hiking, .swimming:
-            pace(metersPerSecond: metersPerSecond)
-        case .strengthTraining, .functionalTraining, .yoga, .other:
-            missing
-        }
+        guard kind.isDistanceBased else { return missing }
+        return kind.isPaceBased
+            ? pace(metersPerSecond: metersPerSecond)
+            : speed(metersPerSecond: metersPerSecond)
     }
 
     public static func energy(kilocalories: Double?) -> String {
@@ -69,6 +80,16 @@ public enum WorkoutFormatting {
 
     public static func elevation(meters: Double?) -> String {
         guard let meters, meters.isFinite, meters != 0 else { return missing }
+        return "\(Int(meters.rounded())) m"
+    }
+
+    /// Height gained, where **zero is a fact rather than a gap**.
+    ///
+    /// The opposite of ``elevation(meters:)``, deliberately. A workout with no
+    /// `elevationAscended` field has none to report; a flat kilometre of a split genuinely
+    /// climbed nothing, and an em dash there reads as "we don't know".
+    public static func elevationGain(meters: Double?) -> String {
+        guard let meters, meters.isFinite, meters >= 0 else { return missing }
         return "\(Int(meters.rounded())) m"
     }
 }

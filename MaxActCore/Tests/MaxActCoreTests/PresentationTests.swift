@@ -179,10 +179,29 @@ import Testing
         #expect(WorkoutFormatting.duration(nil) == WorkoutFormatting.missing)
     }
 
+    @Test("a flat split reads as zero climbing, not as unknown")
+    func zeroGainIsNotMissing() {
+        // The inverse of the rule above, and deliberately so: a kilometre that climbed nothing
+        // is a measurement, while a workout with no elevation field has none to report.
+        #expect(WorkoutFormatting.elevationGain(meters: 0) == "0 m")
+        #expect(WorkoutFormatting.elevationGain(meters: 29) == "29 m")
+        #expect(WorkoutFormatting.elevationGain(meters: nil) == WorkoutFormatting.missing)
+        #expect(WorkoutFormatting.elevation(meters: 0) == WorkoutFormatting.missing)
+    }
+
     @Test("a strength session shows no pace rather than a meaningless one")
     func noPaceForNonDistanceSports() {
         #expect(WorkoutFormatting.paceOrSpeed(metersPerSecond: 2, for: .strengthTraining)
                 == WorkoutFormatting.missing)
+    }
+
+    @Test("an axis label has no upper cutoff, unlike a summary stat")
+    func paceLabelAlwaysFormats() {
+        // 33:20 /km is not a pace worth claiming in a stat, but it is a legitimate axis tick.
+        #expect(WorkoutFormatting.paceLabel(secondsPerKilometer: 746) == "12:26 /km")
+        #expect(WorkoutFormatting.paceLabel(secondsPerKilometer: 2000) == "33:20 /km")
+        #expect(WorkoutFormatting.pace(metersPerSecond: 0.5) == WorkoutFormatting.missing)
+        #expect(WorkoutFormatting.paceLabel(secondsPerKilometer: 0) == WorkoutFormatting.missing)
     }
 
     @Test("standing still does not render as an absurd pace")

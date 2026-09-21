@@ -83,6 +83,18 @@ public enum ActivityKind: Hashable, Sendable {
         }
     }
 
+    /// Whether the sport is read as **pace** (time per kilometre) rather than speed.
+    ///
+    /// Runners think in 5:20 /km and cyclists in 23 km/h; showing either the other way round is
+    /// the kind of thing that makes an app feel like it wasn't built by someone who trains.
+    public var isPaceBased: Bool {
+        switch self {
+        case .running, .walking, .hiking, .swimming: true
+        case .cycling, .indoorCycling, .rowing, .elliptical: false
+        case .strengthTraining, .functionalTraining, .yoga, .other: false
+        }
+    }
+
     /// Whether distance and pace are meaningful for this activity, so the UI can show an em dash
     /// rather than `0.00 km` for a strength session.
     public var isDistanceBased: Bool {

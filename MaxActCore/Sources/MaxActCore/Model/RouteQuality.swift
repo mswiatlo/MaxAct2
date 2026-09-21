@@ -36,6 +36,13 @@ public enum RouteQuality {
     /// at 35 m one real teleport survived, and at 25 m nothing extra was caught.
     public static let accuracyLimitMeters: Double = 30
 
+    /// A gap longer than this is a pause, not a sampling interval.
+    ///
+    /// Not a delicate boundary: measured pauses ran 9.6 to 51.7 minutes while real sampling
+    /// dropouts were seconds. Shared by moving time, splits and chart segmentation so all three
+    /// agree on where a workout stopped.
+    public static let pauseGapSeconds: TimeInterval = 60
+
     /// Whether a fix looks like a real position.
     ///
     /// Both conditions are required. A missing speed alone is common and harmless — plenty of
@@ -105,9 +112,7 @@ extension WorkoutSeries {
         var moving: TimeInterval = 0
         for (previous, next) in zip(points, points.dropFirst()) {
             let interval = next.timestamp.timeIntervalSince(previous.timestamp)
-            // A gap this long is a pause, not a sampling interval. Measured pauses ran 9.6 to
-            // 51.7 minutes while real dropouts were seconds, so the boundary is not delicate.
-            guard interval > 0, interval <= 60 else { continue }
+            guard interval > 0, interval <= RouteQuality.pauseGapSeconds else { continue }
 
             // Prefer the receiver's own speed. Deriving it from the step between two fixes
             // overstates it badly at 1 Hz, because the jitter between adjacent samples is metres:

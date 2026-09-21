@@ -3,10 +3,8 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**,
 with batch upload to Strava.
 
-**Status:** Phases 0–4 complete and exercised against real data, plus seeded UI tests, bulk detail
-backfill, a configurable route colour, a detail map that follows the selection, and correct
-pace/GPS-quality handling. **Every known issue found so far is fixed.** Next: Phase 5 (detail view
-— heart-rate charts and splits).
+**Status:** Phases 0–5 complete and exercised against real data. **Every known issue found so far
+is fixed.** Next: Phase 6 (approximate location), then Phase 7 (TCX + Strava).
 **Last updated:** 2026-09-21.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first. It carries the
@@ -22,7 +20,7 @@ thumbnails render as real maps with the track drawn on them.
 | | |
 |---|---|
 | Builds | clean, **zero warnings** — check with `XcodeListNavigatorIssues` at `severity: warning`; `BuildProject` reports only errors |
-| Tests | 120 in `MaxActCore` (`swift test`), 25 app/UI tests including 13 seeded (`RunAllTests`) |
+| Tests | 143 in `MaxActCore` (`swift test`), 25 app/UI tests including 13 seeded (`RunAllTests`) |
 | Live MCP suite | passes against the phone; skipped unless `MAXACT_LIVE_HOST`/`MAXACT_LIVE_TOKEN` are set |
 | Verified with real data | 13 workouts synced; detail fetch produced 3311 route points and 664 HR samples; thumbnails written to the sandbox container |
 
@@ -624,16 +622,48 @@ latency disappoints, fall back to a `Canvas`-drawn polyline with no map tiles.
 **Verify:** `RunProject`, then scroll a seeded table of ~1000 rows and confirm no live `Map`
 instances and no hitching; screenshot via the device-interaction tools.
 
-### Phase 5 — Detail view
+### Phase 5 — Detail view *(complete)*
 
-`Map` with `MapPolyline(coordinates:)` over the downsampled route; Swift Charts for heart rate,
-pace and elevation against time; a stats grid; laps/splits table; source and device; Strava status
-with a link to the uploaded activity. Liquid Glass only on the floating map overlay controls, inside
-a single `GlassEffectContainer` — Apple's own guidance is that over-applying it costs render time.
+Map, stats grid, three Swift Charts — heart rate, pace or speed, elevation — and per-kilometre
+splits, all fed by `WorkoutSplits` and `WorkoutCharts` in the package so the view only draws.
 
-Accessibility from the start, not retrofitted: Strava state is **symbol + text**, never colour
-alone; explicit `accessibilityLabel` on every status symbol; text styles throughout so Dynamic Type
-scales.
+**Splits had to be computed: the MCP path carries no lap or split data.** (`.hae` files do, under
+`intervals.splits` — another argument for that reader.) Three things produced visible nonsense
+when done the obvious way, and each is now a measured decision recorded in `WorkoutSplits`:
+
+- **Distance is scaled to the workout's own total.** Summing raw 1 Hz steps overstates distance by
+  4.5–12.9% even after `RouteQuality` filtering, which moves every kilometre mark.
+- **Split time is moving time.** Elapsed time put a 51.7-minute pause inside one kilometre and
+  rendered it as "57.80 min, 1.0 km/h". Excluding long gaps alone wasn't enough either — a rider
+  stopped at lights is still sampled at 1 Hz, and 14 minutes of one ride sat in no gap at all.
+  Splits now sum to within a few percent of HAE's `duration`, which is the check worth having.
+- **Elevation gain needs smoothing *and* hysteresis.** Raw rising deltas claimed 590 m of climbing
+  on a walk that gained 43 m. A 61-sample moving average got it to 53 m; adding a 1 m threshold
+  gives 45 m against HAE's 43, and 8 against 10 and 83 against 77 on the other two workouts that
+  report the figure.
+
+Two chart decisions worth the same treatment:
+
+- **Nothing is drawn across a pause.** Series are split into segments at gaps over 60 s, because
+  one line spanning a 51.7-minute stop asserts a steady heart rate and altitude right through it.
+- **Pace is its own series on a reversed axis, not a relabelled speed axis.** Plotting speed and
+  formatting the ticks as pace looked fine until a slow walk exposed it: every tick below about
+  1 m/s converts to a pace beyond 30 min/km, and the chart came out with one label and two em
+  dashes.
+
+And one feature that measurement removed: the **heart-rate min–max band**. HAE's `{Min, Avg, Max}`
+buckets argue for drawing the range each point flattened, but at the `"seconds"` aggregation we
+request for detail, min, avg and max were **identical in all 2,580 samples** across five workouts —
+a 5-second bucket holds one watch reading. The band is emitted only when it spans ≥1 bpm, so it
+would appear for a coarser aggregation without costing anything now.
+
+Accessibility: each chart is one element with a spoken summary ("136 to 170 bpm over 36 minutes,
+2 pauses") rather than several hundred unlabelled marks; split rows combine into one phrase; the
+pace bars are hidden from VoiceOver since the numbers beside them already say it.
+
+Not done, deliberately: **Liquid Glass on floating map overlay controls.** There are no map overlay
+controls yet, and inventing some to have somewhere to put the material would be backwards. Revisit
+if the map gains real controls.
 
 ### Phase 6 — Approximate location
 
@@ -787,14 +817,31 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 | 2 — Model + ingest | Complete |
 | 3 — Persistence | Complete |
 | 4 — List UI | Complete |
-| 5 — Detail view | Not started |
+| 5 — Detail view | Complete |
 | 6 — Approximate location | Not started |
 | 7 — TCX + Strava | Not started |
 | 8 — Polish | Not started |
 
 ### Change log
 
-- **2026-09-21 (latest)** — Fixed the last two known issues, both of which the list had
+- **2026-09-21 (latest)** — **Phase 5 complete.** Heart-rate, pace/speed and elevation charts plus
+  per-kilometre splits, with the derivation in `MaxActCore` (`WorkoutSplits`, `WorkoutCharts`) and
+  the view reduced to drawing. Splits had to be computed because the MCP path carries no lap data.
+
+  Measuring the five real workouts first again changed the design rather than confirming it: split
+  distance has to be scaled to the workout's stated total, split *time* has to be moving time (a
+  51.7-minute pause otherwise landed inside one kilometre as "57.80 min, 1.0 km/h"), elevation gain
+  needs smoothing **and** a 1 m hysteresis threshold to get from a claimed 590 m of climbing down
+  to the 45 m that matches HAE's own 43, pace needs its own reversed-axis series rather than a
+  relabelled speed axis, and the heart-rate min–max band turned out to be degenerate in all 2,580
+  real samples, so it is now emitted only when it actually spans something. Each is documented at
+  the code that implements it, including what was tried and rejected.
+
+  Verified against real data: the Swift splits reproduce the Python prototype exactly (km 1 2:30,
+  km 2 1:56, km 11 3:14, 663 m tail 2:28) and the per-split gains total 70 m against HAE's 77 m
+  ascent for that ride, 45 m against 43 m for the walk.
+
+- **2026-09-21** — Fixed the last two known issues, both of which the list had
   **misdiagnosed**; an hour measuring five real workouts first changed what got built.
 
   *Pace (issue 1)* was blamed on stopped time. In fact HAE's `avgSpeed` is the mean of

@@ -211,6 +211,22 @@ just heart rate, which is what makes it expensive.
 `heartRateRecovery` is a separate series with the same shape, ~24 samples at 5 s, recorded after the
 workout ends.
 
+**At `"seconds"`, Min/Avg/Max are always identical** *(measured: 2,580 samples over five
+workouts, zero exceptions)*. A 5-second bucket holds exactly one Apple Watch reading, so there is
+nothing to aggregate. Don't build a min–max band on the assumption that the range means something
+— at this aggregation it is always zero-width. It would only carry information at `"minutes"`.
+
+## No laps or splits on the MCP path
+
+The workout object has **no lap, split, segment or interval data at all** — only swimming carries
+`lapLength`/`strokeStyle`. Anything split-shaped has to be derived from the route, which brings its
+own measured pitfalls: scale cumulative distance to the workout's stated total, use *moving* time
+per split, and smooth altitude before totalling gain. See `WorkoutSplits` for the numbers.
+
+`.hae` files *do* carry `intervals` with `laps`, `segments`, `splits` and `events` — HealthKit's
+own figures rather than our reconstruction, plus explicit `pause`/`motionResumed` events. That is
+the strongest remaining argument for building the `.hae` reader.
+
 ## Sync paths
 
 All three require an HAE **Premium** subscription. Apple forbids health data access while the phone

@@ -30,8 +30,11 @@ struct DetailPane: View {
     }
 }
 
-/// Phase 5 replaces this with the full map, charts and splits. For now it shows the stats we
-/// already have and the route if one has been downloaded.
+/// One workout in full: the route, the summary stats, heart rate, pace or speed, elevation, and
+/// per-kilometre splits.
+///
+/// Everything below the stats grid depends on the stored series, so it appears only once detail
+/// has been downloaded — under lazy fetching that is an ordinary state, not a failure.
 struct WorkoutDetailView: View {
     let model: AppModel
     let item: WorkoutListItem
@@ -61,6 +64,11 @@ struct WorkoutDetailView: View {
         /// then demonstrably not the raw recording.
         let discardedFixes: Int
         let movingSpeedMetersPerSecond: Double?
+        let splits: [Split]
+        let heartRate: [ChartSegment]
+        let elevation: [ChartSegment]
+        let speed: [ChartSegment]
+        let pace: [ChartSegment]
     }
 
     var body: some View {
@@ -68,13 +76,25 @@ struct WorkoutDetailView: View {
             VStack(alignment: .leading, spacing: 20) {
                 header
 
-                if let loaded, loaded.id == item.id, !loaded.coordinates.isEmpty {
-                    routeMap(loaded.coordinates)
+                // Only ever trust the loaded series when it belongs to the workout on screen.
+                let series = loaded.flatMap { $0.id == item.id ? $0 : nil }
+
+                if let series, !series.coordinates.isEmpty {
+                    routeMap(series.coordinates)
                 } else if workout.hasRoute && !item.hasDetail {
                     notDownloadedNotice
                 }
 
-                statsGrid
+                statsGrid(series)
+
+                if let series {
+                    charts(series)
+                    SplitsTable(
+                        splits: series.splits,
+                        kind: workout.kind,
+                        tint: Color(model.settings.routeColor)
+                    )
+                }
             }
             .padding(20)
         }
@@ -103,7 +123,14 @@ struct WorkoutDetailView: View {
                 CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
             },
             discardedFixes: series.route.count - route.count,
-            movingSpeedMetersPerSecond: workout.movingSpeedMetersPerSecond(using: series)
+            movingSpeedMetersPerSecond: workout.movingSpeedMetersPerSecond(using: series),
+            // Splits and chart series are derived once here rather than in `body`. Each walks
+            // thousands of points, and body runs on every hover, resize and scroll.
+            splits: WorkoutSplits.splits(for: workout, series: series),
+            heartRate: WorkoutCharts.heartRate(series),
+            elevation: WorkoutCharts.elevation(series),
+            speed: WorkoutCharts.speed(series),
+            pace: WorkoutCharts.pace(series, for: workout.kind)
         )
 
         // 30% headroom so the track isn't flush against the edges. Set last, once the route is
@@ -155,11 +182,52 @@ struct WorkoutDetailView: View {
         }
     }
 
-    private var statsGrid: some View {
-        // Only trust the loaded series when it belongs to the workout on screen.
-        let series = loaded.flatMap { $0.id == item.id ? $0 : nil }
+    /// The three charts the plan calls for, in the order they answer questions: how hard, how
+    /// fast, how hilly.
+    @ViewBuilder
+    private func charts(_ series: LoadedSeries) -> some View {
+        let tint = Color(model.settings.routeColor)
 
-        return VStack(alignment: .leading, spacing: 10) {
+        SeriesChart(
+            title: "Heart Rate",
+            systemImage: "heart",
+            segments: series.heartRate,
+            tint: .pink,
+            format: { "\(Int($0.rounded()))" }
+        )
+
+        // Two different series, not one relabelled: pace is seconds per kilometre on a reversed
+        // axis so faster reads as higher, while speed is metres per second the usual way up.
+        if workout.kind.isPaceBased {
+            SeriesChart(
+                title: "Pace",
+                systemImage: "speedometer",
+                segments: series.pace,
+                tint: tint,
+                format: { WorkoutFormatting.paceLabel(secondsPerKilometer: $0) },
+                reversed: true
+            )
+        } else {
+            SeriesChart(
+                title: "Speed",
+                systemImage: "speedometer",
+                segments: series.speed,
+                tint: tint,
+                format: { WorkoutFormatting.speed(metersPerSecond: $0) }
+            )
+        }
+
+        SeriesChart(
+            title: "Elevation",
+            systemImage: "mountain.2",
+            segments: series.elevation,
+            tint: .teal,
+            format: { "\(Int($0.rounded())) m" }
+        )
+    }
+
+    private func statsGrid(_ series: LoadedSeries?) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
             Grid(alignment: .leading, horizontalSpacing: 28, verticalSpacing: 10) {
                 GridRow {
                     stat("Duration", WorkoutFormatting.duration(workout.duration))
