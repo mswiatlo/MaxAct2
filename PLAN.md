@@ -56,10 +56,10 @@ something now recorded in the skill reference:
 4. Performance assertions were loosened after failing spuriously at load average 86. They catch
    10x regressions; the printed figures are the real measurements.
 
-### Known issues
+### Known issues and requests
 
-Found by using the app. Not blocking, not yet fixed — each has a diagnosis so picking it up
-doesn't start from scratch.
+Found by using the app. Not blocking, not yet done — each has a diagnosis or a design sketch so
+picking it up doesn't start from scratch. Items marked *(feature)* are wants, not defects.
 
 **1. Average speed and pace include time spent stopped.**
 
@@ -131,6 +131,38 @@ Worth deciding early whether cleaning is **destructive or a view**. Keeping the 
 filtering on read is preferable: it stays honest about what the watch recorded, it lets the
 thresholds change later without re-syncing, and an exported TCX can then choose whether to carry
 the raw or cleaned track.
+
+**5. Backfill detail for everything, not one selection at a time.** *(feature)*
+
+Selecting rows and pressing Download Detail works, but it doesn't scale to a corpus: the
+two-pass design leaves every list-synced workout without a route until someone asks for it by
+hand. Wanted: a "Fill In Missing Detail" action that walks the backlog on its own.
+
+**Most of this already exists.** `WorkoutStore.itemsNeedingDetail(limit:)` is written and tested,
+`AppModel.fetchDetail(for:source:)` already loops workouts and commits each one, and `hasDetail`
+per workout makes the whole thing naturally resumable — finer-grained than the list pass, which
+resumes by week. What's missing is an entry point and a policy.
+
+The cost has to be stated before anyone starts it, because it is not small. From the Phase 1
+measurements: **~2.4 s and ~2.5 MB transferred per workout**, against ~140 KB stored after LZFSE.
+For the full ~2,867-workout corpus that's roughly **1.9 hours of foregrounded phone and ~7 GB
+transferred**, to produce ~0.4 GB on disk. So it needs the same treatment as the list pass —
+progress, a stop button, and resumption — and it should say what it's about to cost up front.
+
+Design points worth settling:
+
+- **Where it lives.** A second toolbar button next to Sync is the obvious reading, but a second
+  action *inside* the sync panel may be better: it shares the same precondition (HAE open and
+  foregrounded), the same progress banner and the same stop control, and the toolbar is already
+  carrying four controls. Worth trying both.
+- **Scope.** All-time is one option, but "everything in the current filter or selection" is often
+  what's actually wanted — fill in this month, or this activity type — and reuses the sidebar
+  filters already there. Offering a scope choice costs little.
+- **Order.** Newest first, matching the list pass, so the workouts most likely to be looked at
+  arrive first.
+- **Semi-automatic.** A trickle that trims the backlog whenever the app is open and the server
+  happens to be reachable is attractive, but must be visibly on or off and instantly stoppable —
+  silently occupying the phone for two hours is not acceptable behaviour. Default off.
 
 ### Next up: UI tests with seeded fixture data
 
