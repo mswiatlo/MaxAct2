@@ -56,6 +56,42 @@ something now recorded in the skill reference:
 4. Performance assertions were loosened after failing spuriously at load average 86. They catch
    10x regressions; the printed figures are the real measurements.
 
+### Known issues
+
+Found by using the app. Not blocking, not yet fixed — each has a diagnosis so picking it up
+doesn't start from scratch.
+
+**1. Average speed and pace include time spent stopped.**
+
+`Workout.effectiveSpeedMetersPerSecond` uses HAE's `avgSpeed` when present and otherwise
+`distance / duration`. Neither excludes pauses, so a ride with coffee stops reads slower than it
+felt. The measured walk shows the effect plainly: 3.73 km in 55:20 renders as **19:40 /km**, about
+60% slower than an ordinary walking pace.
+
+Note `duration` is HAE's own figure and is already shorter than wall-clock time — 35:17 against a
+94.7-minute span for one ride — so it excludes *something*, but evidently not all stopped time.
+Worth establishing what it actually measures before building on it.
+
+The raw material for a proper figure is already stored: route points carry per-point `speed` and
+timestamps. Moving time can be derived by discarding samples below a speed threshold and gaps
+above a time threshold. Two caveats: thresholds should differ by activity (a walking pause is not
+a cycling pause), and **this needs the series, so it is only available after detail download** —
+the list view would show the elapsed figure until then, which needs to be either labelled or
+backfilled. `.hae` files carry explicit `pause`/`motionPaused` events that would settle it exactly,
+which is one more argument for the `.hae` reader noted in Phase 1.
+
+**2. The detail map opens on the previously selected workout's region.**
+
+`WorkoutDetailView` uses `Map(initialPosition:)`. The initial position is applied **once, when the
+map view is created** — and SwiftUI reuses the same `Map` across selection changes, so the region
+computed for the first workout sticks and every later selection inherits it.
+
+Two fixes, either workable: hold a `@State var camera: MapCameraPosition` and reassign it in the
+existing `.task(id: item.id)` when the series loads, or give the map `.id(item.id)` to force a
+fresh view per workout. The first is cheaper; the second is harder to get wrong. This compounds
+with the series loading asynchronously — the map is built before the route arrives — so whichever
+is chosen must set the camera *after* the series is in hand.
+
 ### Next up: UI tests with seeded fixture data
 
 Five user-visible bugs in a row got through a green test suite, all for the same reason — the
