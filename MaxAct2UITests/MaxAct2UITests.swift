@@ -24,11 +24,12 @@ final class MaxAct2UITests: XCTestCase {
     /// under Swift 6. Creating it inside each `@MainActor` test and tearing down through
     /// `MainActor.run` keeps every touch of it on the main actor.
     @MainActor
-    private func launchApp() -> XCUIApplication {
+    private func launchApp(seed: Int? = nil) -> XCUIApplication {
         let app = XCUIApplication(bundleIdentifier: Self.appBundleIdentifier)
         // Isolates the app's defaults and database from the real ones. These tests type into the
         // connection fields, and without this a test run overwrites the user's own token.
         app.launchArguments = ["--ui-testing"]
+        if let seed { app.launchArguments += ["--ui-testing-seed", String(seed)] }
         app.launch()
         addTeardownBlock { await MainActor.run { app.terminate() } }
         XCTAssertTrue(
@@ -255,6 +256,162 @@ final class MaxAct2UITests: XCTestCase {
         XCTAssertTrue(
             banner.waitForExistence(timeout: 20),
             "A failed sync should explain itself in the banner."
+        )
+    }
+}
+
+/// Tests that need rows on screen.
+///
+/// Every user-visible bug found so far escaped the suite for the same reason: the tests ran
+/// against an empty database, so the table, the thumbnail pipeline and the detail pane had
+/// nothing to go wrong with. These launch with `--ui-testing-seed`, which plants deterministic
+/// synthetic workouts — some with a stored route, some awaiting download, some indoor — in the
+/// throwaway in-memory store.
+final class SeededTableUITests: XCTestCase {
+    private static let appBundleIdentifier = "com.swiatlowski.MaxAct"
+
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+    }
+
+    @MainActor
+    private func launchSeeded(_ count: Int = 40) -> XCUIApplication {
+        let app = XCUIApplication(bundleIdentifier: Self.appBundleIdentifier)
+        app.launchArguments = ["--ui-testing", "--ui-testing-seed", String(count)]
+        app.launch()
+        addTeardownBlock { await MainActor.run { app.terminate() } }
+        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 15))
+        return app
+    }
+
+    @MainActor
+    func testSeededWorkoutsAppearInTheTable() throws {
+        let app = launchSeeded()
+        // The subtitle reports the visible count, which proves the seed reached the table rather
+        // than merely the store.
+        XCTAssertTrue(
+            app.staticTexts.containing(
+                NSPredicate(format: "value CONTAINS %@", "40 workouts")
+            ).firstMatch.waitForExistence(timeout: 15),
+            "Seeded workouts did not reach the table."
+        )
+    }
+
+    /// Regression test for the crash that reached the user: scrolling trapped with "No Observable
+    /// object of type AppModel found", because a table cell is hosted in a detached
+    /// `NSHostingView` that doesn't inherit the environment. No previous test could reach this —
+    /// there were never any cells.
+    @MainActor
+    func testScrollingASeededTableDoesNotCrash() throws {
+        let app = launchSeeded(60)
+        let table = app.outlines["WorkoutTable"]
+        XCTAssertTrue(table.waitForExistence(timeout: 15))
+
+        for _ in 0..<6 {
+            table.scroll(byDeltaX: 0, deltaY: -260)
+            XCTAssertTrue(app.windows.firstMatch.exists, "The app crashed while scrolling.")
+        }
+        for _ in 0..<6 {
+            table.scroll(byDeltaX: 0, deltaY: 260)
+            XCTAssertTrue(app.windows.firstMatch.exists, "The app crashed while scrolling back.")
+        }
+        XCTAssertTrue(app.buttons["Sync"].isEnabled, "The app is no longer responsive.")
+    }
+
+    /// Regression test for the indoor icon appearing on every outdoor ride. The placeholder used
+    /// to key "indoor" off `hasRoute == false`, which after a list pass means *unknown*.
+    ///
+    /// Asserted through accessibility labels rather than pixels, so it holds without a network.
+    @MainActor
+    func testThumbnailPlaceholdersDistinguishTheirThreeStates() throws {
+        let app = launchSeeded()
+        XCTAssertTrue(app.outlines["WorkoutTable"].waitForExistence(timeout: 15))
+
+        // Outdoor, no series yet: awaiting download — emphatically not "indoor".
+        XCTAssertTrue(
+            app.images["Route not downloaded yet"].firstMatch.waitForExistence(timeout: 15),
+            "An outdoor workout without a stored route should offer to download it."
+        )
+        // Indoor workouts are seeded too, and those *should* say indoor.
+        XCTAssertTrue(
+            app.images["Indoor workout"].firstMatch.exists,
+            "Indoor workouts should be marked as such."
+        )
+    }
+
+    /// Exercises the whole thumbnail chain: stored series → simplify → snapshot → bitmap.
+    ///
+    /// Network-independent despite using `MKMapSnapshotter`, because the renderer falls back to
+    /// drawing the polyline alone when tiles can't be fetched — either way an image appears. A
+    /// hang produces no image at all, which is what the released-snapshotter bug did.
+    @MainActor
+    func testSeededRoutesRenderThumbnails() throws {
+        let app = launchSeeded()
+        XCTAssertTrue(app.outlines["WorkoutTable"].waitForExistence(timeout: 15))
+
+        XCTAssertTrue(
+            app.images["Route map"].firstMatch.waitForExistence(timeout: 45),
+            "No thumbnail rendered for a workout with a stored route."
+        )
+    }
+
+    @MainActor
+    func testSelectingARowShowsItsDetail() throws {
+        let app = launchSeeded()
+        let table = app.outlines["WorkoutTable"]
+        XCTAssertTrue(table.waitForExistence(timeout: 15))
+
+        table.cells.element(boundBy: 0).click()
+        XCTAssertTrue(
+            app.staticTexts.containing(
+                NSPredicate(format: "value CONTAINS[c] 'Duration'")
+            ).firstMatch.waitForExistence(timeout: 10),
+            "Selecting a row should show its stats."
+        )
+    }
+
+    /// Multi-select and the aggregate summary — the reason the table exists — had no coverage.
+    @MainActor
+    func testSelectAllShowsAnAggregateSummary() throws {
+        let app = launchSeeded()
+        let table = app.outlines["WorkoutTable"]
+        XCTAssertTrue(table.waitForExistence(timeout: 15))
+
+        table.cells.element(boundBy: 0).click()
+        app.typeKey("a", modifierFlags: [.command, .shift])
+
+        XCTAssertTrue(
+            app.staticTexts.containing(
+                NSPredicate(format: "value CONTAINS[c] 'Workouts Selected'")
+            ).firstMatch.waitForExistence(timeout: 10),
+            "Selecting many rows should show the aggregate summary."
+        )
+        XCTAssertTrue(
+            app.staticTexts.containing(
+                NSPredicate(format: "value CONTAINS[c] 'Total Distance'")
+            ).firstMatch.exists,
+            "The summary should total the selection."
+        )
+    }
+
+    @MainActor
+    func testSidebarFiltersNarrowTheTable() throws {
+        let app = launchSeeded()
+        let sidebar = app.outlines["Sidebar"]
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 15))
+
+        // "Indoor" is seeded to be a strict subset, so the count must drop.
+        let indoor = sidebar.staticTexts.containing(
+            NSPredicate(format: "label BEGINSWITH 'Indoor'")
+        ).firstMatch
+        XCTAssertTrue(indoor.waitForExistence(timeout: 10))
+        indoor.click()
+
+        XCTAssertFalse(
+            app.staticTexts.containing(
+                NSPredicate(format: "value CONTAINS %@", "40 workouts")
+            ).firstMatch.exists,
+            "Choosing Indoor should show fewer than all 40 workouts."
         )
     }
 }

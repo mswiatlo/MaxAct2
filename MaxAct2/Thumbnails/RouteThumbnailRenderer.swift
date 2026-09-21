@@ -140,8 +140,13 @@ final class RouteThumbnailRenderer {
             }
         }
         // `start` is the snapshotter's last use, so ARC is free to release it the moment the call
-        // returns — and a deallocated snapshotter never calls back, which left every thumbnail
-        // spinning for ever with an empty Thumbnails directory. Keep it alive across the await.
+        // returns, and a deallocated snapshotter never calls back. Retaining it across the await
+        // is the documented way to use this API.
+        //
+        // Added while chasing thumbnails that never appeared, but **not confirmed to have been
+        // the cause**: removing it again and re-running `testSeededRoutesRenderThumbnails` still
+        // passes. The actual fix was more likely the throttle rewrite or the `.task(id:)` retry
+        // in the same round. Kept because it is correct regardless; don't cite it as the fix.
         withExtendedLifetime(snapshotter) {}
         return png
     }

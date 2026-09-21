@@ -3,9 +3,9 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**,
 with batch upload to Strava.
 
-**Status:** Phases 0–4 complete and exercised against real data — sync, table, detail download
-and route thumbnails all work end to end. **Paused here.** Next: UI tests with seeded fixture data
-(see below), then Phase 5.
+**Status:** Phases 0–4 complete and exercised against real data. Seeded UI tests are in — the
+table, thumbnails and multi-select now have coverage that can actually see them. Next: bulk
+detail backfill (item 5), then Phase 5.
 **Last updated:** 2026-09-20.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first. It carries the
@@ -21,7 +21,7 @@ thumbnails render as real maps with the track drawn on them.
 | | |
 |---|---|
 | Builds | clean, **zero warnings** — check with `XcodeListNavigatorIssues` at `severity: warning`; `BuildProject` reports only errors |
-| Tests | 88 in `MaxActCore` (`swift test`), 12 app/UI tests (`RunAllTests`) |
+| Tests | 88 in `MaxActCore` (`swift test`), 19 app/UI tests including 7 seeded (`RunAllTests`) |
 | Live MCP suite | passes against the phone; skipped unless `MAXACT_LIVE_HOST`/`MAXACT_LIVE_TOKEN` are set |
 | Verified with real data | 13 workouts synced; detail fetch produced 3311 route points and 664 HR samples; thumbnails written to the sandbox container |
 
@@ -46,9 +46,11 @@ something now recorded in the skill reference:
 
 **Outstanding:**
 
-1. **UI tests can't see any of this.** They run against an isolated empty database, so there are
-   no rows, no thumbnails and no detail — every bug above was invisible to them. This is the next
-   thing to fix; see below.
+1. ~~UI tests can't see any of this.~~ **Done.** `--ui-testing-seed <n>` plants deterministic
+   synthetic workouts, and seven tests now exercise the table, scrolling, thumbnail placeholder
+   states, rendering, selection and the aggregate summary. Verified by reintroducing a fixed bug:
+   the placeholder test fails without its fix. See the caveat in that section about what is
+   *not* covered.
 2. **Strava is unbuilt.** State machine, badges and filters exist and are tested; the toolbar
    button is deliberately disabled.
 3. **Detail view is a placeholder.** Map, stats and sample counts render, but heart-rate charts
@@ -167,33 +169,39 @@ Sequencing note: this is more valuable *after* the seeded UI tests, since it mul
 of detail flowing through the thumbnail and detail paths — the two areas where every bug so far
 has been found.
 
-### Next up: UI tests with seeded fixture data
+### Seeded UI tests — done 2026-09-20
 
-Five user-visible bugs in a row got through a green test suite, all for the same reason — the
-tests never had data. Worth fixing before Phase 5 adds more surface.
+`SampleData` in `MaxActCore` generates deterministic synthetic workouts, and
+`--ui-testing-seed <n>` plants them in the throwaway in-memory store at launch (only alongside
+`--ui-testing`, so it can never reach the real database). `SeededTableUITests` covers scrolling,
+the three thumbnail placeholder states, thumbnail rendering, row selection, select-all with the
+aggregate summary, and sidebar filtering.
 
-The shape: extend the existing `--ui-testing` flag with `--ui-testing-seed <n>`, which populates
-the in-memory store at launch with synthetic workouts built from the committed fixtures, including
-**synthetic routes** so the thumbnail chain actually runs. That single addition would have caught
-bugs 2 through 5 above:
+Two decisions that made these worth having:
 
-| Test | Catches |
-|---|---|
-| Scroll a seeded table | the table-cell environment crash (#2) |
-| Assert a row shows the download placeholder, not the indoor one | the indoor mislabel (#3) |
-| Seed a workout *with* a stored series, wait for the image | the snapshotter lifetime bug (#5) |
-| Seed without a series, add one, assert the thumbnail appears | the `.task(id:)` retry bug (#4) |
-| Select several rows, check the aggregate summary | multi-select and batch actions, currently untested |
+- **Real coordinates.** Routes are laid over Vancouver, because `MKMapSnapshotter` returns blank
+  ocean tiles for the middle of nowhere and any assertion about a rendered thumbnail would pass
+  without meaning.
+- **Assert on the placeholder state machine, not pixels.** The renderer falls back to drawing the
+  polyline alone when tiles can't be fetched, so an image appears either way and the tests hold
+  offline — while a *hang* still produces no image and fails.
 
-Two notes on doing it well. The seeded routes should be real coordinates near a real place, or
-`MKMapSnapshotter` returns blank tiles and the thumbnail assertions become vacuous. And the
-snapshotter needs the network, so an assertion that a thumbnail *image* appears will be flaky
-offline — assert on the placeholder state machine, and treat the rendered image as a separate,
-network-dependent test.
+**What these do and don't catch, checked rather than assumed.** Reintroducing the indoor-icon bug
+makes `testThumbnailPlaceholdersDistinguishTheirThreeStates` fail, so that one is real. But
+removing `withExtendedLifetime(snapshotter)` — the change made while chasing thumbnails that never
+appeared — leaves `testSeededRoutesRenderThumbnails` **passing**, which means that fix was not the
+cause of the original hang and the test does not discriminate on it. The real cause was more
+likely the throttle rewrite or the `.task(id:)` retry landed in the same round. Neither is pinned
+down.
 
-Alternatives considered, and why they rank lower: snapshot-testing the rendered PNGs would have
-caught #5 but needs a dependency and is brittle across macOS versions; a `WorkoutSource` fake
-driving a full sync would cover ingest, which is already the best-tested layer.
+Still uncovered:
+
+- **Detail arriving after first render** — the `.task(id:)` retry bug. Seeding is static, so no
+  test watches a thumbnail appear once a series lands. Would need the seed to add a series on a
+  delay, or a test hook to trigger a detail fetch.
+- **The table-cell environment crash** is exercised by the scroll test, but that was never
+  confirmed to reproduce it either; the fix removed `@Environment(AppModel.self)` from the
+  codebase entirely, so the original condition can't be restored to check.
 
 ---
 
@@ -758,6 +766,15 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 | 8 — Polish | Not started |
 
 ### Change log
+
+- **2026-09-20 (late)** — Seeded UI tests added: `SampleData` in `MaxActCore`, a
+  `--ui-testing-seed` launch argument, and seven tests over the table, scrolling, thumbnails,
+  selection and filtering. Two findings while writing them. SwiftUI's `Table` is exposed to
+  XCUIAutomation as an **outline**, not a table, so `app.tables` matches nothing — both it and the
+  sidebar now carry accessibility identifiers. And verifying the tests against reintroduced bugs
+  showed one genuinely catches its bug while the thumbnail test does not discriminate on
+  `withExtendedLifetime`, so that earlier fix cannot be credited with resolving the hang; the
+  comment now says so.
 
 - **2026-09-20 (evening)** — Used the app against the real phone for the first time and found five
   bugs no test caught: a force-unwrapped URL that crashed on a pasted address, two separate

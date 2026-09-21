@@ -61,22 +61,29 @@ final class AppModel {
     let thumbnails: RouteThumbnailRenderer
     let settings: SyncSettings
 
+    /// Number of synthetic workouts to plant on first load, for UI tests and previews. `nil` in
+    /// normal use.
+    let seedCount: Int?
+
     private var syncTask: Task<Void, Never>?
+    private var hasSeeded = false
 
     init(
         store: WorkoutStore,
         seriesStore: SeriesStore,
         thumbnails: RouteThumbnailRenderer,
-        settings: SyncSettings
+        settings: SyncSettings,
+        seedCount: Int? = nil
     ) {
         self.store = store
         self.seriesStore = seriesStore
         self.thumbnails = thumbnails
         self.settings = settings
+        self.seedCount = seedCount
     }
 
     /// Used when the on-disk stores can't be opened. Everything works; nothing persists.
-    static func inMemoryFallback(settings: SyncSettings) -> AppModel {
+    static func inMemoryFallback(settings: SyncSettings, seedCount: Int? = nil) -> AppModel {
         // Force-unwrapped deliberately: an in-memory container and a temp directory failing
         // would mean the process cannot allocate or write anywhere, and there is no recovery.
         let seriesStore = try! SeriesStore(
@@ -87,7 +94,8 @@ final class AppModel {
             store: WorkoutStore(modelContainer: try! WorkoutStore.container(inMemory: true)),
             seriesStore: seriesStore,
             thumbnails: try! RouteThumbnailRenderer(seriesStore: seriesStore),
-            settings: settings
+            settings: settings,
+            seedCount: seedCount
         )
     }
 
@@ -136,11 +144,25 @@ final class AppModel {
         isLoading = true
         defer { isLoading = false }
         do {
+            try await seedIfRequested()
             items = try await store.allItems()
             loadError = nil
         } catch {
             loadError = "Could not load workouts: \(error.localizedDescription)"
         }
+    }
+
+    /// Plants synthetic data on the first load when `--ui-testing-seed` was passed.
+    ///
+    /// Done here rather than in `init` because seeding is async, and before the fetch so the
+    /// first frame the tests see is already populated — a test that races the seed is worse than
+    /// no test.
+    private func seedIfRequested() async throws {
+        guard let seedCount, !hasSeeded else { return }
+        hasSeeded = true
+        try await store.upsert(
+            SampleData.ingested(count: seedCount), seriesStore: seriesStore
+        )
     }
 
     func selectAllVisible() {

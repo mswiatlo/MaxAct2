@@ -146,6 +146,19 @@ because it keys off property access rather than off how the reference arrived. T
 Note the crash did **not** reproduce under XCUIAutomation, verified by re-running the smoke test
 against the pre-fix code. Don't assume a UI test covers this class of bug.
 
+## Querying SwiftUI views from XCUIAutomation
+
+Two things that cost a debugging round each, both found by printing `app.debugDescription`:
+
+- **A SwiftUI `Table` is exposed as an `outline`, not a `table`.** `app.tables` matches nothing.
+  So is a `List`, so the sidebar and the workout table are both outlines — give each an
+  `.accessibilityIdentifier` and query `app.outlines["WorkoutTable"]` rather than relying on order.
+- **`.accessibilityLabel` on a row lands on the element's `label`; a `.badge` becomes its
+  `value`.** Predicates must target the right one, and it changed when the badge did.
+
+When a query doesn't match, dump the hierarchy instead of guessing — a throwaway test that prints
+`app.debugDescription` answers it in one run.
+
 ## SwiftPM
 
 - `MaxActCore/Package.swift` needs **`swift-tools-version: 6.2`**. `.macOS(.v26)` was introduced in

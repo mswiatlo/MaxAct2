@@ -102,6 +102,10 @@ struct WorkoutTable: View {
             .customizationID("strava")
         }
         .tableStyle(.inset)
+        // SwiftUI's Table is exposed to accessibility as an *outline*, not a table, and the
+        // sidebar List is one too — so UI tests need a way to tell them apart that doesn't depend
+        // on ordering.
+        .accessibilityIdentifier("WorkoutTable")
         .contextMenu(forSelectionType: WorkoutListItem.ID.self) { ids in
             WorkoutActions(model: model, ids: ids)
         } primaryAction: { ids in

@@ -11,12 +11,24 @@ struct MaxActApp: App {
     /// deterministic instead of depending on whatever happens to be synced.
     static let isUITesting = ProcessInfo.processInfo.arguments.contains("--ui-testing")
 
+    /// `--ui-testing-seed <n>` plants n synthetic workouts in the in-memory store. Only honoured
+    /// alongside `--ui-testing`, so it can never touch the real database.
+    static var uiTestingSeedCount: Int? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let flag = arguments.firstIndex(of: "--ui-testing-seed"),
+              arguments.index(after: flag) < arguments.endIndex
+        else { return nil }
+        return Int(arguments[arguments.index(after: flag)])
+    }
+
     init() {
         if Self.isUITesting {
             let domain = "com.swiatlowski.MaxAct.uitests"
             UserDefaults.standard.removePersistentDomain(forName: domain)
             let settings = SyncSettings(defaults: UserDefaults(suiteName: domain) ?? .standard)
-            _model = State(initialValue: AppModel.inMemoryFallback(settings: settings))
+            _model = State(initialValue: AppModel.inMemoryFallback(
+                settings: settings, seedCount: Self.uiTestingSeedCount
+            ))
             return
         }
 
