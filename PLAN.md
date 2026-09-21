@@ -149,20 +149,23 @@ For the full ~2,867-workout corpus that's roughly **1.9 hours of foregrounded ph
 transferred**, to produce ~0.4 GB on disk. So it needs the same treatment as the list pass —
 progress, a stop button, and resumption — and it should say what it's about to cost up front.
 
-Design points worth settling:
+Design, agreed 2026-09-20:
 
-- **Where it lives.** A second toolbar button next to Sync is the obvious reading, but a second
-  action *inside* the sync panel may be better: it shares the same precondition (HAE open and
-  foregrounded), the same progress banner and the same stop control, and the toolbar is already
-  carrying four controls. Worth trying both.
-- **Scope.** All-time is one option, but "everything in the current filter or selection" is often
-  what's actually wanted — fill in this month, or this activity type — and reuses the sidebar
-  filters already there. Offering a scope choice costs little.
-- **Order.** Newest first, matching the list pass, so the workouts most likely to be looked at
-  arrive first.
-- **Semi-automatic.** A trickle that trims the backlog whenever the app is open and the server
-  happens to be reachable is attractive, but must be visibly on or off and instantly stoppable —
-  silently occupying the phone for two hours is not acceptable behaviour. Default off.
+- **It lives in the sync panel**, as a second action beneath Start Sync — not a separate toolbar
+  button. It shares the panel's precondition (HAE open and foregrounded), its progress display and
+  its stop control, and the toolbar already carries four controls. The panel should show the
+  backlog count so the action is self-explaining: *"Fill In Missing Detail (1,204 workouts,
+  about 48 minutes)"*.
+- **Scope is a choice**, mirroring the range picker: everything, or just the current sidebar
+  filter / selection. Filling in one month or one activity type is often what's actually wanted,
+  and the filters already exist.
+- **Newest first**, matching the list pass, so the workouts most likely to be opened arrive first.
+- **Any automatic trickle defaults off**, is visibly on or off, and stops instantly. Quietly
+  occupying the phone for two hours is not acceptable even with a one-time opt-in.
+
+Sequencing note: this is more valuable *after* the seeded UI tests, since it multiplies the amount
+of detail flowing through the thumbnail and detail paths — the two areas where every bug so far
+has been found.
 
 ### Next up: UI tests with seeded fixture data
 
