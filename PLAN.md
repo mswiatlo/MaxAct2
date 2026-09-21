@@ -3,8 +3,9 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**,
 with batch upload to Strava.
 
-**Status:** Phases 0–5 complete and exercised against real data. **Every known issue found so far
-is fixed.** Next: Phase 6 (approximate location), then Phase 7 (TCX + Strava).
+**Status:** Phases 0–5 complete and exercised against real data, with every known *defect* fixed.
+Next: Phase 6 (approximate location), then Phase 7 (TCX + Strava). One feature request outstanding
+— linking the charts and the map to each other (known issue 6).
 **Last updated:** 2026-09-21.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first. It carries the
@@ -62,9 +63,9 @@ something now recorded in the skill reference:
 Found by using the app. Not blocking, not yet done — each has a diagnosis or a design sketch so
 picking it up doesn't start from scratch. Items marked *(feature)* are wants, not defects.
 
-All five are now done. They are kept here rather than deleted because each records a diagnosis
+Issues 1–5 are all done, and are kept here rather than deleted because each records a diagnosis
 worth not rediscovering — in particular, issues 1 and 4 were both *misdiagnosed* in this list
-until the data was measured.
+until the data was measured. Item 6 is an open feature request.
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -193,6 +194,44 @@ two estimates can't drift, with the measured 2.4 s pinned by a test since the UI
 
 Not built: the opt-in background trickle. The manual action covers the need, and an automatic one
 that occupies the phone for hours deserves its own design pass rather than being tacked on.
+
+**6. Link the charts and the map to each other.** *(feature, not started)*
+
+Clicking a point in a chart should highlight where on the map that happened, and clicking a point
+on the route should highlight where in the charts it falls. This is the thing that turns three
+separate pictures into one — "that's the climb where my heart rate spiked" is currently a question
+you answer by squinting at two x-axes.
+
+**Timestamp is the shared key**, not an array index. Every chart is time-indexed and every route
+point carries a timestamp, so one `@State var highlighted: Date?` on `WorkoutDetailView` drives
+the map annotation and the rule mark in all three charts at once. An index would be wrong: the
+series have different lengths and different membership.
+
+Mechanism: `.chartXSelection(value:)` gives the selected `Date` for charts → map. For map →
+charts, `MapReader`'s proxy converts a click point to a coordinate, then find the nearest route
+point. Draw the highlight as a `MapCircle` or annotation plus a `RuleMark` per chart.
+
+Four traps, all of which follow from how Phase 5 works:
+
+- **Look up against the full cleaned route, never the display arrays.** The charts are thinned to
+  400 marks and the map polyline is RDP-simplified for 900 px, so a selected chart x will usually
+  fall between drawn vertices, and a clicked map point will usually not be a vertex at all. Both
+  lookups have to go back to `series.cleanedRoute`.
+- **A time inside a pause has no position.** Snap to the nearest point only within a tolerance —
+  a few seconds — and show nothing beyond it, rather than highlighting a spot the athlete left
+  51 minutes earlier.
+- **Clicking far from the track should highlight nothing.** Nearest-coordinate search always
+  returns *something*; it needs a distance threshold in screen terms, since a fixed metre
+  threshold behaves differently at every zoom level.
+- **The pace series is a subset.** It drops samples below the stopped threshold, so it can be
+  missing a mark at a time the other two charts have. The highlight comes from the route, so this
+  only affects whether a rule mark lands inside that chart's data.
+
+Cheap and worth doing: nearest-by-time is a binary search on an already-sorted array, and
+nearest-by-coordinate is one linear pass per click over a few thousand points. Put both in
+`MaxActCore` alongside `WorkoutCharts` so the snapping tolerance is testable rather than tuned by
+eye. And decide what a screen reader hears — a silently drawn crosshair is no use, so the
+highlight should update the charts' `accessibilityValue` with the values at that instant.
 
 ### Seeded UI tests — done 2026-09-20
 
@@ -824,7 +863,12 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 
 ### Change log
 
-- **2026-09-21 (latest)** — **Phase 5 complete.** Heart-rate, pace/speed and elevation charts plus
+- **2026-09-21 (latest)** — Recorded known issue 6: linking the charts and the map to each other,
+  so clicking a point in either highlights the corresponding point in the other. Written up with
+  the shared-key decision (timestamp, not index) and the four traps that follow from Phase 5's
+  downsampling, pause handling and pace filtering. Not started.
+
+- **2026-09-21** — **Phase 5 complete.** Heart-rate, pace/speed and elevation charts plus
   per-kilometre splits, with the derivation in `MaxActCore` (`WorkoutSplits`, `WorkoutCharts`) and
   the view reduced to drawing. Splits had to be computed because the MCP path carries no lap data.
 
