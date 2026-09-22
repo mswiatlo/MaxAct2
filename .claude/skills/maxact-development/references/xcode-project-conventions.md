@@ -393,7 +393,16 @@ column widths understated the requirement by that much, and a window sized from 
 scrolling. Measure instead: widen the window in steps and watch when the columns stop sitting at
 their minimums. Note also that the content's own ideal width wins over a smaller requested one.
 
-Window geometry lives in `NSWindow Frame …` and `NSSplitView Subview Frames …` keys, plus a
-`Saved Application State` directory in the container. To reset the window and column layout while
-keeping the sync credentials: kill `cfprefsd`, strip every key except `syncHost` and `syncToken`
-from the container plist, then delete the container's `Saved Application State`.
+### Resetting the saved window state
+
+**Run `Spikes/reset-window-state.sh` with the app quit.** Changing a default window size or column
+width does nothing visible until the saved state is cleared, so this is needed after every such
+change — and it is the first thing to try when a layout change "didn't work".
+
+It keeps `syncHost` and `syncToken` and removes everything else: the `NSWindow Frame …` and
+`NSSplitView Subview Frames …` keys, the `workoutTableColumns.vN` layout, and the container's
+`Saved Application State` directory — window geometry lives in that directory as well as in the
+plist, so deleting only the keys is not enough.
+
+The script refuses to run while the app is open, because the app writes its state back on exit and
+would undo the reset.
