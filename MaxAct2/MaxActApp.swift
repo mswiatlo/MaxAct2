@@ -63,12 +63,23 @@ struct MaxActApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView(model: model)
-                // `defaultSize` alone did not take: with no saved frame the window opened at
-                // SwiftUI's 700×700 fallback, which is narrower than the table needs and leaves
-                // it scrolling horizontally. An ideal width on the content is what the window
-                // actually sizes itself to. `minWidth` is the sidebar plus the table's column
-                // minimums, below which the list can only scroll.
-                .frame(minWidth: 1040, idealWidth: 1090, minHeight: 480, idealHeight: 780)
+                // `defaultSize` alone does not take: with no saved frame the window opened at
+                // SwiftUI's 700×780 fallback. An ideal width on the content is what the window
+                // actually sizes itself to.
+                //
+                // 1,300 is measured, not derived. Widening in steps and watching when the
+                // columns stop sitting at their minimums put the fit between 1,230 (squeezed)
+                // and 1,250 (slack); the content's own ideal then settles at 1,300, and asking
+                // for less than that is ignored, so the declared value matches what it does.
+                //
+                // The arithmetic misleads here, which is how an earlier 1,090 shipped too narrow:
+                // the sidebar (223) plus the column widths (824) is only 1,047, because a
+                // `.inset` table adds roughly 185pt of gutters and insets that the persisted
+                // column widths don't include.
+                //
+                // `minWidth` stays well below: the window should still drag narrow, it just
+                // means the table scrolls.
+                .frame(minWidth: 1040, idealWidth: 1300, minHeight: 480, idealHeight: 780)
                 .alert(
                     "MaxAct couldn't open its database",
                     isPresented: .constant(startupError != nil)
@@ -85,7 +96,7 @@ struct MaxActApp: App {
         //
         // The inspector is deliberately not counted, because it starts closed — opening it widens
         // the window rather than squeezing the list.
-        .defaultSize(width: 1090, height: 780)
+        .defaultSize(width: 1300, height: 780)
         .commands {
             MaxActCommands(model: model)
             // View ▸ Show/Hide Inspector with its standard shortcut. The detail pane starts

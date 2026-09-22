@@ -987,7 +987,17 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 
 ### Change log
 
-- **2026-09-21 (latest)** — Narrowed the Strava column and sized the default window to the table.
+- **2026-09-22 (latest)** — Widened the default window to 1,300 and centred the Strava glyph in
+  its column.
+
+  The previous 1,090 was too narrow with the sidebar showing, and the arithmetic is why: the
+  sidebar (223) plus the persisted column widths (824) is 1,047, but an `.inset` table adds
+  roughly **185pt of gutters and insets that `currentWidth` does not include**. Measured by
+  widening in steps and watching when the columns stop sitting at their minimums — squeezed at
+  1,230, slack at 1,250 — after which the content's own ideal settles at 1,300 and a smaller
+  requested width is simply ignored.
+
+- **2026-09-21** — Narrowed the Strava column and sized the default window to the table.
   The Strava cell shows the **symbol alone** (44pt, down from 96): the six states have six
   distinct symbol *shapes*, so colour was never carrying the meaning, and `help` plus the
   accessibility label still give the wording. The detail pane keeps symbol-and-text.

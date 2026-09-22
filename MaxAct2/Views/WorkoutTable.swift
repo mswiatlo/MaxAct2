@@ -112,7 +112,10 @@ struct WorkoutTable: View {
             .customizationID("heartRate")
 
             TableColumn("Strava") { item in
+                // Centred: a lone glyph pinned to the leading edge of its column reads as
+                // misaligned rather than as a column of status marks.
                 StravaStateBadge(state: item.stravaState, showsLabel: false)
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
             // Symbol alone, so the column is barely wider than its own header. The floor is the
             // word "Strava", not the content.

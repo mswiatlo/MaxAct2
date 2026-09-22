@@ -387,6 +387,12 @@ even exist. Several "resets" appeared to do nothing for exactly this reason.
 in memory and flushes it on exit, so killing it after an edit writes the stale values straight back
 over the change.
 
+**Sizing a window to fit a `Table` cannot be done on paper.** The persisted `currentWidth` values
+exclude the table's gutters and insets, which measured ~185pt across ten columns — so sidebar plus
+column widths understated the requirement by that much, and a window sized from it left the table
+scrolling. Measure instead: widen the window in steps and watch when the columns stop sitting at
+their minimums. Note also that the content's own ideal width wins over a smaller requested one.
+
 Window geometry lives in `NSWindow Frame …` and `NSSplitView Subview Frames …` keys, plus a
 `Saved Application State` directory in the container. To reset the window and column layout while
 keeping the sync credentials: kill `cfprefsd`, strip every key except `syncHost` and `syncToken`
