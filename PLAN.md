@@ -3,23 +3,30 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**,
 with batch upload to Strava.
 
-**Status:** Phases 0–6 complete and exercised against real data, with every known *defect* fixed.
-Next: Phase 7 (TCX + Strava), the point of the app. Three feature requests outstanding: linking the
-charts and the map (6), TrainingPeaks as a second sync destination (7), and summary statistics (8).
+**Status:** Phases 0–6 complete and exercised against real data, with every known *defect* fixed
+and the list/detail UI settled after a round of layout polish. Next: Phase 7 (TCX + Strava), the
+point of the app and the last big piece. Three feature requests outstanding: linking the charts
+and the map (6), TrainingPeaks as a second sync destination (7), and summary statistics (8).
 The last two are speculative — 7 in particular is blocked on whether the TrainingPeaks API is even
 open to us, but it has one consequence for Phase 7's design worth reading before starting it.
-**Last updated:** 2026-09-21.
+**Last updated:** 2026-09-22.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first. It carries the
 > Health Auto Export data contract, the Xcode tooling limits we hit, and the Strava API facts —
 > the things that cost research to establish and aren't visible in the code.
 
-### Where things stand — paused 2026-09-21
+### Where things stand — 2026-09-22
 
 **Phases 0–6 are done and the app is genuinely usable.** Workouts sync from the phone, the table
 renders them with map thumbnails and approximate place names, detail downloads fill in routes and
 heart rate, and selecting a workout shows its map, stats, three charts and per-kilometre splits.
 Everything below is verified against real data, not just tests.
+
+Since Phase 6 the work has been **layout polish driven by using it**: the detail pane became a
+trailing inspector that starts closed, Place moved to the third column, the table's columns were
+narrowed and capped, the Strava column became a centred glyph at 44pt rather than 96, and the
+default window was sized to actually fit the table with the sidebar showing. No model or sync code
+changed in any of it.
 
 | | |
 |---|---|
@@ -27,13 +34,20 @@ Everything below is verified against real data, not just tests.
 | Tests | 155 in `MaxActCore` (`swift test`), 27 app/UI tests including 15 seeded (`RunAllTests`) |
 | Live MCP suite | passes against the phone; skipped unless `MAXACT_LIVE_HOST`/`MAXACT_LIVE_TOKEN` are set |
 | Verified with real data | 33 workouts synced, 5 with full detail; the largest is 3,311 route points and 664 HR samples. Pace, GPS filtering, splits and elevation gain were each checked against HAE's own figures |
-| Working tree | clean, everything merged to `main` at `5114d39` |
+| Working tree | clean, everything merged and pushed to `origin/main` at `4a2296a` |
 
 **What to pick up next**, in the order I'd suggest:
 
-1. **Phase 7 — TCX + Strava.** The largest remaining piece, and the point of the app. Read
-   `references/strava-api.md` first; the two-bucket rate limiting and the `external_id` dedupe are
-   the parts that need care.
+1. **Phase 7 — TCX + Strava.** The largest remaining piece, and the point of the app: everything
+   so far only *looks* at workouts. Read `references/strava-api.md` first — the two independent
+   rate-limit buckets and the `external_id` dedupe are the parts that need care — and read known
+   issue 7's note before designing the uploader, because per-destination state is much cheaper to
+   allow for now than to migrate to later. Suggested order within it: the TCX writer with
+   golden-file tests (pure, testable, no network), then OAuth, then upload and polling.
+
+   Worth deciding early: whether to export the raw or the `RouteQuality`-cleaned track, and
+   whether to carry the `.hae` question (outstanding item 2) into this phase, since HealthKit's
+   own splits and pause events would make a better TCX than the ones we reconstruct.
 2. **Known issue 6 — link the charts and the map.** Self-contained, sits on top of what Phase 5
    landed, and the traps are written up.
 3. **Known issue 8 — summary statistics.** Also self-contained, and mostly grouping on top of the
@@ -45,12 +59,24 @@ API access that may close it off entirely. But **read its note before building P
 state is currently Strava-shaped, and a `WorkoutDestination` protocol costs nothing now and a
 schema migration later.
 
-**A habit worth keeping.** Four of the last five pieces of work started by *measuring the real
-data*, and in three of them the measurement contradicted the plan: `avgSpeed` turned out to be a
-mean of instantaneous samples rather than a pause problem, the proposed GPS spike detector fired
-only on jitter, and the heart-rate min–max band was degenerate in all 2,580 real samples. An hour
-with the five stored blobs in `/tmp` has repeatedly changed *what got built*, not just confirmed
-it. Do that before implementing anything derived from the series.
+**A habit worth keeping: measure, don't derive.** This has now paid off twice over, in two
+different areas, and in nearly every case the measurement *contradicted* a reasonable-looking
+calculation.
+
+On the data: `avgSpeed` turned out to be a mean of instantaneous samples rather than a pause
+problem, the proposed GPS spike detector fired only on jitter, and the heart-rate min–max band was
+degenerate in all 2,580 real samples. An hour with the stored blobs repeatedly changed *what got
+built*, not just confirmed it.
+
+On the layout, more recently and more embarrassingly: `.width(ideal:)` turned out not to control
+rendered width at all, a saved `TableColumnCustomization` was silently overriding every declared
+width, `.defaultSize` was ignored in favour of the content's ideal, and a window sized from
+sidebar + column widths came out ~185pt short because a `.inset` table's gutters aren't in those
+numbers. Three shipped-then-corrected values came from trusting arithmetic over a measurement.
+
+The cheap instruments, both documented in the skill reference: decode the stored series blobs for
+anything data-shaped, and read the app's persisted state back after a launch for anything
+layout-shaped. Neither needs a screenshot.
 
 **Five bugs were found by using it, none of which any test caught.** Each is fixed and each taught
 something now recorded in the skill reference:
@@ -91,7 +117,12 @@ passed as `--ui-testing-seed=40`.
    10x regressions; the printed figures are the real measurements.
 5. The seeded UI tests can't see the map camera or chart contents — neither is exposed to
    accessibility — so those were verified by hand and by decoding rendered PNGs. Anything visual
-   still needs an eye on it.
+   still needs an eye on it. The same limit bit the layout work: `entire contents` of the window
+   returns nothing through System Events, so cell alignment could not be checked programmatically
+   and the centred Strava glyph is the one recent change **not** independently verified.
+6. **Column widths and window size are tuned for this Mac's content**, not proven across
+   locales — a longer place name than "Greater Vancouver BC" or a longer activity name than
+   "Strength Training" will truncate. Retuning means bumping `workoutTableColumns.v5` again.
 
 ### Known issues and requests
 
@@ -987,7 +1018,18 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 
 ### Change log
 
-- **2026-09-22 (latest)** — Widened the default window to 1,300 and centred the Strava glyph in
+- **2026-09-22 (latest)** — Refreshed *Where things stand*: current tree state (`4a2296a`, pushed),
+  a summary of the post-Phase-6 layout polish, and a sharper Phase 7 starting point including a
+  suggested order within it and two things worth deciding early.
+
+  Also generalised the "measure, don't derive" note. It had been about the data series; the layout
+  work made the same point again in a new area, where three shipped-then-corrected values all came
+  from trusting arithmetic over a measurement. Added the two cheap instruments — decode the stored
+  blobs for data questions, read the persisted state back after a launch for layout ones — and
+  recorded that the centred Strava glyph is the one recent change not independently verified,
+  since the window's accessibility tree isn't reachable.
+
+- **2026-09-22** — Widened the default window to 1,300 and centred the Strava glyph in
   its column.
 
   The previous 1,090 was too narrow with the sidebar showing, and the arithmetic is why: the
