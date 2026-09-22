@@ -327,3 +327,34 @@ actual pixels of a written PNG is what settled the route-colour fix.
 `DEVELOPMENT_TEAM` is unset; signing is ad-hoc by choice. Rebuilds change the cdhash, so macOS may
 prompt to re-authorise Keychain items after a rebuild. If that becomes disruptive, create a
 self-signed development certificate — don't work around it by moving secrets out of the Keychain.
+
+## `Table` column widths: `ideal:` is not the rendered width
+
+Two traps, both of which made a width change appear to do nothing.
+
+**A saved customization overrides the declared widths.** `TableColumnCustomization` persists a
+`currentWidth` per column alongside order and visibility, so once someone has used the app, the
+`.width(...)` values in code are dead. Retuning them requires bumping the `@AppStorage` key
+(`workoutTableColumns.v3` at the time of writing), which retires the old widths once.
+
+**`ideal:` only matters when space is tight.** Given room to spare, the table distributes *all*
+available width across its flexible columns. Narrowing every `ideal:` and relaunching produced a
+persisted total of **1,094pt before and after** — identical to the point, just reapportioned.
+`max:` is what stops a column growing; with a cap on every column the surplus becomes trailing
+blank space, which is the normal Mac behaviour and what "narrower columns" actually means.
+
+**How to verify.** Read the key back after a launch rather than eyeballing it — the table persists
+its own computed widths, so this reports what it really did:
+
+```bash
+python3 -c "
+import subprocess, plistlib, json
+raw = subprocess.run(['defaults','export','com.swiatlowski.MaxAct','-'],capture_output=True).stdout
+j = json.loads(bytes(plistlib.loads(raw)['workoutTableColumns.v3']).decode())
+st = j['perColumnState']
+print([(st[i]['base']['explicit']['_0'], st[i+1].get('currentWidth')) for i in range(0,len(st)-1,2)])
+"
+```
+
+The Route column is exempt: it is fixed-width with `.disabledCustomizationBehavior(.resize)`, and
+its width is part of the thumbnail cache key, so changing it invalidates every cached PNG.

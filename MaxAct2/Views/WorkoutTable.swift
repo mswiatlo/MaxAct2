@@ -9,7 +9,21 @@ import SwiftUI
 struct WorkoutTable: View {
     @Bindable var model: AppModel
 
-    @AppStorage("workoutTableColumns") private var columnCustomizationData = Data()
+    /// Versioned, because `TableColumnCustomization` persists a **`currentWidth` per column** as
+    /// well as order and visibility. A saved arrangement silently overrides the widths declared
+    /// below, so retuning them changes nothing for anyone who has already used the app until the
+    /// key is bumped.
+    ///
+    /// Two things measured while tuning these, both worth knowing before touching them again:
+    ///
+    /// - **`ideal:` does not control the rendered width when there is room to spare.** The table
+    ///   distributes all available width across the flexible columns. Narrowing every `ideal:`
+    ///   and relaunching produced a persisted total of 1,094pt both before and after — identical
+    ///   to the point, merely reapportioned between columns. `max:` is what actually stops a
+    ///   column growing, which is why every column below has one.
+    /// - The widths the table persists are its own computed ones, not the declared ideals, so
+    ///   reading this key back after a launch is the only reliable way to see what it really did.
+    @AppStorage("workoutTableColumns.v3") private var columnCustomizationData = Data()
     @State private var columnCustomization = TableColumnCustomization<WorkoutListItem>()
 
     var body: some View {
@@ -41,7 +55,7 @@ struct WorkoutTable: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .width(min: 100, ideal: 120)
+            .width(min: 80, ideal: 88, max: 104)
             .customizationID("date")
 
             // Third, beside the date: where a workout happened is part of identifying it, and it
@@ -50,27 +64,27 @@ struct WorkoutTable: View {
             TableColumn("Place") { item in
                 PlaceCell(item: item)
             }
-            .width(min: 100, ideal: 140)
+            .width(min: 84, ideal: 104, max: 160)
             .customizationID("place")
 
             TableColumn("Activity", value: \.workout.kind.displayName) { item in
                 Label(item.workout.kind.displayName, systemImage: item.workout.kind.symbolName)
             }
-            .width(min: 120, ideal: 160)
+            .width(min: 100, ideal: 120, max: 150)
             .customizationID("activity")
 
             TableColumn("Duration", value: \.workout.duration) { item in
                 Text(WorkoutFormatting.duration(item.workout.duration))
                     .monospacedDigit()
             }
-            .width(min: 70, ideal: 80)
+            .width(min: 58, ideal: 64, max: 72)
             .customizationID("duration")
 
             TableColumn("Distance", value: \.sortDistance) { item in
                 Text(WorkoutFormatting.distance(item.workout.distanceMeters))
                     .monospacedDigit()
             }
-            .width(min: 80, ideal: 90)
+            .width(min: 58, ideal: 66, max: 76)
             .customizationID("distance")
 
             TableColumn("Pace", value: \.sortPace) { item in
@@ -80,27 +94,27 @@ struct WorkoutTable: View {
                 ))
                 .monospacedDigit()
             }
-            .width(min: 80, ideal: 90)
+            .width(min: 60, ideal: 70, max: 84)
             .customizationID("pace")
 
             TableColumn("Energy", value: \.sortEnergy) { item in
                 Text(WorkoutFormatting.energy(kilocalories: item.workout.activeEnergyKilocalories))
                     .monospacedDigit()
             }
-            .width(min: 70, ideal: 80)
+            .width(min: 54, ideal: 62, max: 72)
             .customizationID("energy")
 
             TableColumn("Avg HR", value: \.sortHeartRate) { item in
                 Text(WorkoutFormatting.heartRate(item.workout.averageHeartRate))
                     .monospacedDigit()
             }
-            .width(min: 70, ideal: 80)
+            .width(min: 56, ideal: 64, max: 74)
             .customizationID("heartRate")
 
             TableColumn("Strava") { item in
                 StravaStateBadge(state: item.stravaState)
             }
-            .width(min: 90, ideal: 110)
+            .width(min: 72, ideal: 82, max: 96)
             .customizationID("strava")
         }
         .tableStyle(.inset)

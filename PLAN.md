@@ -987,7 +987,21 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 
 ### Change log
 
-- **2026-09-21 (latest)** — Recorded two speculative features: **TrainingPeaks** as a second sync
+- **2026-09-21 (latest)** — Narrowed the table's default column widths: the columns now need
+  992pt rather than 1,198, a 17% reduction, with the surplus left as trailing space instead of
+  inflating every column.
+
+  Two measurements were needed, and the first attempt was wrong. `TableColumnCustomization`
+  persists a **`currentWidth` per column**, so the saved arrangement silently overrode the
+  declared widths and retuning them changed nothing until the `@AppStorage` key was bumped. Then,
+  with the key bumped, narrowing every `ideal:` *still* changed nothing: reading the persisted
+  widths back gave a total of exactly 1,094pt before and after, merely reapportioned between
+  columns, because the table distributes all available width across its flexible columns.
+  **`max:` is what actually stops a column growing**, so every column now has one. Reading the
+  defaults key back after a launch turned out to be the only reliable way to see what the table
+  really did — no screenshot required.
+
+- **2026-09-21** — Recorded two speculative features: **TrainingPeaks** as a second sync
   destination (7) and **summary statistics** by week, month, year and all time (8). Both are
   unresearched wants rather than plans, written up mainly to capture constraints already
   established elsewhere: that TrainingPeaks' API may be partner-gated and so the feature could be
