@@ -987,7 +987,22 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 
 ### Change log
 
-- **2026-09-21 (latest)** — Narrowed the table's default column widths: the columns now need
+- **2026-09-21 (latest)** — Narrowed the Strava column and sized the default window to the table.
+  The Strava cell shows the **symbol alone** (44pt, down from 96): the six states have six
+  distinct symbol *shapes*, so colour was never carrying the meaning, and `help` plus the
+  accessibility label still give the wording. The detail pane keeps symbol-and-text.
+
+  Two things measured on the way, both now in the skill reference. In the current two-column
+  layout the table settles at the sum of its column **minimums** and never stretches — the
+  opposite of the three-column finding below — so `min:` is the only lever that matters and the
+  earlier mins had been cut far enough to truncate "11.66 km". And **`.defaultSize` does not
+  take**: with no saved frame the window opened at SwiftUI's 700×780 fallback, narrower than the
+  table. An `idealWidth` on the scene's root content is what the window actually sizes to;
+  `.windowResizability(.contentMinSize)` made it worse, opening at the content minimum.
+
+  Table is now 824pt (sidebar 223 + table = a 1,090pt window, verified at a clean first launch).
+
+- **2026-09-21** — Narrowed the table's default column widths: the columns now need
   992pt rather than 1,198, a 17% reduction, with the surplus left as trailing space instead of
   inflating every column.
 

@@ -358,3 +358,36 @@ print([(st[i]['base']['explicit']['_0'], st[i+1].get('currentWidth')) for i in r
 
 The Route column is exempt: it is fixed-width with `.disabledCustomizationBehavior(.resize)`, and
 its width is part of the thumbnail cache key, so changing it invalidates every cached PNG.
+
+## Window sizing: `defaultSize` loses, and the prefs are in the container
+
+**`.defaultSize` on `WindowGroup` did not take.** With no saved frame the window opened at
+SwiftUI's **700×780** fallback regardless of the requested size. What works is an ideal width on
+the scene's root content:
+
+```swift
+ContentView(model: model)
+    .frame(minWidth: 1040, idealWidth: 1090, minHeight: 480, idealHeight: 780)
+```
+
+`.defaultSize` is kept alongside it as a statement of intent, but the frame is what the window
+sizes to. **Don't reach for `.windowResizability(.contentMinSize)`** to fix this — it makes the
+window open at the content's *minimum* (measured: 700×700), which is the opposite of the goal.
+
+**The app is sandboxed, so `defaults` reads the wrong file.** The real preferences are at
+
+```
+~/Library/Containers/com.swiatlowski.MaxAct/Data/Library/Preferences/com.swiatlowski.MaxAct.plist
+```
+
+`defaults read com.swiatlowski.MaxAct` hits `~/Library/Preferences/…`, which for this app doesn't
+even exist. Several "resets" appeared to do nothing for exactly this reason.
+
+**`killall cfprefsd` must come *before* editing the plist, not after.** `cfprefsd` holds the domain
+in memory and flushes it on exit, so killing it after an edit writes the stale values straight back
+over the change.
+
+Window geometry lives in `NSWindow Frame …` and `NSSplitView Subview Frames …` keys, plus a
+`Saved Application State` directory in the container. To reset the window and column layout while
+keeping the sync credentials: kill `cfprefsd`, strip every key except `syncHost` and `syncToken`
+from the container plist, then delete the container's `Saved Application State`.

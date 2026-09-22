@@ -23,7 +23,7 @@ struct WorkoutTable: View {
     ///   column growing, which is why every column below has one.
     /// - The widths the table persists are its own computed ones, not the declared ideals, so
     ///   reading this key back after a launch is the only reliable way to see what it really did.
-    @AppStorage("workoutTableColumns.v3") private var columnCustomizationData = Data()
+    @AppStorage("workoutTableColumns.v5") private var columnCustomizationData = Data()
     @State private var columnCustomization = TableColumnCustomization<WorkoutListItem>()
 
     var body: some View {
@@ -55,7 +55,7 @@ struct WorkoutTable: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            .width(min: 80, ideal: 88, max: 104)
+            .width(min: 96, ideal: 100, max: 110)
             .customizationID("date")
 
             // Third, beside the date: where a workout happened is part of identifying it, and it
@@ -64,27 +64,27 @@ struct WorkoutTable: View {
             TableColumn("Place") { item in
                 PlaceCell(item: item)
             }
-            .width(min: 84, ideal: 104, max: 160)
+            .width(min: 110, ideal: 124, max: 160)
             .customizationID("place")
 
             TableColumn("Activity", value: \.workout.kind.displayName) { item in
                 Label(item.workout.kind.displayName, systemImage: item.workout.kind.symbolName)
             }
-            .width(min: 100, ideal: 120, max: 150)
+            .width(min: 128, ideal: 134, max: 156)
             .customizationID("activity")
 
             TableColumn("Duration", value: \.workout.duration) { item in
                 Text(WorkoutFormatting.duration(item.workout.duration))
                     .monospacedDigit()
             }
-            .width(min: 58, ideal: 64, max: 72)
+            .width(min: 68, ideal: 72, max: 78)
             .customizationID("duration")
 
             TableColumn("Distance", value: \.sortDistance) { item in
                 Text(WorkoutFormatting.distance(item.workout.distanceMeters))
                     .monospacedDigit()
             }
-            .width(min: 58, ideal: 66, max: 76)
+            .width(min: 70, ideal: 76, max: 82)
             .customizationID("distance")
 
             TableColumn("Pace", value: \.sortPace) { item in
@@ -94,27 +94,29 @@ struct WorkoutTable: View {
                 ))
                 .monospacedDigit()
             }
-            .width(min: 60, ideal: 70, max: 84)
+            .width(min: 76, ideal: 80, max: 90)
             .customizationID("pace")
 
             TableColumn("Energy", value: \.sortEnergy) { item in
                 Text(WorkoutFormatting.energy(kilocalories: item.workout.activeEnergyKilocalories))
                     .monospacedDigit()
             }
-            .width(min: 54, ideal: 62, max: 72)
+            .width(min: 64, ideal: 68, max: 74)
             .customizationID("energy")
 
             TableColumn("Avg HR", value: \.sortHeartRate) { item in
                 Text(WorkoutFormatting.heartRate(item.workout.averageHeartRate))
                     .monospacedDigit()
             }
-            .width(min: 56, ideal: 64, max: 74)
+            .width(min: 64, ideal: 70, max: 76)
             .customizationID("heartRate")
 
             TableColumn("Strava") { item in
-                StravaStateBadge(state: item.stravaState)
+                StravaStateBadge(state: item.stravaState, showsLabel: false)
             }
-            .width(min: 72, ideal: 82, max: 96)
+            // Symbol alone, so the column is barely wider than its own header. The floor is the
+            // word "Strava", not the content.
+            .width(min: 44, ideal: 50, max: 58)
             .customizationID("strava")
         }
         .tableStyle(.inset)
@@ -146,9 +148,16 @@ struct WorkoutTable: View {
 struct StravaStateBadge: View {
     let state: StravaState
 
+    /// The table column omits the text: the six states have six *distinct symbol shapes*
+    /// (`circle.dashed`, `clock`, `arrow.up.circle`, `checkmark.circle.fill`,
+    /// `equal.circle.fill`, `exclamationmark.triangle.fill`), so shape — not colour — is what
+    /// distinguishes them, and the wording is still carried by `help` and the accessibility
+    /// label. The detail pane, which has room, keeps the text.
+    var showsLabel = true
+
     var body: some View {
         Label {
-            Text(shortLabel)
+            if showsLabel { Text(shortLabel) }
         } icon: {
             Image(systemName: state.symbolName)
                 .foregroundStyle(tint)

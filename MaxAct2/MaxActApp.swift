@@ -63,6 +63,12 @@ struct MaxActApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView(model: model)
+                // `defaultSize` alone did not take: with no saved frame the window opened at
+                // SwiftUI's 700×700 fallback, which is narrower than the table needs and leaves
+                // it scrolling horizontally. An ideal width on the content is what the window
+                // actually sizes itself to. `minWidth` is the sidebar plus the table's column
+                // minimums, below which the list can only scroll.
+                .frame(minWidth: 1040, idealWidth: 1090, minHeight: 480, idealHeight: 780)
                 .alert(
                     "MaxAct couldn't open its database",
                     isPresented: .constant(startupError != nil)
@@ -72,7 +78,14 @@ struct MaxActApp: App {
                     Text((startupError ?? "") + "\n\nWorkouts synced now will not be saved.")
                 }
         }
-        .defaultSize(width: 1240, height: 780)
+        // Sized to hold the table and no more. Measured, not estimated: with the inspector closed
+        // the table settles at the sum of its column *minimums*, 824pt including the fixed Route
+        // column, and the sidebar takes 223pt. 1,090 leaves ~40pt for the table's own inset and
+        // the scroller gutter without leaving a band of empty space to the right.
+        //
+        // The inspector is deliberately not counted, because it starts closed — opening it widens
+        // the window rather than squeezing the list.
+        .defaultSize(width: 1090, height: 780)
         .commands {
             MaxActCommands(model: model)
             // View ▸ Show/Hide Inspector with its standard shortcut. The detail pane starts
