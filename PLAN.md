@@ -6,7 +6,8 @@ with batch upload to Strava.
 **Status:** Phases 0–6 complete. **Phase 7 (TCX + Strava) is built and fully tested offline, but
 not yet exercised against the live Strava API** — that needs the user's Strava app connected, and is
 the first thing to do on resuming. Work is on branch `phase-7-tcx-strava`, not yet merged to `main`.
-Three feature requests outstanding: chart/map linking (6), TrainingPeaks (7), summary stats (8).
+Four feature requests outstanding: chart/map linking (6), TrainingPeaks (7), summary stats (8),
+and region/country search (9).
 **Last updated:** 2026-10-07.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first. It carries the
@@ -62,8 +63,8 @@ proven, not before.
   subset each run. Fixed with a registered `ApplePersistenceIgnoreState`; restoration state now
   lives in the container's `tmp/`, and `Spikes/reset-window-state.sh` clears it.
 
-**After Phase 7**, unchanged: known issue 6 (chart/map linking), known issue 8 (summary stats),
-Phase 8 (polish). Known issue 7 (TrainingPeaks) still starts with whether its API is open to us;
+**After Phase 7**: known issue 6 (chart/map linking), known issue 8 (summary stats), known issue 9
+(search by region and country — small and self-contained), Phase 8 (polish). Known issue 7 (TrainingPeaks) still starts with whether its API is open to us;
 the `WorkoutDestination` protocol is in place for it, though upload *state* is still Strava-shaped.
 
 **A habit worth keeping: measure, don't derive.** This has now paid off twice over, in two
@@ -141,7 +142,7 @@ picking it up doesn't start from scratch. Items marked *(feature)* are wants, no
 
 Issues 1–5 are all done, and are kept here rather than deleted because each records a diagnosis
 worth not rediscovering — in particular, issues 1 and 4 were both *misdiagnosed* in this list
-until the data was measured. Items 6–8 are open feature requests; 7 and 8 are speculative and
+until the data was measured. Items 6–9 are open feature requests; 7 and 8 are speculative and
 unresearched, written down so the constraints already learned elsewhere aren't rediscovered when
 someone picks them up.
 
@@ -364,6 +365,46 @@ Four things that will bite, three of them already established elsewhere in this 
 
 Performance is a non-issue: a few thousand value-type rows group in memory well inside a frame,
 which is already how the sidebar counts work. No need for SwiftData aggregation.
+
+**9. Search by region and country, not just the stored label.** *(feature, not started)*
+
+Searching "BC" or "British Columbia" should find the Vancouver rides, and "Switzerland" the Geneva
+ones. Today it can't: search (`WorkoutListItem.matches(searchText:)`) only looks at `placeLabel`,
+which holds MapKit's one-line `cityWithContext(.automatic)` — "Vancouver BC". "BC" happens to
+work; "British Columbia", "Canada" and any country name don't.
+
+**Design: store a hidden search field, keep the visible label short.** Alongside `placeLabel`,
+keep a `placeSearchTerms` string — city, region abbreviation *and* full name, country name *and*
+ISO code — matched by search but never shown. The column stays "Vancouver BC"; search gets
+"Vancouver · BC · British Columbia · Canada · CA". Folded for case and diacritics
+(`.caseInsensitive, .diacriticInsensitive`), so "geneve" finds "Genève".
+
+What's already known, from the Phase 6 measurements, that shapes this:
+
+- **MapKit gives the pieces only partly.** `MKAddressRepresentations` exposes `cityName` and
+  `cityWithContext(_:)`; `.full` adds the country ("Vancouver BC Canada"). The documented
+  `regionCode` / `regionName` **do not exist in the SDK** — they failed to compile. So the country
+  name is available, but the *full* region name ("British Columbia") is not; MapKit only ever gave
+  the abbreviation.
+- **Countries are easy, regions are not.** `Locale.current.localizedString(forRegionCode: "CH")`
+  turns an ISO country code into "Switzerland" in the user's language, with no table. There's no
+  Foundation equivalent for subdivisions ("BC" → "British Columbia"), so that needs either a small
+  bundled ISO 3166-2 table — only the countries the user has actually been to matter — or more
+  measurement of what `MKMapItem` returns for a few non-Canadian places first; the answer may
+  differ by country (a Swiss canton, a US state, a UK nation).
+- **City names depend on the geocoder's locale.** Geneva comes back as "Geneva" or "Genève"
+  depending on `preferredLocale`. Searching in either should work, which argues for storing the
+  English form *and* the local one when they differ.
+- **Every existing place needs resolving again**, since only the short label was kept. That's
+  cheap: the resolver caches by ~1 km cell, so it costs one request per distinct *place*, not per
+  workout, at the existing one-per-second throttle. Version the stored terms so it happens once,
+  automatically.
+- **Keep the privacy line.** Only the snapped cell is ever sent to the geocoder, and only
+  city/region/country are stored — never `name` or `shortAddress`, which return the street
+  address.
+
+The same terms would also make a natural sidebar grouping later ("Places → Canada → British
+Columbia"), but search is the request; grouping is optional.
 
 ### Seeded UI tests — done 2026-09-20
 
@@ -1024,6 +1065,12 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 | 8 — Polish | Not started |
 
 ### Change log
+
+- **2026-10-07** — Recorded known issue 9: search by region and country, so "British Columbia"
+  or "Switzerland" find workouts labelled "Vancouver BC" or "Geneva". Design is a hidden search
+  field beside the short label. The constraint worth knowing: MapKit supplies country names but not
+  full region names (its documented `regionName` doesn't exist in the SDK), so regions need a table
+  or more measurement. Not started.
 
 - **2026-10-07 (latest)** — **Phase 7 built, paused before the live check.** TCX writer validated
   against Garmin's XSD and every real stored series; two-bucket rate limiter; Strava client and
