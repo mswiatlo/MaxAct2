@@ -27,6 +27,13 @@ public struct UploadResult: Sendable, Equatable {
     /// Something that went wrong after the workout safely arrived — e.g. the sport couldn't be
     /// corrected. Reported rather than swallowed, and not a failure of the upload itself.
     public let warning: String?
+
+    public init(state: StravaState, activityID: Int?, uploadID: Int?, warning: String?) {
+        self.state = state
+        self.activityID = activityID
+        self.uploadID = uploadID
+        self.warning = warning
+    }
 }
 
 /// Uploads one workout to Strava and follows it through processing.

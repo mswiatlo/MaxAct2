@@ -31,6 +31,17 @@ struct MaxActApp: App {
     }
 
     init() {
+        // Always open the library window at launch. macOS otherwise restores the previous
+        // session's *windows*, and a session that ended with the window closed relaunched with no
+        // window at all — only a Dock click (a "reopen") produced one. For a single-library app
+        // that is never what anyone wants. Window size and position are unaffected: they're kept
+        // by frame autosave (`NSWindow Frame …`), not by session restoration.
+        //
+        // Registered rather than set, so it's a default and never written to the user's domain.
+        // `.restorationBehavior(.disabled)` on the scene was tried first and did not help: AppKit
+        // still restored the saved, windowless session and SwiftUI then opened nothing.
+        UserDefaults.standard.register(defaults: ["ApplePersistenceIgnoreState": true])
+
         if Self.isUITesting {
             let domain = "com.swiatlowski.MaxAct.uitests"
             UserDefaults.standard.removePersistentDomain(forName: domain)
@@ -38,7 +49,10 @@ struct MaxActApp: App {
             _model = State(initialValue: AppModel.inMemoryFallback(
                 settings: settings,
                 seedCount: Self.uiTestingSeedCount,
-                resolvesPlaces: false
+                resolvesPlaces: false,
+                // Its own Keychain service: a UI test must never be able to sign the real Strava
+                // account out, as one once overwrote the real Health Auto Export token.
+                stravaSecrets: KeychainSecretStore(service: "com.swiatlowski.MaxAct.strava.uitests")
             ))
             return
         }
@@ -134,6 +148,13 @@ struct MaxActCommands: Commands {
             .keyboardShortcut("d", modifiers: [.command, .shift])
             .disabled(model.selection.isEmpty || model.syncStatus.isRunning
                       || !model.settings.isConfigured)
+
+            Button("Upload Selection to Strava") {
+                model.startStravaUpload(for: model.selectedItems)
+            }
+            .keyboardShortcut("u", modifiers: [.command, .shift])
+            .disabled(model.stravaUploadCount(model.selectedItems).ready == 0
+                      || model.syncStatus.isRunning || !model.isStravaConnected)
         }
 
         // No Select All here on purpose. The standard `.pasteboard` group already provides

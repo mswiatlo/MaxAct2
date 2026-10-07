@@ -34,13 +34,31 @@ struct WorkoutActions: View {
               ? "Fetch routes and heart rate from your iPhone"
               : "Set your iPhone's address in Settings first")
 
-        // Phase 7 wires this to the real uploader; the state machine behind it already exists.
+        let counts = model.stravaUploadCount(items)
         Button {
+            model.startStravaUpload(for: items)
         } label: {
-            Label("Upload to Strava", systemImage: "arrow.up.circle")
+            Label(
+                counts.ready > 1 ? "Upload \(counts.ready) Workouts to Strava" : "Upload to Strava",
+                systemImage: "arrow.up.circle"
+            )
         }
-        .disabled(true)
-        .help("Strava upload arrives in Phase 7")
+        .disabled(counts.ready == 0 || model.syncStatus.isRunning || !model.isStravaConnected)
+        .help(uploadHelp(counts))
+    }
+
+    /// Says *why* the button is disabled, since there are four different reasons and a greyed-out
+    /// button with no explanation is a dead end.
+    private func uploadHelp(_ counts: (ready: Int, needingDetail: Int)) -> String {
+        if !model.isStravaConnected { return "Connect to Strava in Settings first" }
+        if counts.ready == 0 && counts.needingDetail > 0 {
+            return "Download detail first — without a route and heart rate there's nothing worth uploading"
+        }
+        if counts.ready == 0 { return "Everything selected is already on Strava" }
+        if counts.needingDetail > 0 {
+            return "Uploads \(counts.ready); \(counts.needingDetail) still need their detail downloaded"
+        }
+        return "Upload to Strava, one at a time within its rate limit"
     }
 }
 
@@ -122,6 +140,10 @@ struct SettingsView: View {
                     """)
                 .font(.callout)
                 .foregroundStyle(.secondary)
+            }
+
+            if let model {
+                StravaSettingsSection(model: model)
             }
 
             appearanceSection

@@ -1,5 +1,51 @@
 import XCTest
 
+extension XCTestCase {
+    /// Launches MaxAct for a UI test, **brings it to the front**, and waits for its window.
+    ///
+    /// The one launch path for every suite, which used to be four copies.
+    ///
+    /// **`-ApplePersistenceIgnoreState YES` is what makes the window appear at all.** macOS
+    /// restores the previous session's windows, and a session that ended with none open — a
+    /// test that closed its window, or the user quitting from the menu with it closed — relaunches
+    /// with *no window*. Activating the app doesn't create one; only a Dock click (a "reopen") does,
+    /// which is why the suite passed whenever someone clicked the app into focus and failed, in a
+    /// different subset each run, whenever they didn't. Diagnosed with the window server: a
+    /// background launch had zero windows where Calculator had one, and the unified log showed
+    /// `hasPersistentStateToRestore=1`.
+    ///
+    /// **It must come first.** `NSUserDefaults` pairs each `-key` with the following token, so
+    /// after `--ui-testing` it would be swallowed as that flag's value and silently do nothing —
+    /// the same trap documented on `MaxActApp.uiTestingSeedCount`.
+    ///
+    /// `activate()` then brings it forward, since activation is cooperative and a launched app
+    /// won't take focus from whatever the user is working in.
+    ///
+    /// Also isolates the app's data: `--ui-testing` swaps in a throwaway defaults domain,
+    /// in-memory database and separate Keychain service. These tests type into the connection
+    /// fields, and without it a test run once overwrote the user's real token.
+    @MainActor
+    func launchMaxAct(seed: Int? = nil) -> XCUIApplication {
+        let app = XCUIApplication(bundleIdentifier: "com.swiatlowski.MaxAct")
+        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES", "--ui-testing"]
+        // `=` joined, never two tokens — see `MaxActApp.uiTestingSeedCount` for why.
+        if let seed { app.launchArguments.append("--ui-testing-seed=\(seed)") }
+        app.launch()
+        addTeardownBlock { await MainActor.run { app.terminate() } }
+
+        app.activate()
+        XCTAssertTrue(
+            app.wait(for: .runningForeground, timeout: 10),
+            "The app launched but couldn't be brought to the front."
+        )
+        XCTAssertTrue(
+            app.windows.firstMatch.waitForExistence(timeout: 15),
+            "The app launched but no window appeared."
+        )
+        return app
+    }
+}
+
 /// Launch and structure checks.
 ///
 /// The app is launched by bundle identifier rather than via `XCUIApplication()`, because
@@ -11,8 +57,6 @@ import XCTest
 /// either way rather than on specific rows. Phase 8 adds a seeded multi-select and batch-action
 /// test once there's a way to launch with fixture data.
 final class MaxAct2UITests: XCTestCase {
-    private static let appBundleIdentifier = "com.swiatlowski.MaxAct"
-
     override func setUpWithError() throws {
         continueAfterFailure = false
     }
@@ -25,18 +69,7 @@ final class MaxAct2UITests: XCTestCase {
     /// `MainActor.run` keeps every touch of it on the main actor.
     @MainActor
     private func launchApp(seed: Int? = nil) -> XCUIApplication {
-        let app = XCUIApplication(bundleIdentifier: Self.appBundleIdentifier)
-        // Isolates the app's defaults and database from the real ones. These tests type into the
-        // connection fields, and without this a test run overwrites the user's own token.
-        app.launchArguments = ["--ui-testing"]
-        if let seed { app.launchArguments.append("--ui-testing-seed=\(seed)") }
-        app.launch()
-        addTeardownBlock { await MainActor.run { app.terminate() } }
-        XCTAssertTrue(
-            app.windows.firstMatch.waitForExistence(timeout: 10),
-            "The app launched but no window appeared."
-        )
-        return app
+        launchMaxAct(seed: seed)
     }
 
     @MainActor
@@ -274,20 +307,13 @@ final class MaxAct2UITests: XCTestCase {
 /// synthetic workouts — some with a stored route, some awaiting download, some indoor — in the
 /// throwaway in-memory store.
 final class SeededTableUITests: XCTestCase {
-    private static let appBundleIdentifier = "com.swiatlowski.MaxAct"
-
     override func setUpWithError() throws {
         continueAfterFailure = false
     }
 
     @MainActor
     private func launchSeeded(_ count: Int = 40) -> XCUIApplication {
-        let app = XCUIApplication(bundleIdentifier: Self.appBundleIdentifier)
-        app.launchArguments = ["--ui-testing", "--ui-testing-seed=\(count)"]
-        app.launch()
-        addTeardownBlock { await MainActor.run { app.terminate() } }
-        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 15))
-        return app
+        launchMaxAct(seed: count)
     }
 
     @MainActor
@@ -533,20 +559,13 @@ final class SeededTableUITests: XCTestCase {
 
 /// The bulk detail backfill, which only means anything with rows present.
 final class DetailBackfillUITests: XCTestCase {
-    private static let appBundleIdentifier = "com.swiatlowski.MaxAct"
-
     override func setUpWithError() throws {
         continueAfterFailure = false
     }
 
     @MainActor
     private func launchSeeded(_ count: Int) -> XCUIApplication {
-        let app = XCUIApplication(bundleIdentifier: Self.appBundleIdentifier)
-        app.launchArguments = ["--ui-testing", "--ui-testing-seed=\(count)"]
-        app.launch()
-        addTeardownBlock { await MainActor.run { app.terminate() } }
-        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 15))
-        return app
+        launchMaxAct(seed: count)
     }
 
     /// The cost has to be visible before committing, not discovered in a progress bar: a full
@@ -619,20 +638,13 @@ final class DetailBackfillUITests: XCTestCase {
 
 /// Clearing stored data from Settings.
 final class DeleteDataUITests: XCTestCase {
-    private static let appBundleIdentifier = "com.swiatlowski.MaxAct"
-
     override func setUpWithError() throws {
         continueAfterFailure = false
     }
 
     @MainActor
     private func launchSeeded(_ count: Int) -> XCUIApplication {
-        let app = XCUIApplication(bundleIdentifier: Self.appBundleIdentifier)
-        app.launchArguments = ["--ui-testing", "--ui-testing-seed=\(count)"]
-        app.launch()
-        addTeardownBlock { await MainActor.run { app.terminate() } }
-        XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 15))
-        return app
+        launchMaxAct(seed: count)
     }
 
     /// A button inside the frontmost dialog, **not** its Touch Bar mirror.

@@ -158,6 +158,22 @@ struct WorkoutDetailView: View {
                 }
             }
             .font(.callout)
+
+            // The activity itself, once Strava has one — a duplicate links to the existing copy.
+            if let activityID = item.stravaActivityID,
+               let url = URL(string: "https://www.strava.com/activities/\(activityID)") {
+                Link(destination: url) {
+                    Label("Open on Strava", systemImage: "arrow.up.right.square")
+                }
+                .font(.callout)
+            }
+            // Failures are never swallowed: Strava's own reason, in words, where the user looks.
+            if let reason = item.stravaState.failureReason {
+                Label(reason, systemImage: "exclamationmark.triangle")
+                    .font(.callout)
+                    .foregroundStyle(.orange)
+                    .textSelection(.enabled)
+            }
         }
     }
 

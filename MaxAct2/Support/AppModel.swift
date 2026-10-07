@@ -39,15 +39,24 @@ final class AppModel {
     enum SyncActivity: Equatable {
         case listing
         case fillingDetail
+        case uploadingToStrava
     }
 
     enum SyncStatus: Equatable {
         case idle
         case running(SyncActivity, completed: Int, total: Int, found: Int)
         case finished(SyncActivity, found: Int)
+        /// Paused for Strava's rate limit, still running. Distinct from a failure: the batch
+        /// resumes on its own at `until`, and the user should see when rather than a spinner.
+        case waiting(SyncActivity, until: Date)
         case failed(String)
 
-        var isRunning: Bool { if case .running = self { true } else { false } }
+        var isRunning: Bool {
+            switch self {
+            case .running, .waiting: true
+            case .idle, .finished, .failed: false
+            }
+        }
 
         var message: String? {
             switch self {
@@ -61,6 +70,13 @@ final class AppModel {
                 found == 0 ? "No new workouts" : "Synced \(found) workouts"
             case .finished(.fillingDetail, let found):
                 found == 0 ? "Nothing left to download" : "Downloaded detail for \(found) workouts"
+            case .running(.uploadingToStrava, let done, let total, _):
+                "Uploading to Strava — \(done) of \(total)"
+            case .finished(.uploadingToStrava, let found):
+                found == 0 ? "Nothing was uploaded" : "Uploaded \(found) workouts to Strava"
+            case .waiting(_, let until):
+                "Paused for Strava's rate limit — resumes at "
+                    + until.formatted(date: .omitted, time: .shortened)
             case .failed(let reason):
                 reason
             }
@@ -95,6 +111,25 @@ final class AppModel {
     private var syncTask: Task<Void, Never>?
     private var hasSeeded = false
 
+    // MARK: Strava
+
+    /// Where the Strava application credentials and tokens live. A separate Keychain service
+    /// under UI testing, so a test can never sign the real account out.
+    let stravaSecrets: KeychainSecretStore
+    let strava: StravaClient
+
+    /// Whether a client ID and secret have been entered, and whose account is connected.
+    private(set) var isStravaConfigured = false
+    private(set) var stravaAthlete: String?
+    var isStravaConnected: Bool { stravaAthlete != nil }
+    private var hasResumedUploads = false
+
+    /// The redirect Strava sends the browser back to. Strava only checks the *host* against the
+    /// app's "Authorization Callback Domain", so that has to be set to `localhost` on
+    /// strava.com/settings/api; the scheme is what hands control back to us.
+    static let stravaRedirectURI = "maxact://localhost/strava"
+    static let stravaCallbackScheme = "maxact"
+
     /// Resolves coarse coordinates into place names. One instance for the app's lifetime, so its
     /// cache of cell → name survives across loads and syncs.
     @ObservationIgnored private let placeResolver: PlaceResolver
@@ -106,8 +141,11 @@ final class AppModel {
         thumbnails: RouteThumbnailRenderer,
         settings: AppSettings,
         seedCount: Int? = nil,
-        resolvesPlaces: Bool = true
+        resolvesPlaces: Bool = true,
+        stravaSecrets: KeychainSecretStore = KeychainSecretStore()
     ) {
+        self.stravaSecrets = stravaSecrets
+        strava = StravaClient(secrets: stravaSecrets)
         self.store = store
         self.seriesStore = seriesStore
         self.thumbnails = thumbnails
@@ -119,12 +157,14 @@ final class AppModel {
 
     /// Used when the on-disk stores can't be opened. Everything works; nothing persists.
     static func inMemoryFallback(
-        settings: AppSettings, seedCount: Int? = nil, resolvesPlaces: Bool = true
+        settings: AppSettings, seedCount: Int? = nil, resolvesPlaces: Bool = true,
+        stravaSecrets: KeychainSecretStore = KeychainSecretStore()
     ) -> AppModel {
         // Force-unwrapped deliberately: an in-memory container and a temp directory failing
         // would mean the process cannot allocate or write anywhere, and there is no recovery.
+        removeStaleScratchDirectories()
         let scratch = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appending(path: "MaxActFallback-\(UUID().uuidString)")
+            .appending(path: "\(scratchPrefix)\(UUID().uuidString)")
         let seriesStore = try! SeriesStore(directory: scratch.appending(path: "Series"))
         return AppModel(
             store: WorkoutStore(modelContainer: try! WorkoutStore.container(inMemory: true)),
@@ -136,8 +176,32 @@ final class AppModel {
             ),
             settings: settings,
             seedCount: seedCount,
-            resolvesPlaces: resolvesPlaces
+            resolvesPlaces: resolvesPlaces,
+            stravaSecrets: stravaSecrets
         )
+    }
+
+    private static let scratchPrefix = "MaxActFallback-"
+
+    /// Deletes scratch directories left behind by earlier in-memory launches.
+    ///
+    /// Every UI test launches with an in-memory store and its own scratch directory, and XCUITest
+    /// ends each test by *killing* the app — so cleanup at quit never runs, and ~350 of these had
+    /// piled up in the container's `tmp/`. Sweeping at the next launch is the one point that is
+    /// guaranteed to happen. Only directories untouched for an hour go, so a concurrently running
+    /// instance can never have its live store deleted from under it.
+    private static func removeStaleScratchDirectories(olderThan age: TimeInterval = 3600) {
+        let fileManager = FileManager.default
+        let temporary = URL(fileURLWithPath: NSTemporaryDirectory())
+        let cutoff = Date.now.addingTimeInterval(-age)
+        let entries = (try? fileManager.contentsOfDirectory(
+            at: temporary, includingPropertiesForKeys: [.contentModificationDateKey]
+        )) ?? []
+        for entry in entries where entry.lastPathComponent.hasPrefix(scratchPrefix) {
+            let modified = (try? entry.resourceValues(forKeys: [.contentModificationDateKey]))?
+                .contentModificationDate ?? .distantPast
+            if modified < cutoff { try? fileManager.removeItem(at: entry) }
+        }
     }
 
     // MARK: Derived
@@ -209,6 +273,189 @@ final class AppModel {
             loadError = "Could not load workouts: \(error.localizedDescription)"
         }
         resolvePlaces()
+        await refreshStravaConnection()
+        resumeStravaUploads()
+    }
+
+    // MARK: Strava
+
+    /// Re-reads what the Keychain holds, for the Settings pane and for enabling Upload.
+    func refreshStravaConnection() async {
+        let credentials = await stravaSecrets.credentials()
+        isStravaConfigured = credentials?.isComplete ?? false
+        let tokens = await stravaSecrets.tokens()
+        // A connection with no name still counts — the name is cosmetic, the token isn't.
+        stravaAthlete = tokens.map { $0.athleteName?.isEmpty == false ? $0.athleteName! : "Strava athlete" }
+    }
+
+    func saveStravaCredentials(clientID: String, clientSecret: String) async throws {
+        let credentials = StravaCredentials(clientID: clientID, clientSecret: clientSecret)
+        try await stravaSecrets.save(credentials: credentials.isComplete ? credentials : nil)
+        await refreshStravaConnection()
+    }
+
+    /// The approval page, with a fresh `state` the callback must echo back.
+    func stravaAuthorizationRequest() async -> (url: URL, state: String)? {
+        guard let credentials = await stravaSecrets.credentials(), credentials.isComplete else { return nil }
+        let state = UUID().uuidString
+        return (StravaClient.authorizationURL(
+            clientID: credentials.clientID, redirectURI: Self.stravaRedirectURI, state: state
+        ), state)
+    }
+
+    /// Finishes connecting from the URL the browser was redirected to.
+    ///
+    /// Checks `state` against the one sent, so a stray or forged callback can't connect someone
+    /// else's account, and checks the granted scope: Strava lets the user untick permissions on
+    /// the approval page, and without `activity:write` every upload would fail later with a
+    /// confusing 401 instead of now with a clear reason.
+    func completeStravaConnection(callback: URL, expectedState: String) async throws {
+        let items = URLComponents(url: callback, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        let query = Dictionary(items.map { ($0.name, $0.value ?? "") }, uniquingKeysWith: { a, _ in a })
+        if let error = query["error"] {
+            throw StravaError.authorizationRejected(error == "access_denied" ? "access was declined" : error)
+        }
+        guard query["state"] == expectedState else {
+            throw StravaError.authorizationRejected("the reply didn't match the request")
+        }
+        guard query["scope"]?.contains("activity:write") == true else {
+            throw StravaError.authorizationRejected(
+                "upload permission wasn't granted — leave \"Upload your activities\" ticked")
+        }
+        guard let code = query["code"] else {
+            throw StravaError.invalidResponse("no authorisation code in the callback")
+        }
+        try await strava.exchange(code: code)
+        await refreshStravaConnection()
+    }
+
+    func disconnectStrava() async {
+        try? await strava.disconnect()
+        await refreshStravaConnection()
+    }
+
+    /// Uploads the selection, one at a time. Skips anything already on Strava, and anything with
+    /// no stored detail — a summary-only file would arrive with no route and no heart rate, which
+    /// is worse than not uploading it.
+    func startStravaUpload(for items: [WorkoutListItem]) {
+        guard !syncStatus.isRunning, isStravaConnected else { return }
+        let pending = items.filter { !$0.stravaState.isOnStrava && $0.hasDetail }
+        guard !pending.isEmpty else { return }
+        syncTask = Task { await uploadToStrava(pending) }
+    }
+
+    /// What the Upload action would do with this selection, for its label and enabled state.
+    func stravaUploadCount(_ items: [WorkoutListItem]) -> (ready: Int, needingDetail: Int) {
+        let notOnStrava = items.filter { !$0.stravaState.isOnStrava }
+        let ready = notOnStrava.filter(\.hasDetail).count
+        return (ready, notOnStrava.count - ready)
+    }
+
+    private func uploadToStrava(_ items: [WorkoutListItem]) async {
+        let uploader = StravaUploader(client: strava)
+        for item in items { try? await store.setStravaState(.queued, for: item.id) }
+        await refreshItems()
+
+        var uploaded = 0
+        var index = 0
+        while index < items.count, !Task.isCancelled {
+            let item = items[index]
+            syncStatus = .running(.uploadingToStrava, completed: index, total: items.count, found: uploaded)
+            do {
+                let result = try await uploadOne(item, with: uploader)
+                try? await store.setStravaState(
+                    result.state, activityID: result.activityID, uploadID: result.uploadID, for: item.id
+                )
+                if result.state.isOnStrava { uploaded += 1 }
+                index += 1
+            } catch StravaError.rateLimited(let until) {
+                // Not a failure of this workout. Wait visibly, then try the same one again —
+                // `uploadOne` resumes rather than re-uploads if it had already been accepted.
+                syncStatus = .waiting(.uploadingToStrava, until: until)
+                try? await Task.sleep(for: .seconds(max(1, until.timeIntervalSinceNow + 2)))
+            } catch let error as StravaError where Self.endsBatch(error) {
+                // Nothing else will succeed either; stop, and say why.
+                await requeue(items[index...])
+                syncStatus = .failed(error.description)
+                await refreshItems()
+                return
+            } catch {
+                try? await store.setStravaState(.failed(reason: Self.describeUpload(error)), for: item.id)
+                index += 1
+            }
+            await refreshItems()
+        }
+
+        if Task.isCancelled { await requeue(items[index...]) }
+        await refreshItems()
+        syncStatus = .finished(.uploadingToStrava, found: uploaded)
+    }
+
+    /// Sends one workout — or, if a previous attempt got as far as an upload id, follows that
+    /// instead. Re-uploading an accepted workout would only earn a "duplicate" and spend a write.
+    private func uploadOne(_ item: WorkoutListItem, with uploader: StravaUploader) async throws -> UploadResult {
+        if let inFlight = try? await store.itemsUploadingToStrava().first(where: { $0.id == item.id }) {
+            return try await uploader.resume(uploadID: inFlight.uploadID, workout: item.workout)
+        }
+        guard let series = await seriesStore.loadIfAvailable(item.id) else {
+            return UploadResult(state: .failed(reason: "No route or heart rate stored — download detail first"),
+                                activityID: nil, uploadID: nil, warning: nil)
+        }
+        let store = store
+        let id = item.id
+        return try await uploader.send(item.workout, series: series) { uploadID in
+            // Persisted before polling starts, so a quit mid-wait resumes instead of re-uploading.
+            try? await store.setStravaState(.uploading, uploadID: uploadID, for: id)
+        }
+    }
+
+    /// Uploads a previous run accepted but didn't see finish. Quiet: no banner, because the user
+    /// didn't just ask for anything, but every outcome is persisted and visible in the table.
+    private func resumeStravaUploads() {
+        guard !hasResumedUploads, isStravaConnected else { return }
+        hasResumedUploads = true
+        Task {
+            guard let inFlight = try? await store.itemsUploadingToStrava(), !inFlight.isEmpty else { return }
+            let uploader = StravaUploader(client: strava)
+            for entry in inFlight {
+                guard let item = items.first(where: { $0.id == entry.id }) else { continue }
+                if let result = try? await uploader.resume(uploadID: entry.uploadID, workout: item.workout) {
+                    try? await store.setStravaState(
+                        result.state, activityID: result.activityID, uploadID: result.uploadID, for: entry.id
+                    )
+                }
+            }
+            await refreshItems()
+        }
+    }
+
+    /// Anything still merely queued goes back to not-uploaded, so a stopped batch doesn't leave
+    /// rows claiming to be waiting for something that will never come.
+    private func requeue(_ items: ArraySlice<WorkoutListItem>) async {
+        let current = (try? await store.allItems()) ?? []
+        for item in items where current.first(where: { $0.id == item.id })?.stravaState == .queued {
+            try? await store.setStravaState(.notUploaded, for: item.id)
+        }
+    }
+
+    private static func endsBatch(_ error: StravaError) -> Bool {
+        switch error {
+        case .notConfigured, .notAuthorized, .authorizationRejected: true
+        case .rateLimited, .http, .invalidResponse: false
+        }
+    }
+
+    private static func describeUpload(_ error: any Error) -> String {
+        if let strava = error as? StravaError { return strava.description }
+        if let url = error as? URLError {
+            return url.code == .notConnectedToInternet ? "No internet connection" : url.localizedDescription
+        }
+        return error.localizedDescription
+    }
+
+    /// Cheaper than `load()`: no place resolution, no Strava resume.
+    private func refreshItems() async {
+        if let fresh = try? await store.allItems() { items = fresh }
     }
 
     /// Fills in the Place column in the background.

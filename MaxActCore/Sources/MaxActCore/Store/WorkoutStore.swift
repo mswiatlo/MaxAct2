@@ -100,6 +100,18 @@ public actor WorkoutStore {
         return try modelContext.fetch(descriptor).map(WorkoutListItem.init(record:))
     }
 
+    /// Uploads a previous run accepted but didn't see finish. Resumed by polling the saved id —
+    /// uploading again would only earn a "duplicate" and spend a write.
+    public func itemsUploadingToStrava() throws -> [(id: String, uploadID: Int)] {
+        let uploading = StravaState.uploading.storageKey
+        let descriptor = FetchDescriptor<WorkoutRecord>(
+            predicate: #Predicate { $0.stravaStateKey == uploading && $0.stravaUploadID != nil }
+        )
+        return try modelContext.fetch(descriptor).compactMap { record in
+            record.stravaUploadID.map { (record.id, $0) }
+        }
+    }
+
     /// Workouts whose detail has not been fetched, oldest-listed first — the backlog for the lazy
     /// second pass.
     public func itemsNeedingDetail(limit: Int? = nil) throws -> [WorkoutListItem] {

@@ -11,7 +11,8 @@
 #      `defaults` command reads ~/Library/Preferences/, which for this app doesn't even exist.
 #   2. `cfprefsd` caches the domain and flushes it on exit, so it has to be killed BEFORE the
 #      plist is edited. Killing it afterwards writes the stale values straight back.
-#   3. Window geometry also lives in a `Saved Application State` directory, not just the plist.
+#   3. Window geometry and the open-window list also live in a restoration directory —
+#      on macOS 26 in the container's tmp/, not Library/Saved Application State/.
 #
 # See .claude/skills/maxact-development/references/xcode-project-conventions.md.
 
@@ -46,7 +47,11 @@ for key in removed:
 print(f'  kept    {sorted(data)}')
 PY
 
-# 3. And the saved window state, which is a directory rather than a key.
+# 3. And the restoration state, which is a directory rather than a key — and which has moved.
+#    On macOS 26 it lives in the container's tmp/, not Library/Saved Application State/; the old
+#    locations are cleared too in case an older system wrote there. Leaving it behind is how the
+#    app came to relaunch with no window at all (see launchMaxAct in the UI tests).
+rm -rf "$CONTAINER/../tmp/com.swiatlowski.MaxAct.savedState" 2>/dev/null
 rm -rf "$CONTAINER/Saved Application State" 2>/dev/null
 rm -rf ~/Library/Saved\ Application\ State/com.swiatlowski.MaxAct.savedState 2>/dev/null
 

@@ -406,3 +406,32 @@ plist, so deleting only the keys is not enough.
 
 The script refuses to run while the app is open, because the app writes its state back on exit and
 would undo the reset.
+
+## The app relaunched with no window at all
+
+**Symptom:** UI tests failed with "no window appeared", a different subset every run, and passed
+only when someone clicked the app into focus. The real app did the same: quit with the window
+closed, relaunch, nothing to see until a Dock click.
+
+**Cause: session restoration, not focus.** macOS restores the previous session's *windows*; a
+session that ended with none open relaunches with none. Activation doesn't create one — only a
+"reopen" (Dock click) does. Diagnosed with the window server rather than guessed: `CGWindowList`
+showed zero windows for a background launch where Calculator had one, and the unified log
+(`/usr/bin/log` — zsh shadows `log` with a builtin) showed `hasPersistentStateToRestore=1`.
+
+**Fix:** `UserDefaults.standard.register(defaults: ["ApplePersistenceIgnoreState": true])` in
+`MaxActApp.init`, before AppKit restores anything. Window size and position survive — those are
+frame autosave (`NSWindow Frame …`), not session restoration. Things that did **not** work:
+`XCUIApplication.activate()` (activates a windowless app) and `.restorationBehavior(.disabled)`
+on the `WindowGroup` (AppKit still restored the empty session and SwiftUI opened nothing). The UI
+tests also pass `-ApplePersistenceIgnoreState YES` as the **first** launch arguments — after
+`--ui-testing` it would be swallowed as that flag's value.
+
+**Where the state lives on macOS 26:** `~/Library/Containers/<bundle id>/Data/tmp/<bundle
+id>.savedState`, written through the `com.apple.appkit.restoration_storage` service — *not*
+`Library/Saved Application State`, which no longer exists. `Spikes/reset-window-state.sh` clears it.
+
+**Test scratch directories:** XCUITest ends each test by killing the app, so cleanup at quit
+never runs. `AppModel.inMemoryFallback` sweeps `MaxActFallback-*` directories older than an hour at
+the next launch instead (324 had accumulated). Doing it from the test runner would mean reaching
+into another app's container, which triggers a privacy prompt.
