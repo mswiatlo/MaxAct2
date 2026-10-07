@@ -155,6 +155,9 @@ struct MaxActCommands: Commands {
             .keyboardShortcut("u", modifiers: [.command, .shift])
             .disabled(model.stravaUploadCount(model.selectedItems).ready == 0
                       || model.syncStatus.isRunning || !model.isStravaConnected)
+
+            Button("Check Strava for Existing Activities") { model.startStravaCheck() }
+                .disabled(model.syncStatus.isRunning || !model.isStravaConnected || model.items.isEmpty)
         }
 
         // No Select All here on purpose. The standard `.pasteboard` group already provides

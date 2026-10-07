@@ -100,6 +100,30 @@ public actor WorkoutStore {
         return try modelContext.fetch(descriptor).map(WorkoutListItem.init(record:))
     }
 
+    /// Records workouts found already on Strava, returning how many changed.
+    ///
+    /// Only touches workouts MaxAct hasn't itself put there: not-uploaded, failed, or queued.
+    /// One we uploaded keeps its "Uploaded" state and its own activity id, and one mid-upload is
+    /// left for its upload to settle — a background check must never rewrite either.
+    @discardableResult
+    public func markAlreadyOnStrava(_ matches: [String: Int], now: Date = .now) throws -> Int {
+        let replaceable: Set<String> = [
+            StravaState.notUploaded.storageKey, StravaState.queued.storageKey,
+            StravaState.failed(reason: "").storageKey,
+        ]
+        var changed = 0
+        for (workoutID, activityID) in matches {
+            guard let record = try record(id: workoutID),
+                  replaceable.contains(record.stravaStateKey) else { continue }
+            record.stravaState = .duplicate
+            record.stravaActivityID = activityID
+            record.lastUploadedAt = now
+            changed += 1
+        }
+        if changed > 0 { try modelContext.save() }
+        return changed
+    }
+
     /// Uploads a previous run accepted but didn't see finish. Resumed by polling the saved id —
     /// uploading again would only earn a "duplicate" and spend a write.
     public func itemsUploadingToStrava() throws -> [(id: String, uploadID: Int)] {

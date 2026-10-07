@@ -159,20 +159,34 @@ public actor StravaClient {
         )
     }
 
+    /// One page of the athlete's activities. `after`/`before` are epoch seconds per the spec.
+    func activitiesPage(after: Date, before: Date, page: Int, perPage: Int) async throws -> [StravaActivitySummary] {
+        let response = try await send(
+            method: "GET", path: "athlete/activities", kind: .read,
+            query: [
+                URLQueryItem(name: "after", value: String(Int(after.timeIntervalSince1970))),
+                URLQueryItem(name: "before", value: String(Int(before.timeIntervalSince1970))),
+                URLQueryItem(name: "page", value: String(page)),
+                URLQueryItem(name: "per_page", value: String(perPage)),
+            ]
+        )
+        return try decode([StravaActivitySummary].self, from: response)
+    }
+
     // MARK: - Plumbing
 
     /// One authorised request: waits for rate-limit room, refreshes a stale token first, and
     /// retries exactly once with a fresh token on a 401.
     private func send(
         method: String, path: String, kind: StravaRateLimit.Kind,
-        headers: [String: String] = [:], body: Data? = nil
+        query: [URLQueryItem] = [], headers: [String: String] = [:], body: Data? = nil
     ) async throws -> StravaHTTPResponse {
         var tokens = try await validTokens()
         for attempt in 0..<2 {
             try await waitForRoom(kind)
-            var request = StravaHTTPRequest(
-                method: method, url: Self.apiBase.appending(path: path), headers: headers, body: body
-            )
+            var url = Self.apiBase.appending(path: path)
+            if !query.isEmpty { url.append(queryItems: query) }
+            var request = StravaHTTPRequest(method: method, url: url, headers: headers, body: body)
             request.headers["Authorization"] = "Bearer \(tokens.accessToken)"
 
             rateLimit.spend(kind, at: now())
@@ -262,7 +276,10 @@ public actor StravaClient {
 
     private func decode<T: Decodable>(_ type: T.Type, from response: StravaHTTPResponse) throws -> T {
         do {
-            return try JSONDecoder().decode(type, from: response.body)
+            // Strava's timestamps are ISO 8601 strings ("2026-10-07T18:00:00Z").
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            return try decoder.decode(type, from: response.body)
         } catch {
             throw StravaError.invalidResponse("\(T.self): \(error)")
         }

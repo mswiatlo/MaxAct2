@@ -21,6 +21,9 @@ struct StravaSettingsSection: View {
         Section {
             if model.isStravaConnected {
                 LabeledContent("Connected as", value: model.stravaAthlete ?? "")
+                Button("Check for Workouts Already on Strava") { model.startStravaCheck() }
+                    .disabled(model.syncStatus.isRunning)
+                    .help("Matches by time, so it finds workouts the watch uploaded, not only MaxAct's")
                 Button("Disconnect", role: .destructive) {
                     Task { await model.disconnectStrava() }
                 }

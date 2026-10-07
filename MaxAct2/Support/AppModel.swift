@@ -40,6 +40,7 @@ final class AppModel {
         case listing
         case fillingDetail
         case uploadingToStrava
+        case checkingStrava
     }
 
     enum SyncStatus: Equatable {
@@ -74,6 +75,11 @@ final class AppModel {
                 "Uploading to Strava — \(done) of \(total)"
             case .finished(.uploadingToStrava, let found):
                 found == 0 ? "Nothing was uploaded" : "Uploaded \(found) workouts to Strava"
+            case .running(.checkingStrava, _, _, _):
+                "Checking Strava for workouts already there…"
+            case .finished(.checkingStrava, let found):
+                found == 0 ? "Nothing new found on Strava"
+                    : "Found \(found) workout\(found == 1 ? "" : "s") already on Strava"
             case .waiting(_, let until):
                 "Paused for Strava's rate limit — resumes at "
                     + until.formatted(date: .omitted, time: .shortened)
@@ -327,6 +333,41 @@ final class AppModel {
         }
         try await strava.exchange(code: code)
         await refreshStravaConnection()
+        // The library has years of workouts the watch already put on Strava. Find them now, so
+        // the first thing the user sees isn't hundreds of rows offering to upload duplicates.
+        startStravaCheck()
+    }
+
+    /// Looks for every workout in the library on Strava, and marks the ones already there.
+    func startStravaCheck() {
+        guard !syncStatus.isRunning, isStravaConnected, !items.isEmpty else { return }
+        let workouts = items.filter { !$0.stravaState.isOnStrava }.map(\.workout)
+        syncTask = Task {
+            syncStatus = .running(.checkingStrava, completed: 0, total: 1, found: 0)
+            do {
+                let found = try await markWorkoutsAlreadyOnStrava(workouts)
+                syncStatus = .finished(.checkingStrava, found: found)
+            } catch let error as StravaError {
+                syncStatus = .failed(error.description)
+            } catch {
+                syncStatus = .failed(Self.describeUpload(error))
+            }
+        }
+    }
+
+    /// Lists Strava's activities over the workouts' span and marks the matches. Costs one read
+    /// request per 200 activities in the span — about a dozen for seven years.
+    @discardableResult
+    private func markWorkoutsAlreadyOnStrava(_ workouts: [Workout]) async throws -> Int {
+        guard let earliest = workouts.map(\.start).min(), let latest = workouts.map(\.end).max() else { return 0 }
+        // A day's margin either side: a workout near the edge must still see an activity that
+        // started a few minutes before it.
+        let span = DateInterval(start: earliest.addingTimeInterval(-86_400), end: latest.addingTimeInterval(86_400))
+        let activities = try await strava.activities(in: span)
+        let matches = StravaActivityMatcher.match(workouts, against: activities)
+        let marked = try await store.markAlreadyOnStrava(matches)
+        await refreshItems()
+        return marked
     }
 
     func disconnectStrava() async {
@@ -351,8 +392,21 @@ final class AppModel {
         return (ready, notOnStrava.count - ready)
     }
 
-    private func uploadToStrava(_ items: [WorkoutListItem]) async {
+    private func uploadToStrava(_ requested: [WorkoutListItem]) async {
         let uploader = StravaUploader(client: strava)
+
+        // Check first: anything the watch already put on Strava would only come back as a
+        // duplicate, after spending a write and a few polls to find that out. If the check itself
+        // fails, carry on — Strava's own duplicate detection still stands behind the upload.
+        syncStatus = .running(.checkingStrava, completed: 0, total: 1, found: 0)
+        _ = try? await markWorkoutsAlreadyOnStrava(requested.map(\.workout))
+        let alreadyThere = Set(self.items.filter { $0.stravaState.isOnStrava }.map(\.id))
+        let items = requested.filter { !alreadyThere.contains($0.id) }
+        guard !items.isEmpty else {
+            syncStatus = .finished(.uploadingToStrava, found: 0)
+            return
+        }
+
         for item in items { try? await store.setStravaState(.queued, for: item.id) }
         await refreshItems()
 
