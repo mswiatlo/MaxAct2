@@ -25,8 +25,12 @@ quarter-hour boundary on `429`.
 
 ## Upload flow
 
-1. `POST /api/v3/uploads`, multipart: `file`, `data_type=tcx`, `name`, `description`,
-   `activity_type`, and `external_id` set to our workout id.
+1. `POST /api/v3/uploads`, multipart: `file`, `data_type=tcx`, `name`, `description`, `trainer`,
+   `commute`, and `external_id` set to our workout id. **That is the complete documented list
+   (spec checked 2026-10-07) — there is no `activity_type`.** Strava infers the type from the TCX
+   `Sport` attribute (Running / Biking / Other), so anything else needs `PUT /activities/{id}`
+   with `sport_type` once processing finishes. MaxAct writes walks and hikes as "Other" so a
+   failed correction leaves a generic workout rather than a false run.
 2. Poll `GET /api/v3/uploads/{id}` until `activity_id` appears or `error` is set. **"Queued" is
    in-flight, not success** — the request succeeding does not mean the activity exists.
 3. Persist the upload id so a relaunch resumes polling instead of re-uploading.
@@ -71,3 +75,20 @@ completion → `PUT /activities/{id}`. That is an extra *write* per workout agai
 
 Re-check `DetailedActivity` before building on this. Strava has been adding tags recently and the
 feature is still rolling out unevenly, so a real tags field may land.
+
+
+## Finding what's already there *(added 2026-10-07)*
+
+`GET /athlete/activities?after=&before=&page=&per_page=200` returns `SummaryActivity` with
+`start_date` (ISO 8601), `elapsed_time`, `distance`, `sport_type` and `external_id`. A read request
+per 200 activities — about a dozen for seven years. Most of a user's activities arrived from the
+watch or another app, so `external_id` won't match ours; `StravaActivityMatcher` matches by start
+within 10 minutes plus ≥50% overlap of the shorter interval, one-to-one. Those thresholds are
+**unmeasured** against real data — check them on the first live run.
+
+## Spec source
+
+`https://developers.strava.com/swagger/swagger.json`, with models in `upload.json` and
+`activity.json` beside it. The HTML reference page is too long to fetch whole; query the JSON.
+The September note above about the upload ignoring `commute`/`trainer` came from community
+reports and predates the current spec, which documents both — unconfirmed live either way.

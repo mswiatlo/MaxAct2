@@ -3,61 +3,68 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**,
 with batch upload to Strava.
 
-**Status:** Phases 0–6 complete and exercised against real data, with every known *defect* fixed
-and the list/detail UI settled after a round of layout polish. Next: Phase 7 (TCX + Strava), the
-point of the app and the last big piece. Three feature requests outstanding: linking the charts
-and the map (6), TrainingPeaks as a second sync destination (7), and summary statistics (8).
-The last two are speculative — 7 in particular is blocked on whether the TrainingPeaks API is even
-open to us, but it has one consequence for Phase 7's design worth reading before starting it.
-**Last updated:** 2026-09-22.
+**Status:** Phases 0–6 complete. **Phase 7 (TCX + Strava) is built and fully tested offline, but
+not yet exercised against the live Strava API** — that needs the user's Strava app connected, and is
+the first thing to do on resuming. Work is on branch `phase-7-tcx-strava`, not yet merged to `main`.
+Three feature requests outstanding: chart/map linking (6), TrainingPeaks (7), summary stats (8).
+**Last updated:** 2026-10-07.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first. It carries the
 > Health Auto Export data contract, the Xcode tooling limits we hit, and the Strava API facts —
 > the things that cost research to establish and aren't visible in the code.
 
-### Where things stand — 2026-09-22
+### Where things stand — paused 2026-10-07, mid-Phase 7
 
-**Phases 0–6 are done and the app is genuinely usable.** Workouts sync from the phone, the table
-renders them with map thumbnails and approximate place names, detail downloads fill in routes and
-heart rate, and selecting a workout shows its map, stats, three charts and per-kilometre splits.
-Everything below is verified against real data, not just tests.
+**Phase 7 is code-complete except tags, and everything that can be tested without a Strava account
+is.** What exists, on `phase-7-tcx-strava` (pushed to `origin`, not merged):
 
-Since Phase 6 the work has been **layout polish driven by using it**: the detail pane became a
-trailing inspector that starts closed, Place moved to the third column, the table's columns were
-narrowed and capped, the Strava column became a centred glyph at 44pt rather than 96, and the
-default window was sized to actually fit the table with the sidebar showing. No model or sync code
-changed in any of it.
+| Layer | What it does | Verified by |
+|---|---|---|
+| `TCXWriter` | TCX v2 from a workout and its cleaned series; a pause starts a new `<Track>`; distance scaled to HealthKit's total | Golden files + Garmin's XSD via `xmllint`; all 8 real stored series validate, and the rides with long stops produce the predicted 2–3 tracks |
+| `StravaRateLimit` | Both buckets from headers; reads spend both; quarter-hour / midnight-UTC rollover; 429 backoff | 13 unit tests with injected time |
+| `StravaClient` | OAuth exchange + refresh (proactive and on 401), upload, status, sport `PUT`, activity listing | Scripted fake transport — **no live call yet** |
+| `StravaUploader` | TCX → upload with `external_id` → persist upload id → poll → correct sport | Same |
+| `StravaActivityMatcher` | Finds workouts already on Strava by time overlap (most arrived from the watch, not MaxAct) | Unit tests with constructed activities |
+| App | Keychain store, Settings → Strava, Upload (⇧⌘U) with rate-limit pauses and resume, "Already on Strava" check, activity link and failure reason in detail | 27/27 UI tests; the live flow untested |
 
 | | |
 |---|---|
-| Builds | clean, **zero warnings** — check with `XcodeListNavigatorIssues` at `severity: warning`; `BuildProject` reports only errors |
-| Tests | 155 in `MaxActCore` (`swift test`), 27 app/UI tests including 15 seeded (`RunAllTests`) |
-| Live MCP suite | passes against the phone; skipped unless `MAXACT_LIVE_HOST`/`MAXACT_LIVE_TOKEN` are set |
-| Verified with real data | 33 workouts synced, 5 with full detail; the largest is 3,311 route points and 664 HR samples. Pace, GPS filtering, splits and elevation gain were each checked against HAE's own figures |
-| Working tree | clean, everything merged and pushed to `origin/main` at `4a2296a` |
+| Builds | clean, **zero warnings** |
+| Tests | 220 in `MaxActCore` (`swift test`), 27 app/UI tests (`RunAllTests` — needs the Mac left alone ~3 min) |
+| Working tree | clean; `phase-7-tcx-strava` at `6a0667c`, `main` at `74a0f06` |
 
-**What to pick up next**, in the order I'd suggest:
+**Pick up here — the live Strava check, in this order:**
 
-1. **Phase 7 — TCX + Strava.** The largest remaining piece, and the point of the app: everything
-   so far only *looks* at workouts. Read `references/strava-api.md` first — the two independent
-   rate-limit buckets and the `external_id` dedupe are the parts that need care — and read known
-   issue 7's note before designing the uploader, because per-destination state is much cheaper to
-   allow for now than to migrate to later. Suggested order within it: the TCX writer with
-   golden-file tests (pure, testable, no network), then OAuth, then upload and polling.
+1. **Connect.** On strava.com/settings/api set the *Authorization Callback Domain* to `localhost`.
+   In MaxAct, Settings → Strava: paste client ID and secret, Connect, leave "Upload your
+   activities" ticked. The Keychain may ask once ("Always Allow"); being ad-hoc signed, it may ask
+   again after rebuilds.
+2. **Read the automatic "already on Strava" check.** It runs straight after connecting and reports
+   "Found N workouts already on Strava". The 10-minute start tolerance and 50% overlap rule were
+   *chosen*, not measured — if N looks low against what is known to be there, measure the real
+   HealthKit-vs-Strava start gaps before changing anything.
+3. **Upload one walk.** That single upload confirms the three things only checked against the
+   published spec: that `commute`/`trainer` are honoured at upload (September's community reports
+   said no; the 2026 spec documents them), that the follow-up `PUT sport_type` turns the TCX's
+   "Other" into a Walk, and the duplicate-error phrasing the parser expects. Then a ride.
+4. **Then merge** `phase-7-tcx-strava` to `main`, and decide on tags (below).
 
-   Worth deciding early: whether to export the raw or the `RouteQuality`-cleaned track, and
-   whether to carry the `.hae` question (outstanding item 2) into this phase, since HealthKit's
-   own splits and pause events would make a better TCX than the ones we reconstruct.
-2. **Known issue 6 — link the charts and the map.** Self-contained, sits on top of what Phase 5
-   landed, and the traps are written up.
-3. **Known issue 8 — summary statistics.** Also self-contained, and mostly grouping on top of the
-   `WorkoutAggregate` that already exists.
-4. **Phase 8 — polish**, including the first-run onboarding.
+**Not built in Phase 7: tags.** The plan's local tagging (Commute/Trainer mapped to Strava flags,
+the rest local-only, batch editing, sidebar filters) is a feature of its own. The 2026 spec
+confirms there is still no Activity Tags field in the API. Worth doing after the live upload is
+proven, not before.
 
-Known issue 7 (TrainingPeaks) is deliberately not in that order: it starts with a question about
-API access that may close it off entirely. But **read its note before building Phase 7** — upload
-state is currently Strava-shaped, and a `WorkoutDestination` protocol costs nothing now and a
-schema migration later.
+**Two findings from this round worth not rediscovering** — both now in the skill reference:
+- **The upload API takes no activity type**; Strava infers it from TCX `Sport`, which knows only
+  Running/Biking/Other. Hence walks and hikes are written as "Other" and corrected with a `PUT`.
+- **The app relaunched with no window at all** whenever the last session ended with it closed —
+  macOS session restoration, not focus. That is also what made the UI suite fail in a different
+  subset each run. Fixed with a registered `ApplePersistenceIgnoreState`; restoration state now
+  lives in the container's `tmp/`, and `Spikes/reset-window-state.sh` clears it.
+
+**After Phase 7**, unchanged: known issue 6 (chart/map linking), known issue 8 (summary stats),
+Phase 8 (polish). Known issue 7 (TrainingPeaks) still starts with whether its API is open to us;
+the `WorkoutDestination` protocol is in place for it, though upload *state* is still Strava-shaped.
 
 **A habit worth keeping: measure, don't derive.** This has now paid off twice over, in two
 different areas, and in nearly every case the measurement *contradicted* a reasonable-looking
@@ -1013,10 +1020,21 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 | 4 — List UI | Complete |
 | 5 — Detail view | Complete |
 | 6 — Approximate location | Complete |
-| 7 — TCX + Strava | Not started |
+| 7 — TCX + Strava | Built and tested offline; live API check and tags outstanding |
 | 8 — Polish | Not started |
 
 ### Change log
+
+- **2026-10-07 (latest)** — **Phase 7 built, paused before the live check.** TCX writer validated
+  against Garmin's XSD and every real stored series; two-bucket rate limiter; Strava client and
+  uploader behind a fake transport; Keychain, Settings → Strava, Upload with rate-limit pauses and
+  resume; and — added at the user's request — matching against the athlete's existing Strava
+  activities by time overlap, so workouts the watch already uploaded show "Already on Strava" and
+  are skipped by batches. Re-verifying Strava's spec changed two things: flags travel with the
+  upload, and the sport needs a follow-up `PUT` because uploads take no type. Also fixed the app
+  relaunching windowless (session restoration), which had been failing the UI suite
+  intermittently, and stopped UI tests leaking scratch directories (324 had accumulated).
+  220 package tests, 27/27 app and UI tests. Not yet run against the live API.
 
 - **2026-09-22 (latest)** — Refreshed *Where things stand*: current tree state (`4a2296a`, pushed),
   a summary of the post-Phase-6 layout polish, and a sharper Phase 7 starting point including a
