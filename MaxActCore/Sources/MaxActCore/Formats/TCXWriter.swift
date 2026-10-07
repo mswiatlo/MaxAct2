@@ -195,10 +195,14 @@ public enum TCXWriter {
         return "\(pad)<\(name)><Value>\(Int(bpm.rounded()))</Value></\(name)>\n"
     }
 
-    /// TCX only knows three sports. Strava takes the real type from the upload's `activity_type`.
+    /// TCX only knows three sports, and Strava infers the activity type from this attribute — the
+    /// upload API has no type parameter. So walks and hikes are **"Other"**, not "Running": mapping
+    /// them to the nearest foot sport would publish a walk as a run, and the follow-up
+    /// `PUT sport_type` that corrects it might not happen (rate limit, network). "Other" is wrong
+    /// in a harmless direction; "Running" is wrong in one that pollutes running statistics.
     static func sport(for kind: ActivityKind) -> String {
         switch kind {
-        case .running, .walking, .hiking: "Running"
+        case .running: "Running"
         case .cycling, .indoorCycling: "Biking"
         default: "Other"
         }
