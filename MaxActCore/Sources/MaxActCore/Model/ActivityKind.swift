@@ -5,7 +5,7 @@ import Foundation
 /// Health Auto Export identifies activities by **display name** (`"Outdoor Cycling"`), not by an
 /// `HKWorkoutActivityType` raw value, so this cannot be a plain enum over integers: an unrecognised
 /// name has to survive as itself. (`.hae` files do carry the HealthKit code, but that path isn't
-/// the one we ingest — see PLAN.md §2.)
+/// the one we ingest — see PLAN.md, Decisions.)
 public enum ActivityKind: Hashable, Sendable {
     case running
     case walking

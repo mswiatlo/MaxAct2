@@ -12,7 +12,8 @@ will otherwise be rediscovered the hard way.
 ## Ground rules
 
 - **Read `PLAN.md` first** and keep it current. Edit affected sections in place rather than leaving
-  a contradiction, bump *Last updated*, append a dated change-log line, and update the phase table.
+  a contradiction, bump *Last updated*, and update the phase table. Keep it short: the dated
+  change log, fixed issues and phase write-ups live in `HISTORY.md`.
 - **Never hand-edit `MaxAct2.xcodeproj/project.pbxproj`**, and never read it to answer a question
   that `GetTargetBuildSettings` can answer. Grepping it to *verify* a change landed is fine.
 - **Prefer `xcode-tools` MCP tools** over shell commands for anything project-shaped.

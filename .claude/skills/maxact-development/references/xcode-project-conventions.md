@@ -65,7 +65,7 @@ every build phase while leaving them in the navigator — so non-app material st
 Xcode without being built or bundled. Current value:
 
 ```
-Spikes/* Spikes/**/* PLAN.md *.py *.pyc *.swift.txt
+Spikes/* Spikes/**/* PLAN.md HISTORY.md *.py *.pyc *.swift.txt
 ```
 
 Both path- and basename-style patterns are listed, because which form matches is not worth
@@ -116,7 +116,18 @@ components (not a SwiftUI `Color`) so it lives in the model layer and is testabl
 `RouteThumbnailRenderer.Key` is `(workoutID, width, height, isDark, routeColor)` and the filename
 is derived from all five. The colour was added when it became configurable: thumbnails are cached
 on disk indefinitely, so omitting it would have left every existing image in the old colour until
-something unrelated invalidated it. The same applies to any future appearance input.
+something unrelated invalidated it. The same applies to any future appearance input. The key also
+carries a `drawingVersion`, bumped whenever *how* a route is drawn changes (e.g. when bad GPS fixes
+started being filtered), so stale images are redrawn rather than served.
+
+## `MKMapSnapshotter` must be kept alive across the await
+
+If `start` is the snapshotter's last use, Swift may release it as soon as the call returns, and the
+completion never fires — every thumbnail spins for ever with no error. Hold it for the duration
+(`withExtendedLifetime(snapshotter) { … }`). Separately, the renderer's throttle once parked
+cancelled tasks on continuations nothing resumed, wedging every later render; it polls instead.
+The seeded UI tests do **not** catch a regression of the first (removing the lifetime extension
+leaves them passing), so treat it as a rule rather than something the suite guards.
 
 ## SwiftUI reuses a detail view across selection changes
 

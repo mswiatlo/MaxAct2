@@ -66,7 +66,7 @@ public struct Split: Identifiable, Hashable, Sendable {
 /// ``smoothedAltitudes(_:window:)``.
 public enum WorkoutSplits {
     /// Distance covered by a full split. A kilometre, for both foot and wheeled sports — miles are
-    /// out of scope, as recorded in PLAN.md §2.
+    /// out of scope, as recorded in PLAN.md, Decisions.
     public static let splitMeters: Double = 1000
 
     /// `[]` when there is no usable route, no distance to scale against, or the activity has no

@@ -1,1124 +1,14 @@
-# MaxAct — Build Plan
+# MaxAct — Plan
 
-A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**,
-with batch upload to Strava.
+A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**
+(HAE), with batch upload to Strava.
 
-**Status:** Phases 0–7 built. Phase 7 has three live checks left (tag push, flags and mute at
-upload) — see "Where things stand". Five feature
-requests outstanding: chart/map linking (6), TrainingPeaks (7), summary stats (8), region/country
-search (9), and a visible close control for the detail inspector (10).
-**Last updated:** 2026-10-07 (night).
+**Status:** Phases 0–7 built. Phase 7 has three live checks left; then known issues and Phase 8.
+**Last updated:** 2026-10-07.
 
-> **Working on this project?** Read `.claude/skills/maxact-development/` first. It carries the
-> Health Auto Export data contract, the Xcode tooling limits we hit, and the Strava API facts —
-> the things that cost research to establish and aren't visible in the code.
-
-### Where things stand — paused 2026-10-07, Phase 7 built
-
-**Phase 7 is complete; only live checks remain.** All on `main` (pushed); no open branches.
-
-| Layer | What it does | Verified by |
-|---|---|---|
-| `TCXWriter` | TCX v2 from a workout and its cleaned series; a pause starts a new `<Track>`; distance scaled to HealthKit's total | Golden files + Garmin's XSD via `xmllint`; all real stored series validate |
-| `StravaRateLimit` | Both buckets from headers; quarter-hour / midnight-UTC rollover; 429 backoff | Unit tests with injected time |
-| `StravaClient` / `StravaUploader` | OAuth + refresh, upload with `external_id`, resumable polling, one combined post-upload `PUT` (sport correction + mute), activity listing | Scripted fake transport, **and live**: a walk and a ride uploaded 2026-10-07, the walk correctly corrected to Walk |
-| `StravaActivityMatcher` | Finds workouts already on Strava by time overlap | Unit tests, **and live**: found the two watch-uploaded rides |
-| Tags | Local tags; Commute/Trainer mirrored to Strava (imported on every check, sent at upload, pushed when edited, protected by a pending flag); other tags Mac-only | Unit tests + a batch-tagging UI test; import path matches live data |
-| App | Settings → Strava (connect, mute toggle, check), Upload (⇧⌘U), "Synced to Strava" orange check, Tags menu/sidebar/search/chips/column | 28/28 app and UI tests |
-
-| | |
-|---|---|
-| Builds | clean, **zero warnings** |
-| Tests | 233 in `MaxActCore` (`swift test`), 28 app/UI tests (`RunAllTests` — needs the Mac left alone ~3.5 min) |
-| Working tree | clean; `main` pushed |
-
-**Settled live, 2026-10-07:**
-- Upload, the sport-correcting `PUT`, and the "already on Strava" check all work against the real
-  account.
-- The activity list returns `commute` and `trainer`; `hide_from_home` is only in the full record.
-- **Strava's Activity Tags ("With Kid", "With Pet") are not in the API at all.** Confirmed against
-  the 2026-09-18 16:04 ride, which the user tagged "With Kid": no field or value mentions it. So
-  such tags are Mac-only in MaxAct, by necessity.
-- The commute flags on the 9/18 and 9/21 rides were set by hand on Strava — they prove importing,
-  not sending.
-
-**Pick up here — three live checks, in the app, no code expected:**
-1. Settings → Strava → "Check for Workouts Already on Strava". The 9/18 (13:20 and 16:04) and 9/21
-   rides should come back tagged **Commute**.
-2. Untag Commute on one of them. The detail pane should show "Updating Strava…" briefly, and the
-   flag should clear on Strava. Re-tag it afterwards.
-3. Tag the next workout before uploading it. It should arrive with the commute flag and muted.
-   While there, note whether a *backdated* upload shows in followers' feeds even unmuted — that
-   decides whether mute should stay on by default.
-
-Also still unseen live: the exact duplicate-error phrasing (no real duplicate rejected yet).
-
-**Not built, optional:** writing Mac-only tags into the Strava description (`#withkid`) behind a
-setting.
-
-**Findings worth not rediscovering** — all in the skill references:
-- **The upload API takes no activity type**; Strava infers it from TCX `Sport` (Running/Biking/
-  Other only), so walks and hikes are written as "Other" and corrected with a `PUT`.
-- **The app relaunched with no window** whenever the last session ended with it closed — session
-  restoration. Fixed with a registered `ApplePersistenceIgnoreState`;
-  `Spikes/reset-window-state.sh` clears the state.
-- **The sidebar vanished** in the real app and in every sidebar UI test: the inspector squeezes it
-  out at the default width and AppKit saves that collapse. The split view now starts with an
-  explicit `.all`; the squeeze itself is tracked under known issue 10.
-
-**After Phase 7**: known issue 10 (a visible close control for the detail inspector, plus the
-sidebar squeeze — smallest), known issue 9 (search by region and country — small and
-self-contained), known issue 11 (odd pace splits on the 9/21 commute), known issue 6 (chart/map linking), known issue 8 (summary stats), then Phase 8
-(polish). Known issue 7 (TrainingPeaks) still starts with whether its API is open to us; the
-`WorkoutDestination` protocol is in place for it, though upload *state* is still Strava-shaped.
-
-**A habit worth keeping: measure, don't derive.** This has now paid off twice over, in two
-different areas, and in nearly every case the measurement *contradicted* a reasonable-looking
-calculation.
-
-On the data: `avgSpeed` turned out to be a mean of instantaneous samples rather than a pause
-problem, the proposed GPS spike detector fired only on jitter, and the heart-rate min–max band was
-degenerate in all 2,580 real samples. An hour with the stored blobs repeatedly changed *what got
-built*, not just confirmed it.
-
-On the layout, more recently and more embarrassingly: `.width(ideal:)` turned out not to control
-rendered width at all, a saved `TableColumnCustomization` was silently overriding every declared
-width, `.defaultSize` was ignored in favour of the content's ideal, and a window sized from
-sidebar + column widths came out ~185pt short because a `.inset` table's gutters aren't in those
-numbers. Three shipped-then-corrected values came from trusting arithmetic over a measurement.
-
-The cheap instruments, both documented in the skill reference: decode the stored series blobs for
-anything data-shaped, and read the app's persisted state back after a launch for anything
-layout-shaped. Neither needs a screenshot.
-
-**Five bugs were found by using it, none of which any test caught.** Each is fixed and each taught
-something now recorded in the skill reference:
-
-1. `components.url!` on the typed address — pasting the full URL from HAE's Server screen (the
-   natural thing to do) hard-crashed on Start Sync. Now parsed by `MCPEndpoint`, which accepts
-   every sensible form and echoes the resolved URL back in the panel.
-2. `@Environment(AppModel.self)` in a popover — crashed when the window re-laid out. Fixed in the
-   popover only, and then it recurred in a table cell while scrolling. The model is now threaded
-   explicitly everywhere and `@Environment(AppModel.self)` appears nowhere; on macOS, AppKit hosts
-   table cells, toolbars, menus and popovers detached, and none of them reliably inherit it.
-3. The thumbnail placeholder keyed "indoor" off `hasRoute == false`, which after a list pass means
-   *unknown* — so every outdoor ride was labelled indoor.
-4. `.task(id: key)` didn't include `hasDetail`, so the first attempt ran before any route existed,
-   returned nothing, and never retried once Download Detail completed.
-5. `MKMapSnapshotter` was released the moment `start` returned, since that was its last use, so
-   the completion never fired and every thumbnail spun for ever. Held across the await now. Its
-   throttle also parked cancelled tasks on continuations that nothing resumed, which wedged all
-   later renders; it polls instead.
-
-A sixth was found by running the suite rather than the app, and is worth remembering because it
-looked like everything except what it was: **13 seeded UI tests couldn't launch the app at all**,
-because `--ui-testing-seed 40` as two tokens leaves a stray `40` once `NSUserDefaults` pairs
-arguments, and AppKit reads a stray argument as a file to open — which suppresses `WindowGroup`'s
-window entirely. It is invisible under `open --args`, and raising the timeout doesn't help. Now
-passed as `--ui-testing-seed=40`.
-
-**Outstanding:**
-
-1. **Strava is unbuilt.** The state machine, badges and filters exist and are tested; the toolbar
-   button is deliberately disabled until Phase 7.
-2. **No `.hae` reader.** Repeatedly the answer to things we currently reconstruct: HealthKit's own
-   splits and laps, and explicit `pause`/`motionResumed` events that would settle moving time
-   exactly instead of by threshold. Worth reconsidering before Phase 7.
-3. **`Spikes/` is still in the tree.** Phase 2 said delete it; it stays for now because the Python
-   probes remain the quickest way to interrogate a stored blob.
-4. Performance assertions were loosened after failing spuriously at load average 86. They catch
-   10x regressions; the printed figures are the real measurements.
-5. The seeded UI tests can't see the map camera or chart contents — neither is exposed to
-   accessibility — so those were verified by hand and by decoding rendered PNGs. Anything visual
-   still needs an eye on it. The same limit bit the layout work: `entire contents` of the window
-   returns nothing through System Events, so cell alignment could not be checked programmatically
-   and the centred Strava glyph is the one recent change **not** independently verified.
-6. **Column widths and window size are tuned for this Mac's content**, not proven across
-   locales — a longer place name than "Greater Vancouver BC" or a longer activity name than
-   "Strength Training" will truncate. Retuning means bumping `workoutTableColumns.v5` again.
-
-### Known issues and requests
-
-> These are numbered independently of the phases in §4, so "known issue 8" (summary statistics) is
-> a different thing from "Phase 8" (polish). Both are referred to by their full name below.
-
-Found by using the app. Not blocking, not yet done — each has a diagnosis or a design sketch so
-picking it up doesn't start from scratch. Items marked *(feature)* are wants, not defects.
-
-Issues 1–5 are all done, and are kept here rather than deleted because each records a diagnosis
-worth not rediscovering — in particular, issues 1 and 4 were both *misdiagnosed* in this list
-until the data was measured. Items 6–10 are open feature requests; 7 and 8 are speculative and
-unresearched, written down so the constraints already learned elsewhere aren't rediscovered when
-someone picks them up.
-
-**1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
-
-The cause turned out to be nothing to do with pauses, and measuring first saved building the wrong
-thing. `effectiveSpeedMetersPerSecond` preferred HAE's `avgSpeed`, and **`avgSpeed` is the
-arithmetic mean of the per-point instantaneous speeds** — it matched that mean to six significant
-figures in all five measured workouts. That mean includes every sample recorded while stopped
-(6–27% of points), so it is biased low by 13–31%, by a varying amount.
-
-Meanwhile `duration` is *already* moving time: 509–2,154 s against wall-clock spans of
-551–6,240 s, and it agreed with a moving time computed from the route's own speeds to within 3%
-every time. So the fix is simply to prefer **distance ÷ duration**, which needs no series and works
-in the list for every workout immediately. The evidence that it's the unbiased figure: across four
-rides by the same rider it gives 5.37–5.55 m/s, where `avgSpeed` scattered over 3.75–4.87 m/s. The
-measured walk went from 19:40 /km to **14:50 /km**. `avgSpeed` is kept only as a last resort for a
-workout with no distance.
-
-Moving time is still computed, as a *refinement* rather than the fix, because activities the watch
-doesn't auto-pause don't benefit from the above — the walk's `duration` equalled its full
-55.3-minute span, with 12.3 minutes of it standing still. The detail pane shows both, labelled
-**Elapsed Pace** and **Moving Pace** (14:50 against 11:30 for that walk); the list shows the
-elapsed figure, which is the one always available. Thresholds are per activity — a cyclist at
-0.6 m/s is stopped at a light, a walker at 0.6 m/s is walking.
-
-**2. ~~The detail map opens on the previously selected workout's region.~~ — done 2026-09-21.**
-
-`WorkoutDetailView` used `Map(initialPosition:)`. An initial position is applied **once, when the
-map view is created**, and SwiftUI reuses the same `Map` across selection changes, so the region
-computed for the first workout stuck and every later selection inherited it. The map is now driven
-by a bound `@State var camera: MapCameraPosition`, reassigned in the existing `.task(id: item.id)`
-*after* the series loads — the map exists well before the route arrives, so ordering matters. The
-documented semantics are what make this work: passing `MapCameraPosition` as a *binding* has the
-map adjust its camera whenever the value changes, whereas `initialPosition` explicitly does not.
-
-A second defect of the same family was found while fixing it and is also gone: `series` was plain
-`@State` on a reused view, so between selections the **previous** workout's route stayed drawn
-under the **new** workout's header until the load finished. The loaded series is now tagged with
-the id it belongs to and the body refuses to draw a mismatch, which rules the class of bug out
-structurally rather than by getting the ordering right.
-
-Region framing (bounding box + headroom, with a floor so a treadmill-sized route doesn't zoom to
-one building) moved to `CoordinateBounds.displaySpan(headroom:minimumSpan:)` in `MaxActCore`, with
-an `MKCoordinateRegion(fitting:…)` bridge in `MaxAct2/Support/MapRegion.swift`. The detail map and
-the thumbnail renderer now share it, passing their own values — 1.3/0.003 for the 280pt map,
-1.25/0.002 for a 96×56 thumbnail, where the track needs the pixels more than the breathing room.
-
-Verified by hand against real workouts, since the camera region isn't exposed to accessibility and
-the seeded routes all loop around one origin: a 3.73 km walk framed tightly on Granville Park, an
-11.66 km ride on a much wider view from UBC to Burrard, and a 2.82 km ride zoomed back in on the
-UBC Botanical Garden — re-framing correctly in both directions, not merely tracking the newest.
-
-**3. ~~Route lines are grey.~~ — done 2026-09-20.**
-
-Two separate causes, and both are fixed.
-
-The defect: `Assets.xcassets/AccentColor` was **empty** — it declared a `universal` idiom with no
-colour components — so `NSColor.controlAccentColor` in the thumbnail renderer and `.tint` in the
-detail map both resolved to a default grey. There is no
-`ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME` in the project, so the asset was being picked up
-purely by naming convention; the colorset is deleted, and the app now follows the user's system
-accent like any other Mac app.
-
-The design mistake: a route line shouldn't follow the system accent at all. The accent is
-user-configurable (graphite is a legitimate choice), and a track has to stay legible over parkland,
-water and dense city blocks in both map appearances. `RouteColor` in `MaxActCore/Model` now holds
-six deliberately saturated choices — default **Sunset** (`#FA590F`), a vivid orange-red — as sRGB
-components rather than a SwiftUI `Color`, so it stays in the model layer and is testable. Picked in
-Settings → Appearance, with swatches.
-
-One subtlety worth keeping in mind for anything else cached: thumbnails live on disk indefinitely,
-so the colour had to become part of `RouteThumbnailRenderer.Key` and therefore of the filename
-(`…-dark-sunset.png`). Without that, changing the setting would have left every existing thumbnail
-in the old colour until something unrelated invalidated it. Old-format files are simply never read
-again; `Delete All Workouts` clears them.
-
-Verified by decoding a rendered PNG: 605 pixels of `(247, 93, 42)` — the stroke, antialiased over
-real map tiles.
-
-**4. ~~No detection of bad GPS fixes.~~ — done 2026-09-21.** *(feature)*
-
-`RouteQuality` in `MaxActCore/Model`, filtering **on read** as planned: the stored series keeps
-exactly what the watch recorded, so thresholds can change without re-syncing and a future TCX
-export can choose which track to carry.
-
-The signature was measured, not guessed, and it is not the one sketched above. Every
-kilometre-scale teleport across five real workouts landed on a point with **no
-`speedMetersPerSecond` and a horizontal accuracy above ~30 m** — the worst a 1,826 m jump between
-samples one second apart. Good fixes had a median accuracy of 8–16 m, the bad ones 35–39 m.
-Dropping that combination discards 0.0–0.7% of a route and takes the worst implied speed from
-1,826 m/s to 51 m/s; the remainder are 30–74 m wobbles, too small to distort the track or the
-framing. The rule never looks at movement, so it cannot mistake genuine speed for an artifact.
-
-**Two things the sketch above proposed were measured and rejected.**
-
-*Implausible instantaneous speed.* At 1 Hz the GPS noise floor is itself several metres per second.
-With a walking ceiling of 3 m/s the detector fired on **3–5 metre steps** — jitter, not
-teleportation. Raised to a ceiling safe from false positives (5 m/s walking, 30 m/s cycling) it
-never fired at all on real data. A knob that either misfires or no-ops is worse than no knob.
-
-*Stuck fixes.* 3–18% of points with runs up to 33 samples, but at a 10 m accuracy floor they are
-indistinguishable from genuinely standing still, and deleting them would delete real pauses.
-`movingTime(for:)` treats them as what they are instead.
-
-Also settled: **don't compute distance from the route.** Summing raw 1 Hz steps inflated a 3.73 km
-walk to 5.55 km and an 11.66 km ride to 17.39 km, because it accumulates every metre of jitter.
-HAE's own distance, from HealthKit's fused sensors, is the trustworthy figure.
-
-The detail pane reports what was dropped — *"7 GPS fixes left out of the map as implausible. The
-recording itself is unchanged."* — rather than quietly changing the numbers. The thumbnail cache
-key gained a `drawingVersion`, because a single bad fix can be a 20-pixel spur on a 96-pixel
-thumbnail and images cached before the filter had to be redrawn.
-
-**5. ~~Backfill detail for everything~~ — done 2026-09-20.** *(feature)*
-
-"Missing Detail" lives in the sync panel beneath Start Sync, as agreed. The button states the
-count and the cost — *"Download 24 Workouts — about 1 minute"* — so the price is visible before
-committing rather than discovered in a progress bar. A scope choice between all workouts and the
-current filter appears **only when the filter actually narrows the backlog**, so it costs nothing
-when it would say the same thing twice. Work proceeds newest-first, refreshes the table every few
-workouts so a long run fills in visibly, and stops cleanly, keeping everything already fetched.
-
-Two things fell out of building it. `SyncStatus` now carries which job is running — the banner
-previously said "Syncing week 3 of 8" during a backfill, which counts workouts, not weeks. And the
-per-workout cost moved into `SyncEstimate` in `MaxActCore`, shared with the range picker so the
-two estimates can't drift, with the measured 2.4 s pinned by a test since the UI quotes it.
-
-Not built: the opt-in background trickle. The manual action covers the need, and an automatic one
-that occupies the phone for hours deserves its own design pass rather than being tacked on.
-
-**6. Link the charts and the map to each other.** *(feature, not started)*
-
-Clicking a point in a chart should highlight where on the map that happened, and clicking a point
-on the route should highlight where in the charts it falls. This is the thing that turns three
-separate pictures into one — "that's the climb where my heart rate spiked" is currently a question
-you answer by squinting at two x-axes.
-
-**Timestamp is the shared key**, not an array index. Every chart is time-indexed and every route
-point carries a timestamp, so one `@State var highlighted: Date?` on `WorkoutDetailView` drives
-the map annotation and the rule mark in all three charts at once. An index would be wrong: the
-series have different lengths and different membership.
-
-Mechanism: `.chartXSelection(value:)` gives the selected `Date` for charts → map. For map →
-charts, `MapReader`'s proxy converts a click point to a coordinate, then find the nearest route
-point. Draw the highlight as a `MapCircle` or annotation plus a `RuleMark` per chart.
-
-Four traps, all of which follow from how Phase 5 works:
-
-- **Look up against the full cleaned route, never the display arrays.** The charts are thinned to
-  400 marks and the map polyline is RDP-simplified for 900 px, so a selected chart x will usually
-  fall between drawn vertices, and a clicked map point will usually not be a vertex at all. Both
-  lookups have to go back to `series.cleanedRoute`.
-- **A time inside a pause has no position.** Snap to the nearest point only within a tolerance —
-  a few seconds — and show nothing beyond it, rather than highlighting a spot the athlete left
-  51 minutes earlier.
-- **Clicking far from the track should highlight nothing.** Nearest-coordinate search always
-  returns *something*; it needs a distance threshold in screen terms, since a fixed metre
-  threshold behaves differently at every zoom level.
-- **The pace series is a subset.** It drops samples below the stopped threshold, so it can be
-  missing a mark at a time the other two charts have. The highlight comes from the route, so this
-  only affects whether a rule mark lands inside that chart's data.
-
-Cheap and worth doing: nearest-by-time is a binary search on an already-sorted array, and
-nearest-by-coordinate is one linear pass per click over a few thousand points. Put both in
-`MaxActCore` alongside `WorkoutCharts` so the snapping tolerance is testable rather than tuned by
-eye. And decide what a screen reader hears — a silently drawn crosshair is no use, so the
-highlight should update the charts' `accessibilityValue` with the values at that instant.
-
-**7. Sync to TrainingPeaks as well as Strava.** *(feature, speculative — not researched)*
-
-The TCX writer from Phase 7 is the reusable half: TrainingPeaks accepts TCX, and also FIT, GPX and
-its own PWX. So the file is probably free and the work is all in the transport and the accounting.
-
-**Establish API access before designing anything.** Strava's API is self-serve — you create an app
-and get a client ID. TrainingPeaks' public API is understood to be partner-gated, i.e. you apply
-and may be refused, which would make this feature impossible rather than merely hard. That
-question is cheap to answer and decides whether the rest is worth thinking about. If the API is
-closed, the fallback is exporting a TCX to disk and letting the user upload it — which argues for
-a plain "Export TCX…" command regardless, since that also serves Garmin, Runalyze and an archive.
-
-**The thing to get right in Phase 7, before this exists.** Upload state is currently
-Strava-shaped: `WorkoutRecord` has `stravaStateKey`, `stravaActivityID`, `stravaUploadID`,
-`stravaFailureReason` and `lastUploadedAt`, and the sidebar has a "Not on Strava" filter. A second
-destination means **per-destination** state, which is a schema change and a UI change. Worth
-shaping Phase 7's uploader behind a `WorkoutDestination` protocol — authorise, upload, poll,
-report — and keeping the rate-limit budget per destination, so adding a second service is a new
-conformance rather than a migration. Not worth *building* the second one speculatively; worth not
-painting ourselves into a corner while the first is being written.
-
-**8. Summary statistics: weekly, monthly, yearly, all-time.** *(feature, speculative)*
-
-Totals and counts over a period — distance, moving time, energy, elevation, workout count — broken
-down by activity kind, with the obvious chart of "distance per month" beside them. The library
-already holds seven years; nothing currently answers "how much did I ride last year".
-
-`WorkoutAggregate` in `MaxActCore` already reduces a collection into exactly these totals, so the
-work is grouping and presentation rather than arithmetic. It belongs in the package next to it, so
-the period boundaries are testable.
-
-Four things that will bite, three of them already established elsewhere in this plan:
-
-- **Summing `duration` mixes two meanings.** It is moving time for activities the watch
-  auto-pauses and elapsed time for ones it doesn't — measured, a walk's duration equalled its full
-  wall-clock span. A season total is therefore "moving time for rides plus elapsed for walks".
-  Either label it plainly or derive moving time per workout, which needs the series and so is only
-  available after detail download.
-- **Missing values must not silently read as zero.** `distanceMeters` and the energies are
-  optional, and `WorkoutAggregate` treats absent as 0 — correct for a total, but a total that
-  quietly understates because some workouts lack distance is worse than one that says how many it
-  couldn't count.
-- **Week boundaries are a locale setting, not a constant.** `Calendar.current.firstWeekday` is
-  Sunday in the US and Monday in much of the world, and a training week is conventionally Monday.
-  Use `Calendar.dateInterval(of:for:)` rather than arithmetic on 604,800 seconds, and decide
-  explicitly whose week it is — this is exactly the kind of thing that silently differs between
-  the app and whatever the user compares it against.
-- **Time zones and DST.** Workouts are stored as instants; bucketing them into calendar months
-  needs a zone, and a ride that started at 23:40 belongs to the day it started in *somewhere*.
-  Pick the current zone and say so, rather than letting UTC decide.
-
-Performance is a non-issue: a few thousand value-type rows group in memory well inside a frame,
-which is already how the sidebar counts work. No need for SwiftData aggregation.
-
-**9. Search by region and country, not just the stored label.** *(feature, not started)*
-
-Searching "BC" or "British Columbia" should find the Vancouver rides, and "Switzerland" the Geneva
-ones. Today it can't: search (`WorkoutListItem.matches(searchText:)`) only looks at `placeLabel`,
-which holds MapKit's one-line `cityWithContext(.automatic)` — "Vancouver BC". "BC" happens to
-work; "British Columbia", "Canada" and any country name don't.
-
-**Design: store a hidden search field, keep the visible label short.** Alongside `placeLabel`,
-keep a `placeSearchTerms` string — city, region abbreviation *and* full name, country name *and*
-ISO code — matched by search but never shown. The column stays "Vancouver BC"; search gets
-"Vancouver · BC · British Columbia · Canada · CA". Folded for case and diacritics
-(`.caseInsensitive, .diacriticInsensitive`), so "geneve" finds "Genève".
-
-What's already known, from the Phase 6 measurements, that shapes this:
-
-- **MapKit gives the pieces only partly.** `MKAddressRepresentations` exposes `cityName` and
-  `cityWithContext(_:)`; `.full` adds the country ("Vancouver BC Canada"). The documented
-  `regionCode` / `regionName` **do not exist in the SDK** — they failed to compile. So the country
-  name is available, but the *full* region name ("British Columbia") is not; MapKit only ever gave
-  the abbreviation.
-- **Countries are easy, regions are not.** `Locale.current.localizedString(forRegionCode: "CH")`
-  turns an ISO country code into "Switzerland" in the user's language, with no table. There's no
-  Foundation equivalent for subdivisions ("BC" → "British Columbia"), so that needs either a small
-  bundled ISO 3166-2 table — only the countries the user has actually been to matter — or more
-  measurement of what `MKMapItem` returns for a few non-Canadian places first; the answer may
-  differ by country (a Swiss canton, a US state, a UK nation).
-- **City names depend on the geocoder's locale.** Geneva comes back as "Geneva" or "Genève"
-  depending on `preferredLocale`. Searching in either should work, which argues for storing the
-  English form *and* the local one when they differ.
-- **Every existing place needs resolving again**, since only the short label was kept. That's
-  cheap: the resolver caches by ~1 km cell, so it costs one request per distinct *place*, not per
-  workout, at the existing one-per-second throttle. Version the stored terms so it happens once,
-  automatically.
-- **Keep the privacy line.** Only the snapped cell is ever sent to the geocoder, and only
-  city/region/country are stored — never `name` or `shortAddress`, which return the street
-  address.
-
-The same terms would also make a natural sidebar grouping later ("Places → Canada → British
-Columbia"), but search is the request; grouping is optional.
-
-**10. A visible way to close the detail inspector.** *(after Phase 7, small)*
-
-The detail pane is a SwiftUI `.inspector` that opens on the first selection. Today the only ways to
-close it are View ▸ Hide Inspector and ⌃⌘I (`InspectorCommands`) — there is nothing in the window
-itself, so it reads as a pane that can't be dismissed.
-
-The standard macOS answer is a **toolbar toggle**: a `ToolbarItem` bound to the same
-`showsDetail` state, with the `sidebar.trailing` symbol and the label "Inspector", placed at the
-trailing end the way Finder and Xcode do it. It mirrors the existing ⌃⌘I, so the shortcut and the
-button can't disagree. A close button inside the pane itself is a reasonable addition but not a
-substitute — it disappears along with the pane, so it can't reopen anything.
-
-One behaviour to decide at the same time, because the button makes it visible: the pane
-**auto-opens only when the selection goes from empty to non-empty** (`ContentView`,
-`onChange(of: model.selection.isEmpty)`). That was deliberate — so it doesn't flap open and shut
-while clicking down the list — but it means that after closing it with rows still selected,
-clicking a different row leaves it closed until the selection is cleared and remade. Options:
-reopen on *any* selection change unless the user closed it during the current selection; or treat
-an explicit close as "stay closed until reopened". Pick one and test it in the seeded UI suite,
-which already covers `testDetailPaneIsHiddenUntilSomethingIsSelected`.
-
-**Related, found 2026-10-07:** at the default 1,300pt width, opening the inspector leaves no room for
-three panes, so AppKit **collapses the sidebar** — and then saves that as if the user had chosen it,
-so the next launch also opened without a sidebar. Fixed for launches (the split view now starts
-with an explicit `.all`), but the squeeze itself remains: selecting a workout still hides the
-sidebar until the window is widened. Worth deciding with the inspector toggle — either widen the
-window when the inspector opens, or let the table shrink further so all three fit.
-
-**11. Strange pace splits around km 5 on the 2026-09-21 ~1 PM commute ride.** *(after Phase 7)*
-
-Reported 2026-10-07 by the user from the detail pane's splits; not yet investigated. Start by
-measuring, not guessing: load that workout's stored series and print the per-km splits from
-`WorkoutSplits` alongside the raw route around the 4–6 km mark (timestamps, gaps, speeds,
-accuracy). Likely suspects, unverified: a GPS gap or a stop (traffic light, pause) landing inside
-the km, a jump the route cleaning didn't catch, or the route distance disagreeing with HealthKit's
-total. Compare with Strava's own splits for the same ride, since it's on Strava, before deciding
-what "right" looks like. Fix in `MaxActCore` with a test built from the real points.
-
-### Seeded UI tests — done 2026-09-20
-
-`SampleData` in `MaxActCore` generates deterministic synthetic workouts, and
-`--ui-testing-seed <n>` plants them in the throwaway in-memory store at launch (only alongside
-`--ui-testing`, so it can never reach the real database). `SeededTableUITests` covers scrolling,
-the three thumbnail placeholder states, thumbnail rendering, row selection, select-all with the
-aggregate summary, and sidebar filtering.
-
-Two decisions that made these worth having:
-
-- **Real coordinates.** Routes are laid over Vancouver, because `MKMapSnapshotter` returns blank
-  ocean tiles for the middle of nowhere and any assertion about a rendered thumbnail would pass
-  without meaning.
-- **Assert on the placeholder state machine, not pixels.** The renderer falls back to drawing the
-  polyline alone when tiles can't be fetched, so an image appears either way and the tests hold
-  offline — while a *hang* still produces no image and fails.
-
-**What these do and don't catch, checked rather than assumed.** Reintroducing the indoor-icon bug
-makes `testThumbnailPlaceholdersDistinguishTheirThreeStates` fail, so that one is real. But
-removing `withExtendedLifetime(snapshotter)` — the change made while chasing thumbnails that never
-appeared — leaves `testSeededRoutesRenderThumbnails` **passing**, which means that fix was not the
-cause of the original hang and the test does not discriminate on it. The real cause was more
-likely the throttle rewrite or the `.task(id:)` retry landed in the same round. Neither is pinned
-down.
-
-Still uncovered:
-
-- **Detail arriving after first render** — the `.task(id:)` retry bug. Seeding is static, so no
-  test watches a thumbnail appear once a series lands. Would need the seed to add a series on a
-  delay, or a test hook to trigger a detail fetch.
-- **The table-cell environment crash** is exercised by the scroll test, but that was never
-  confirmed to reproduce it either; the fix removed `@Environment(AppModel.self)` from the
-  codebase entirely, so the original condition can't be restored to check.
-
----
-
-## 1. Context
-
-`OLD_PLAN.md` assumed a companion iOS app reading HealthKit directly and shipping workouts to the
-Mac over Bonjour + TLS-PSK. That is dead: HealthKit is unavailable on macOS, and the Apple Developer
-Program cost to provision the HealthKit entitlement on a companion app isn't worth it for a personal
-tool. Everything in that plan downstream of the transport (models, SwiftData store, Table UI, GPX
-writer, Strava upload, geocoding) is still sound and is carried forward here.
-
-The replacement data source is **Health Auto Export** (HAE) on the iPhone, which already has
-HealthKit access and three ways to get data off the phone. That collapses two app targets into one
-and removes ~2 phases of work (HealthKit reading, custom TLS-PSK transport), at the cost of a new
-uncertainty: which HAE export path actually carries full-fidelity data, including GPS routes and
-heart-rate series. That question is settled empirically in Phase 1, not from documentation.
-
-**Intended outcome:** one macOS app. It browses every workout in a sortable, filterable,
-multi-selectable table with route thumbnails and Strava sync state; a detail view shows the full
-map, heart-rate chart and splits; and batch actions upload selections to Strava under correct rate
-limiting.
-
-### Research findings that shape the plan
-
-| Path | Mechanism | Route + HR? | Cost / risk |
-|---|---|---|---|
-| **REST API** | Phone POSTs JSON to a URL you own | **Yes — confirmed against the vendor's own reference server** (see below): `route?: ILocation[]` and `heartRateData?: IHeartRate[]` are first-class fields | Mac must run an HTTP listener. The Network framework has **no** HTTP server protocol, so this means hand-rolling HTTP/1.1 over `NetworkListener` or taking an SPM dependency — and the reference server sets a **200 MB** body limit, so bodies are genuinely large and a naive parser won't do. iOS background tasks get ~30 s, so backfill is awkward. |
-| **MCP / TCP server** | Mac is the client; JSON-RPC 2.0 on port 9000, `http://{LAN_IP}:9000/mcp` + `Authorization: Bearer <token>` (HTTPS available via an app-generated local CA) | `workouts` tool takes `start`, `end`, `includeRoutes`, `includeMetadata`, `metadataAggregation` — but the docs never confirm route/HR arrays actually come back | Mac controls the date range, so backfill is chunked requests and re-sync is idempotent. But HAE must be **foregrounded** on the phone for the whole sync, `listTools` is documented as non-functional, and tool names differ by contract version (v1.1.0 `get_*` vs v1.0.0 `workouts`) — needs runtime probing. |
-| **Sync to Mac** | iCloud Drive → `Auto Export/AutoSync/{Health Metrics,Workouts,Routes}` | Has a dedicated `Routes/` folder, so probably yes | Files are a **proprietary, undocumented `.hae` format**. Nothing exists in this Mac's iCloud Drive yet (no `Auto Export` folder), so it is entirely unverified — and the vendor's public server repo does **not** read `.hae`, so no reference implementation exists to crib from. Also needs `Keep Downloaded` on the folder or the files are cloud placeholders. |
-
-### The vendor's reference server — what it settles, and what it doesn't
-
-[`HealthyApps/health-auto-export-server`](https://github.com/HealthyApps/health-auto-export-server)
-(TypeScript, Express + MongoDB + Grafana; last pushed 2025-12-15) turns out to be a **REST receiver**,
-not a `.hae` reader. It does not touch iCloud Drive at all, so the `.hae` probe in Phase 1 stands
-unchanged. What it does give us:
-
-- **The exact push contract.** `POST /api/data` with an `api-key:` header (their convention, not
-  HAE's — HAE sends whatever custom headers you configure), body
-  `{"data": {"metrics": [...], "workouts": [...]}}`, `200` on success and `207` on partial failure.
-- **The authoritative workout shape**, from `server/src/models/Workout.ts`. Required: `id`, `name`,
-  `start`, `end`, `duration`. Optional: `distance`, `activeEnergyBurned`, `activeEnergy`,
-  `heartRateData`, `heartRateRecovery`, `stepCount`, `temperature`, `humidity`, `intensity`,
-  `route`. Their Mongo schema marks `activeEnergyBurned` required while the TypeScript interface
-  marks it optional — so **treat everything except the five required fields as optional**, whatever
-  the docs imply.
-- **Richer route points than the docs list.** `ILocation` carries `latitude`, `longitude`,
-  `timestamp`, `course`, `courseAccuracy`, `speed`, `speedAccuracy`, `altitude`,
-  `verticalAccuracy`, `horizontalAccuracy`. The help pages omit the three accuracy fields.
-- **A fidelity problem worth knowing about early.** `IHeartRate` is `{Min, Avg, Max, date, units,
-  source}` — a **bucketed aggregate per timestamp, not a raw beat-by-beat series**. Sample density
-  is therefore a function of the export's time-grouping setting (the MCP `workouts` tool's
-  `metadataAggregation` argument and the REST automation's grouping control are almost certainly the
-  same knob). This directly bounds how good the heart-rate track in an uploaded TCX can be, so
-  Phase 1 must measure the achievable interval, not just presence.
-- **Idempotency confirmation.** They upsert workouts and routes separately, both keyed on the
-  workout `id`, with routes in their own collection — the same split (summary row + series blob,
-  keyed on `id`) that Phase 3 plans.
-
-The repo has **no license file**. Read it as documentation and as a Phase 1 test harness; don't copy
-code from it.
-
-Prerequisites confirmed present: **HAE Premium** (required for all three paths) and a **Strava API
-application** (client ID + secret). No Apple Developer team — builds stay ad-hoc signed.
-
-Strava, as of 2026: overall limit 200 req/15 min and 2000/day; a *separate* read limit of
-100 req/15 min and 1000/day, and upload-status polls are GETs that count against the **read**
-bucket. New apps are in single-player mode (own account only), which is exactly the use case.
-
----
-
-## 2. Decisions
-
-| Decision | Choice | Rationale |
-|---|---|---|
-| Targets | One macOS app target (`MaxAct2`, display name **MaxAct**) + `MaxActCore` local SwiftPM package + unit and UI test bundles | No iOS companion is needed any more. The package keeps model/ingest/format/Strava logic testable with `swift test`, without booting the app. |
-| Minimum OS | macOS 26.0 | Liquid Glass, `MKReverseGeocodingRequest`, Swift-native `Network` API. The current `MACOSX_DEPLOYMENT_TARGET = 26.6.2` is an inherited template artifact, not a choice. |
-| Primary sync | **MCP over HTTP, chunked and resumable** (decided 2026-09-20 after Phase 1) | All three paths carry full route and heart-rate fidelity, so the decision came down to bulk import of ~7 years / ~2,867 workouts. `.hae` is the richer schema but its backfill cannot be forced and was observed to stall after two days' worth. Manual export would have been fastest but writes multi-GB files to a phone with little free space. MCP is the only path the Mac can drive to completion, and it shares the v2 JSON schema with manual export, so one decoder covers both. |
-| Sync shape | **Two passes.** Pass 1: list sync over weekly windows, no routes, `metadataAggregation: "minutes"`. Pass 2: per-workout detail with routes and `"seconds"`, fetched lazily. | Pass 1 is the only blocking cost: ~1.9 h of foregrounded phone for 7 years, 0.13 GB. Fetching every route up front would double that and add 2.9 GB, to populate thumbnails for rows the user may never scroll to. |
-| Resumability | Persisted sync frontier: which windows are listed, which workouts have detail. Weekly chunks. | Requests are independent date windows with no server cursor, and per-request overhead is negligible against the 2.4 s/workout cost, so fine chunks are nearly free: an interruption loses ~20 s. Small chunks also cap peak memory on an old phone, which builds each response in memory (16 MB for a 14-day windowed request with routes). Upsert on the stable workout UUID makes a re-fetched window idempotent. |
-| Backfill | HAE **manual export** (JSON + GPX) imported from a file/folder, regardless of which live path wins | Manual export has no 30-second background window and no foreground requirement. Years of history land in one pass. |
-| Units | Decode **metric only** (`kJ`/`kcal`, `km`, `m`, `km/hr`, `count/min`/`bpm`, `count`/`steps`), normalise to SI, and treat any other unit — including imperial — as a hard decode failure | HAE's unit strings follow its preferences and are not stable, so decoding must be units-driven regardless. Imperial is explicitly out of scope: the user doesn't need it, and a loud failure beats silently reading `mi` as `km`. If HAE's locale ever flips, sync stops with a clear error rather than showing wrong distances. |
-| Canonical model | Own `Workout` value types in `MaxActCore`, decoded *from* HAE's shape | HAE identifies activity type by display name (`"Running"`), not `HKWorkoutActivityType` raw values — so `ActivityKind` must carry `.other(String)` rather than an integer fallback. |
-| Persistence | SwiftData for summary rows + local state; route/HR series as compressed JSON blobs on disk | A 4-hour ride is thousands of points and must not sit in the table's query path. |
-| Row thumbnails | Pre-rendered, disk-cached `MKMapSnapshotter` images of a simplified polyline — never a live `Map` per row | N live `Map` views in a table is the single easiest way to make this app slow. |
-| Strava upload format | **TCX only** | Carries GPS, heart rate, laps, distance and calories in one schema, and still produces a meaningful file for indoor workouts with no route. One writer, one golden-file suite. GPX/FIT explicitly out of scope for v1. |
-| Strava credentials | User's own client ID + secret, in the Keychain | Already held; a bundled secret is extractable and shares one rate-limit budget. |
-| Concurrency | Swift 6 language mode, `SWIFT_STRICT_CONCURRENCY = complete`, `async`/`await`, no Combine | Project code-style guidance. `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` and `SWIFT_APPROACHABLE_CONCURRENCY = YES` are already set and stay. |
-
-### Out of scope for v1
-Writing to HealthKit; non-workout health metrics (sleep, body mass — the model shouldn't preclude
-them); GPX/FIT export; Strava *download*; syncing between Macs.
-
----
-
-## 3. Architecture
-
-```
-MaxAct2.xcodeproj
-├── MaxAct2              macOS app target (macOS 26+)   ← exists, currently multiplatform template
-├── MaxAct2Tests         Swift Testing                  ← to add
-├── MaxAct2UITests       XCUIAutomation                 ← to add
-└── MaxActCore/          local SwiftPM package          ← to add
-    ├── Model/           Workout, RoutePoint, HeartRateSample, Lap, ActivityKind
-    ├── Ingest/          WorkoutSource protocol + HAE decoders (MCP, REST, file)
-    ├── Formats/         TCXWriter
-    └── Strava/          OAuth, upload client, rate-limit budget
-```
-
-Data flow:
-
-```
-iPhone / Health Auto Export
-   └─ (winning path from Phase 1) ─→ HAEWorkoutPayload  [Ingest]
-                                        ↓ decode
-                                     Workout             [Model]
-                                        ↓
-                          WorkoutStore (SwiftData rows + blob files)
-                                        ↓
-                      Table + detail views ─→ TCXWriter ─→ Strava upload
-```
-
-### Canonical model sketch (`MaxActCore/Model`)
-
-```swift
-public struct Workout: Identifiable, Hashable, Sendable {
-    public let id: String              // HAE workout id — stable, our dedupe key
-    public let kind: ActivityKind
-    public let start: Date
-    public let end: Date
-    public let duration: TimeInterval
-    public let distanceMeters: Double?
-    public let activeEnergyKilocalories: Double?
-    public let elevationUpMeters: Double?
-    public let averageHeartRate: Double?
-    public let maximumHeartRate: Double?
-    public let isIndoor: Bool?
-    public let sourceName: String?
-    public let startCoordinate: Coordinate?   // coarsened to ~1 km, see Phase 6
-    public let hasRoute: Bool
-}
-
-public struct WorkoutSeries: Sendable {       // the heavy part, stored as a blob
-    public let route: [RoutePoint]
-    public let heartRate: [HeartRateSample]   // bucketed min/avg/max, NOT raw beats — see §1
-    public let laps: [Lap]
-}
-
-public struct RoutePoint: Sendable {
-    public let coordinate: Coordinate
-    public let timestamp: Date
-    public let altitudeMeters: Double?
-    public let speedMetersPerSecond: Double?
-    public let course: Double?
-    public let horizontalAccuracy: Double?
-    public let verticalAccuracy: Double?      // these three accuracy fields are undocumented
-    public let speedAccuracy: Double?         // but present in the vendor's reference server
-    public let courseAccuracy: Double?
-}
-
-public struct HeartRateSample: Sendable {
-    public let date: Date
-    public let min: Double, avg: Double, max: Double
-    public let source: String?
-}
-
-public enum ActivityKind: Hashable, Sendable {
-    case running, cycling, walking, swimming, hiking, strengthTraining /* … */
-    case other(String)                        // HAE sends display names, not HK raw values
-}
-```
-
-### Ingest boundary
-
-```swift
-public protocol WorkoutSource: Sendable {
-    /// Pull sources fetch a window; push sources ignore the interval and yield as data arrives.
-    func workouts(in interval: DateInterval) -> AsyncThrowingStream<IngestedWorkout, any Error>
-}
-```
-
-Implementations: `MCPWorkoutSource`, `RESTReceiverSource`, `HAEFileSource` (manual-export JSON/GPX
-and, if Phase 1 says it's readable, `.hae`). All of them emit the same `IngestedWorkout`
-(`Workout` + optional `WorkoutSeries`), so Phases 3–8 are written once and are indifferent to which
-path won.
-
-HAE decoding details that must be handled in one place: measurements arrive as `{ "qty": …,
-"units": … }`; dates are `yyyy-MM-dd HH:mm:ss Z`; optional fields are *absent*, not null; the
-envelope is `{"data": {"workouts": [...], "metrics": [...]}}`; and unknown keys must decode without
-throwing so an HAE update can't brick sync.
-
----
-
-## 4. Phases
-
-Every phase ends with a green build. Don't start the next one on a broken build.
-
-### Phase 0 — Project foundation
-
-The target is still the raw multiplatform template. Fix the settings that are wrong by default:
-
-| Setting | Now | To |
-|---|---|---|
-| `SUPPORTED_PLATFORMS` | `iphoneos iphonesimulator macosx xros xrsimulator` | `macosx` |
-| `SDKROOT` | `auto` | `macosx` |
-| `TARGETED_DEVICE_FAMILY` | `1,2,7` | (clear) |
-| `MACOSX_DEPLOYMENT_TARGET` | `26.6.2` | `26.0` |
-| `SWIFT_VERSION` | `5.0` | `6.0` |
-| `SWIFT_STRICT_CONCURRENCY` | `minimal` | `complete` |
-| `PRODUCT_BUNDLE_IDENTIFIER` | `devplaceholder.MTG0HGP4.MaxAct2` | `com.swiatlowski.MaxAct` |
-| `ENABLE_OUTGOING_NETWORK_CONNECTIONS` | `NO` | `YES` |
-| `ENABLE_USER_SELECTED_FILES` | `readonly` | `readwrite` |
-| `INFOPLIST_KEY_NSLocalNetworkUsageDescription` | — | set (LAN sync) |
-
-The bundle ID must be settled **now** and never change: Keychain items are keyed to it.
-
-Also: rename `MyApp.swift` → `MaxActApp.swift` (`struct MaxActApp: App`), strip the `#Playground`
-and placeholder body from `ContentView.swift`, add `MaxActCore` as a local package and link it,
-add `MaxAct2Tests` (Swift Testing) and `MaxAct2UITests`, add a `.gitignore` for build output and
-`.swiftpm`, and copy this plan into the repo as `PLAN.md`, deleting `OLD_PLAN.md`.
-
-**Done.** All of the above is applied and verified: `BuildProject` is clean, `swift test` in
-`MaxActCore/` passes (2 tests), and `RunAllTests` passes 3 of 3 across both app test bundles.
-
-Notes on what the tooling could and couldn't do, so this isn't rediscovered later:
-
-- The two "needs Xcode's UI" test-wiring steps that `OLD_PLAN.md` predicted were both avoidable.
-  The autocreated scheme really does run **zero** tests, but writing a shared scheme by hand at
-  `MaxAct2.xcodeproj/xcshareddata/xcschemes/MaxAct2.xcscheme` with an explicit `TestAction` /
-  `Testables` fixes it, and has the side benefit of being checked in rather than living in
-  `xcuserdata`. `TEST_HOST` and `BUNDLE_LOADER` are ordinary writable build settings; the app test
-  bundle asserts `@testable import MaxAct2` resolves, so a regression in that wiring fails loudly
-  instead of silently running nothing.
-- `TEST_TARGET_NAME` is **not** writable through the build-settings tooling (it's rejected as an
-  unknown setting), so `MaxAct2UITests` has no implicit target application. Worked around in code:
-  the UI test launches `XCUIApplication(bundleIdentifier: "com.swiatlowski.MaxAct")`. The scheme's
-  build action builds the app for testing, so the bundle is present when the test runs.
-- There is no MCP tool to add a local package to a project, so linking `MaxActCore` was the one
-  genuine Xcode UI step (File → Add Package Dependencies… → Add Local). Done, and verified by
-  `XCLocalSwiftPackageReference` plus a `MaxActCore in Frameworks` entry in the project file —
-  a package can be referenced without being linked, which type-checks and then fails at link time.
-- `MACOSX_DEPLOYMENT_TARGET` is still `26.6.2` at the **project** level (all three targets override
-  it to `26.0`). The build-settings tooling is target-scoped only and `project.pbxproj` must not be
-  hand-edited, so this is left as-is. Harmless today; fix it in Xcode if a new target ever inherits
-  it.
-- `MaxActCore`'s manifest needs `swift-tools-version: 6.2`, not 6.0 — `.macOS(.v26)` doesn't exist
-  before 6.2.
-
-### Phase 1 — Sync evaluation spike *(throwaway code; delete when done)*
-
-Score each path against: does it carry full `route[]` **and** heart-rate series; **what sample
-interval the heart-rate and route series actually come back at, and whether that's configurable**
-(the series are bucketed aggregates, so this bounds TCX quality — see §1); payload size and wall
-time for one long (4 h+) activity and for a one-month window; how hands-off it is; whether
-multi-year backfill is practical; and implementation cost on the Mac.
-
-- **A. MCP over HTTP — done 2026-09-18. PASSES, and is the presumptive winner.** Full results in
-  `.claude/skills/maxact-development/references/hae-data-contract.md`. Headlines: routes at 1 Hz
-  with ten fields per point; heart rate at a 5 s median once `metadataAggregation: "seconds"` is
-  requested; everything the list view needs is present. The transport is real MCP Streamable HTTP
-  (session handshake, `tools/list` / `tools/call`), not the simplified `callTool` the help pages
-  describe — and `tools/list` works fine. Cost is ~2.4 s of phone time per workout, near enough
-  independent of payload size, which is what makes a two-tier fetch (cheap list sync, per-workout
-  detail on demand) the right shape.
-- **C. `.hae` / Sync to Mac — done 2026-09-20. The format is READABLE, and the schema is in some
-  ways better than MCP's.** `.hae` is LZFSE: workouts and routes are bare streams, metric dailies
-  use a `HAE1` + `[uint32 length][block]` container. macOS decodes LZFSE natively, so no dependency
-  is needed. Full details in the skill reference; `Spikes/hae_decode.swift.txt` is a working decoder.
-
-  What it has that MCP doesn't: `measurements` with explicit **SI** units and provenance, the
-  **HKWorkoutActivityType raw code** instead of a display name, **laps/splits/pause events**,
-  an **IANA `sourceTimeZone`**, and a **versioned `schema`** with `minimumReaderVersion`. Route
-  fidelity is identical (2922 points, same as MCP, for the same workout) at a fifth of the bytes.
-
-  What it lacks: **no per-workout heart-rate series** — only `heartRateStatistics` and per-split
-  summaries. It would have to be joined from `HealthMetrics/heart_rate/<date>.hae` and sliced by
-  workout time range. **Unverified**, because that metric had not synced when tested. Route points
-  also drop `course`/`courseAccuracy`/`speedAccuracy`, which MCP provides.
-
-  Also: iCloud delivery is slow and partial. A manual one-week sync produced 4 workouts and 20 of
-  the metric folders (alphabetically `active_energy`→`calcium`) and then stalled. And being another
-  app's ubiquity container, it needs a user-selected folder plus a security-scoped bookmark.
-
-- **B. REST push — deliberately not run.** Probe A settled that MCP carries everything, and probe C
-  settled the schema comparison. B's only distinct value was hands-off incremental capture, and
-  once it emerged that *no* path runs without HAE open on an unlocked phone, that value largely
-  disappeared — while its cost (an HTTP listener in a sandboxed app, with no HTTP server protocol
-  in the Network framework) stayed high. Not run, and not planned. `Spikes/hae_capture.py` is kept
-  until the spike directory is deleted, in case this is revisited.
-
-**Decision — 2026-09-20.** Primary sync is **MCP over HTTP**, in two passes, chunked weekly and
-resumable; see §2. The deciding factor was the ~2,867-workout bulk import, not fidelity — all three
-paths carry full route and heart-rate detail.
-
-- `.hae` **rejected for v1, not on quality.** It is the better schema (SI units with provenance,
-  HealthKit activity codes, laps/splits/pause events, IANA time zone, a fifth of the bytes) and its
-  data is exact wherever it lands. But its backfill cannot be forced, and was measured stalling
-  after delivering two days of workouts while metrics went back a full week. Seven years arriving
-  on HAE's own schedule is not a migration path. It would also be a *third* schema: the v2 JSON
-  decoder is needed regardless, so `.hae` adds a decoder that serves only the steady state MCP
-  already covers in seconds a day. Worth revisiting once the detail view exists and can use laps
-  and pause events.
-- **Manual export rejected** on a hard constraint: it writes multi-GB files to a phone with little
-  free space. This removed what had looked like the obvious bulk-import answer.
-- **Operational note if Sync to Mac is left on:** with all 113 metrics selected it projects to
-  **6.4 GB** of iCloud over 7 years, dominated by `basal_energy_burned` (2.3 GB) and
-  `active_energy` (1.9 GB), neither of which MaxAct reads. Scoped to workouts, routes and
-  `heart_rate` it is 0.41 GB.
-
-**Verify:** captured fixtures committed under `MaxActCore/Tests/Fixtures/`; the decision recorded
-in `PLAN.md`.
-
-#### Spike tooling
-
-`Spikes/` is now a permanent fixture rather than the throwaway Phase 1 said to delete. It is in the
-Xcode navigator for browsing but excluded from every build phase via `EXCLUDED_SOURCE_FILE_NAMES`
-— see `Spikes/README.md` and the conventions reference. `hae_mcp_probe.py` still regenerates
-fixtures and gives a known-good reference to check the Swift client against; `hae_decode.swift.txt`
-is the only artefact of the `.hae` reverse engineering.
-
-Captures are written to `~/.maxact-spike-captures`, outside the repository, because they contain
-real GPS traces and heart rate.
-
-| | |
-|---|---|
-| Mac on the LAN | `10.0.0.206`, hostname `Gondolin-3` |
-| Phone (HAE Server screen) | `10.0.0.158:9000`; the bearer token may have been regenerated — re-read it |
-| HAE must be | open and foregrounded, phone unlocked; the server dies when backgrounded |
-
-```
-python3 Spikes/hae_mcp_probe.py --host 10.0.0.158 --token <token> --list-tools
-MAXACT_LIVE_HOST=10.0.0.158 MAXACT_LIVE_TOKEN=<token> swift test --filter LiveMCPTests
-```
-
-### Phase 2 — Model + ingest (`MaxActCore`)
-
-Canonical types as sketched above, plus HAE decoders built against the Phase 1 fixtures, and the
-winning `WorkoutSource` implementation. `HAEFileSource` handles a manual-export folder (JSON
-workouts + per-workout GPX routes) and is always built.
-
-**Tests:** fixture → `Workout` round-trip; an unknown activity name lands in `.other`; a workout
-with no route decodes; unknown extra JSON keys don't throw; `{qty, units}` unwrapping and unit
-conversion; the `yyyy-MM-dd HH:mm:ss Z` parser across a DST boundary and a non-local offset.
-
-### Phase 3 — Persistence — **done 2026-09-20**
-
-SwiftData `@Model WorkoutRecord` holds every field the table sorts, filters or displays, plus the
-local state: `placeLabel`, `stravaState`, `stravaActivityID`, `stravaUploadID`, `lastUploadedAt`,
-`thumbnailFileName`, `hasDetail`. `WorkoutStore` is a `@ModelActor`, so `@Model` objects never
-escape the actor — the UI only ever sees the value type `WorkoutListItem`.
-
-`upsert` matches on the HealthKit UUID and rewrites **only imported fields**, which is what makes a
-retried chunk safe. Three subtleties that tests pin down: `hasRoute` is OR-ed rather than assigned,
-or a list pass (fetched with `includeRoutes: false`) would erase it; absent optionals keep their
-previous value rather than nulling; and an empty series is not saved, or a list pass would replace
-a stored detail blob with nothing.
-
-Series blobs live in `Application Support/com.swiatlowski.MaxAct/Series/<id>.json.lzfse`.
-**LZFSE, not the zlib originally planned** — comparable ratio, much faster to decompress, and these
-are read interactively.
-
-Measured at corpus scale rather than assumed:
-
-| | |
-|---|---|
-| Largest real route (3.5 h, 12,645 points) | 2465 KB JSON → **168 KB** (14.7×) |
-| Worst case if every workout were that size | **0.5 GB** |
-| Open one workout (load, decompress, decode) | **55 ms** |
-| List all 2,867 rows | **0.108 s** |
-| Bulk insert 2,867 rows | 8.7 s one-time; a weekly chunk of ~20 is ~60 ms |
-
-### Phase 4 — List UI
-
-`NavigationSplitView`:
-- **Sidebar:** All Workouts, per activity kind, and saved filters — at minimum "Not on Strava",
-  "Upload failed", "Has route".
-- **Content:** `Table(_:selection:sortOrder:columnCustomization:)` with `selection: Set<String>`
-  for multi-select (⌘A "Select All" comes free), sortable columns, and customization persisted via
-  `@AppStorage`. Columns: route thumbnail, Date, Kind (symbol + name), Duration, Distance,
-  Pace/Speed, Energy, Avg HR, Place, Strava. `.searchable` over kind, place and source.
-- **Detail:** one row selected → Phase 5's view; many selected → count, aggregate totals and the
-  batch actions.
-
-Every action lives in three places per Mac convention: toolbar, context menu, and a menu-bar
-`CommandGroup` with a shortcut.
-
-**Thumbnails are the performance crux.** A `RouteThumbnailRenderer` actor simplifies the polyline
-(Ramer–Douglas–Peucker down to ~200 points), renders once per (id, size, appearance) with
-`MKMapSnapshotter`, and caches the PNG to disk plus an in-memory `NSCache`. Rows read cached images
-only; renders are requested lazily for visible rows and cancelled on scroll-away. If snapshotter
-latency disappoints, fall back to a `Canvas`-drawn polyline with no map tiles.
-
-**Verify:** `RunProject`, then scroll a seeded table of ~1000 rows and confirm no live `Map`
-instances and no hitching; screenshot via the device-interaction tools.
-
-### Phase 5 — Detail view *(complete)*
-
-Map, stats grid, three Swift Charts — heart rate, pace or speed, elevation — and per-kilometre
-splits, all fed by `WorkoutSplits` and `WorkoutCharts` in the package so the view only draws.
-
-**Splits had to be computed: the MCP path carries no lap or split data.** (`.hae` files do, under
-`intervals.splits` — another argument for that reader.) Three things produced visible nonsense
-when done the obvious way, and each is now a measured decision recorded in `WorkoutSplits`:
-
-- **Distance is scaled to the workout's own total.** Summing raw 1 Hz steps overstates distance by
-  4.5–12.9% even after `RouteQuality` filtering, which moves every kilometre mark.
-- **Split time is moving time.** Elapsed time put a 51.7-minute pause inside one kilometre and
-  rendered it as "57.80 min, 1.0 km/h". Excluding long gaps alone wasn't enough either — a rider
-  stopped at lights is still sampled at 1 Hz, and 14 minutes of one ride sat in no gap at all.
-  Splits now sum to within a few percent of HAE's `duration`, which is the check worth having.
-- **Elevation gain needs smoothing *and* hysteresis.** Raw rising deltas claimed 590 m of climbing
-  on a walk that gained 43 m. A 61-sample moving average got it to 53 m; adding a 1 m threshold
-  gives 45 m against HAE's 43, and 8 against 10 and 83 against 77 on the other two workouts that
-  report the figure.
-
-Two chart decisions worth the same treatment:
-
-- **Nothing is drawn across a pause.** Series are split into segments at gaps over 60 s, because
-  one line spanning a 51.7-minute stop asserts a steady heart rate and altitude right through it.
-- **Pace is its own series on a reversed axis, not a relabelled speed axis.** Plotting speed and
-  formatting the ticks as pace looked fine until a slow walk exposed it: every tick below about
-  1 m/s converts to a pace beyond 30 min/km, and the chart came out with one label and two em
-  dashes.
-
-And one feature that measurement removed: the **heart-rate min–max band**. HAE's `{Min, Avg, Max}`
-buckets argue for drawing the range each point flattened, but at the `"seconds"` aggregation we
-request for detail, min, avg and max were **identical in all 2,580 samples** across five workouts —
-a 5-second bucket holds one watch reading. The band is emitted only when it spans ≥1 bpm, so it
-would appear for a coarser aggregation without costing anything now.
-
-Accessibility: each chart is one element with a spoken summary ("136 to 170 bpm over 36 minutes,
-2 pauses") rather than several hundred unlabelled marks; split rows combine into one phrase; the
-pace bars are hidden from VoiceOver since the numbers beside them already say it.
-
-Not done, deliberately: **Liquid Glass on floating map overlay controls.** There are no map overlay
-controls yet, and inventing some to have somewhere to put the material would be backwards. Revisit
-if the map gains real controls.
-
-### Phase 6 — Approximate location *(complete)*
-
-`PlaceGrid` in the package snaps a route's first fix to a ~1 km grid; `PlaceResolver` (an actor in
-the app, where MapKit belongs) turns cells into names and caches them.
-
-**Snapping happens before the request, not just before storage — and that turned out to matter
-more than the plan assumed.** Reverse-geocoding an unsnapped start returns the *street address*:
-measured, a real coordinate came back as `4629 Haggart St, Vancouver`. So the precise point must
-never reach Apple either, and the resolver reads only `cityWithContext(.automatic)`, never
-`name`/`shortAddress`/`fullAddress`, which all leak the address.
-
-The plan's `cityName` + `regionCode` recipe doesn't work: **`regionCode` doesn't exist** on
-`MKAddressRepresentations` despite being documented. `cityWithContext(.automatic)` gives MapKit's
-own localized `"Vancouver BC"` directly, which is better than reassembling parts — it reads
-correctly outside Canada. `cityName` is the fallback, and a start over water returns an **empty
-string** rather than nil, which would otherwise be stored as a blank that never retries.
-
-Measured against the real library: stored cells sit **132–491 m** from the true starts (704 m worst
-case over a sampled grid), and five workouts collapsed to **three distinct cells**, so caching
-already saved two of five requests. That is the mechanism that makes a seven-year corpus cost a
-request per *place* rather than per workout.
-
-Throttling is defensive rather than observed: a request measured ~0.1 s and five back-to-back
-lookups all succeeded with no sign of a limit. Apple documents a limit without publishing it, so
-the resolver still spaces requests a second apart, backs off on failure and gives up after three
-consecutive ones.
-
-Two things the plan didn't anticipate:
-
-- **Everything synced before Phase 6 needed backfilling.** The coordinate is snapped at upsert,
-  when a route is in hand, so existing workouts had routes on disk and no cell.
-  `backfillPlaceCoordinates` reads the stored series for those, which is why the feature worked on
-  the existing 33-workout library without a re-sync.
-- **Geocoding is off under `--ui-testing`.** A test suite that depends on Apple's geocoder fails on
-  a train. The three Place states are still covered offline, since indoor-versus-not-yet is local.
-
-The column distinguishes a resolved name, **indoor** (no route, so never a place — an em dash there
-reads as "still loading"), and not-yet. Same distinction the thumbnail placeholder gets right.
-
-### Phase 7 — TCX export and Strava
-
-**TCX writer** (`MaxActCore/Formats`): `Activities/Activity/Lap/Track/Trackpoint` with `Time`,
-`Position`, `AltitudeMeters`, `DistanceMeters`, `HeartRateBpm` and `Cadence`; lap-level
-`TotalTimeSeconds`, `DistanceMeters`, `Calories`, `AverageHeartRateBpm`, `MaximumHeartRateBpm`.
-Golden-file tests, plus one indoor (no-GPS) case that must still produce a valid file.
-
-**Strava.** A `Settings` scene takes the client ID and secret into the Keychain
-(`kSecClassGenericPassword`, `.whenUnlocked`). OAuth via `ASWebAuthenticationSession` with a custom
-callback scheme (`CFBundleURLTypes` gets added in this phase, now that the scheme is chosen), scope
-`activity:write,activity:read_all`. Strava's OAuth has no PKCE, so the secret is genuinely required
-— which is exactly why the user supplies their own. Tokens refresh proactively on expiry and
-reactively on a 401.
-
-Upload: multipart `POST /api/v3/uploads` (`file`, `data_type=tcx`, `name`, `description`,
-`activity_type`, `external_id` = our workout id), then poll `GET /api/v3/uploads/{id}` until
-`activity_id` appears or `error` is set. `external_id` buys server-side dedupe: Strava answers
-"duplicate of activity N", which we record as already-uploaded rather than as a failure.
-
-Rate limiting, via one actor with **two** budgets — overall (200/15 min, 2000/day) and read
-(100/15 min, 1000/day), because status polls are GETs and hit the read bucket. Parse
-`X-RateLimit-Usage` / `X-RateLimit-Limit` and `X-ReadRateLimit-*`, keep upload concurrency at 1, and
-on a 429 back off to the next quarter-hour boundary. Persist `stravaUploadID` so a relaunch resumes
-polling instead of re-uploading.
-
-Batch upload: progress sheet with per-item state, continue-on-error, and a "Retry failed" action.
-Failures are never swallowed — `stravaState = .failed(reason)` and the reason is readable in the
-detail pane.
-
-**Tags — partially possible, and worth building either way.** *(researched 2026-09-20, not yet
-verified against the live API)*
-
-Strava's UI exposes two different things that both look like tags, and only one is reachable
-programmatically:
-
-| | In Strava's UI | In API v3 |
-|---|---|---|
-| **Commute** | checkbox | **`commute`** on `PUT /activities/{id}`, integer `1`/`0` |
-| **Trainer / indoor** | checkbox | **`trainer`**, same shape |
-| **Activity Tags** — With Kid, With Pet, Recovery, For a Cause | tag picker | **No documented field.** Nothing in `UpdatableActivity` or `DetailedActivity`. App/website only. |
-
-Two consequences for the uploader:
-
-- **Flags need a second call.** Multiple reports say the multipart upload body honours `name` and
-  `description` but silently ignores `commute`, `trainer` and `sport_type`. So setting them means
-  upload → poll to completion → `PUT /activities/{id}`. That's an extra **write** per workout on
-  top of the existing POST, against the overall 200/15 min budget, so a tagged batch upload runs
-  meaningfully slower than an untagged one. Only issue the `PUT` when something actually needs
-  setting.
-- **Re-verify before building.** Strava has been adding tags recently and the set is still rolling
-  out unevenly, so a tags field may appear. Check `DetailedActivity` on
-  `developers.strava.com/docs/reference/` at the start of Phase 7 rather than trusting this table.
-
-**Therefore: build tagging as a local feature, and sync the subset Strava accepts.** This is worth
-doing regardless of what the API supports, because tags are how you'd actually want to filter and
-batch-operate on seven years of workouts.
-
-- A `Tag` model with a name and colour, and a many-to-many against `WorkoutRecord`. Local state,
-  so Phase 3's rule applies: a re-sync must never drop tags.
-- Two built-in tags, **Commute** and **Trainer**, marked as mapping to Strava's boolean fields.
-  Everything else is local-only.
-- Batch editing from the list: a Tags submenu in the context menu and the toolbar, applying to the
-  whole selection. This is the feature that makes tagging worth having — tagging 400 commutes one
-  at a time is not a thing anyone will do.
-- Tags become sidebar filters alongside the saved filters, and join the `.searchable` fields.
-- For local-only tags, optionally append them to the Strava **description** on upload (e.g.
-  `#withkid`), behind a setting. That is the only honest way to get them across today, and it is
-  lossy — worth offering, not worth pretending it is real tag support.
-
-**Mute on upload — to check, and to build alongside tags.** *(added 2026-10-07)*
-
-Strava's "Mute Activity" keeps an activity off followers' home feeds. It is in the API:
-`hide_from_home` on `UpdatableActivity`, documented as *"Whether this activity is muted"* (spec
-checked 2026-10-07). It is **not** an upload parameter — `POST /uploads` takes only `file`, `name`,
-`description`, `trainer`, `commute`, `data_type` and `external_id` — so muting means
-`PUT /activities/{id}` once processing finishes.
-
-That is the same call the uploader already makes to correct the sport for anything but runs and
-rides, so the cost is small and the shape obvious: **fold every post-upload change into one
-`PUT`** — sport type, mute, and later any tag-derived flags — and skip the call entirely when
-nothing needs changing. For walks and hikes muting is then free; for runs and rides it adds one
-write against the 200 / 15 min overall budget.
-
-Why it matters most here: a multi-year backfill could put hundreds of old workouts in front of
-followers. Whether backdated uploads actually appear in feeds at all is **unverified** — check it
-on the live run before deciding the default. Likely shape: a Settings toggle ("Mute uploaded
-activities"), on by default for batch uploads, plus a per-batch override in the upload action.
-
-Things to confirm live: that `hide_from_home` takes effect via `PUT` for an app with
-`activity:write` (some fields are owner-only in the UI); that it can be set as soon as
-`activity_id` appears, rather than after Strava's own post-processing; and whether muting after
-the fact still briefly shows the activity in a feed — if so, muting can't fully prevent the
-notification, and the setting's description should say that.
-
-**Tests:** golden-file TCX; the rate-limit actor under a simulated 429 and header sequence; the
-duplicate-activity response path; token refresh on 401; tags surviving a re-sync; batch tag apply
-and remove over a selection; and that a workout with no flag changes issues no `PUT`.
-
-### Phase 8 — Polish
-
-First-run onboarding that walks through the chosen sync setup; window state restoration and
-`@SceneStorage` for selection and sort; empty states for every list; an error banner that
-distinguishes "phone not reachable" from "auth rejected" from "HAE returned nothing" (which, per
-HAE's own docs, is indistinguishable from a permissions problem — say so, and point at Health →
-Sharing → Apps); one XCUIAutomation test that launches with seeded data, multi-selects, and runs a
-batch action.
-
----
-
-## 5. Verification
-
-- **Compile fast:** `XcodeRefreshCodeIssuesInFile` after each edit; `BuildProject` per phase.
-- **Package logic:** `swift test` in `MaxActCore/` — models, decoders, TCX golden files, rate-limit
-  actor. No app launch needed, so this is the fast inner loop.
-- **App tests:** `RunAllTests` (once the scheme's Test action is wired in Phase 0).
-- **Spike probes:** `RunCodeSnippet` and `curl` against the live phone in Phase 1.
-- **End to end:** `RunProject`, sync from the phone, confirm rows appear with thumbnails and places;
-  open one workout and confirm map, HR chart and splits; select several, upload to Strava, and
-  confirm the activities exist there with heart-rate data attached and no duplicates on re-run.
-
----
-
-## 6. Risks
-
-| Risk | Mitigation |
-|---|---|
-| No HAE path carries full route + HR | Phase 1 tests all three before any of Phases 2–8 depend on one. Manual export (JSON + GPX) is the documented floor and is built regardless. |
-| `.hae` is opaque | Treated as a bonus, not a dependency, and there's no reference implementation to lean on. Time-boxed to an hour in Phase 1, then dropped. |
-| ~~Heart-rate series are bucketed, so uploaded TCX heart-rate tracks may be coarse~~ | **Retired 2026-09-18.** Measured: `metadataAggregation: "seconds"` yields a 5 s median interval, the Apple Watch's native workout rate. Ask for it on detail fetches. |
-| Backfill is slow: the phone spends ~2.4 s per workout regardless of payload options, and the server dies if HAE is backgrounded | Chunk by month, make sync resumable and idempotent, show progress, and tell the user to keep HAE foregrounded. A 1,000-workout history is ~40 minutes — acceptable once, not per launch. |
-| MCP tool names/contract shift between HAE versions | Probe the contract at connect time and fall back across known names; surface an actionable error rather than failing silently. |
-| MCP server dies when HAE is backgrounded | Sync is an explicit, foreground, resumable operation with visible progress — never a silent background job. Chunk by month so an interruption loses one chunk. |
-| Route-less/indoor workouts | First-class state everywhere: no thumbnail, indoor badge instead of a place, and TCX (not GPX) so the upload still carries HR, laps and calories. |
-| Table performance with thousands of rows | Denormalized sort columns in SwiftData, series in blobs off the query path, pre-rendered cached thumbnails, no live `Map` in a row. |
-| Strava rate limits and async upload processing | Two tracked budgets, serialized uploads, header-driven backoff, persisted upload IDs so polling resumes; "queued" is in-flight, not success. |
-| Ad-hoc signing invalidates Keychain items on rebuild | Bundle ID is fixed in Phase 0. If macOS starts prompting on every rebuild, create a self-signed development certificate — revisit only if it actually bites. |
-| Route data reveals home locations | The start coordinate is coarsened to ~1 km *before* storage; full routes stay local; nothing leaves the Mac without an explicit action on an explicit selection. |
-
----
-
-## 7. Keeping this plan current
-
-`PLAN.md` in the repo is the source of truth for *what* and *which phase*. When something changes:
-edit the affected section in place (don't leave stale text with a contradiction below it), bump
-**Last updated**, append a dated change-log line, and update the phase table.
-
-Durable *how-to* knowledge goes in the skill at `.claude/skills/maxact-development/` instead, so it
-survives past the phase that discovered it:
-
-| File | Holds |
-|---|---|
-| `SKILL.md` | Ground rules, the fast test loop, and the two findings that shape the data model. |
-| `references/hae-data-contract.md` | Envelope, required vs optional fields, `{qty, units}`, date format, route fields, HR bucketing, and the exact invocation details for all three sync paths. |
-| `references/xcode-project-conventions.md` | Settings that must not change, which build settings the tooling can and can't write, the silent zero-tests scheme trap, SwiftPM manifest requirements. |
-| `references/strava-api.md` | The two rate-limit buckets, upload/poll flow, OAuth constraints. |
-
-Rule of thumb: if a fact would still be true two phases from now and cost research to establish, it
-belongs in the skill. If it's a decision, a status, or a sequencing choice, it belongs here.
-**Phase 1's findings are the next thing to land in both** — the measured sync decision goes in §2
-and the change log, and any new payload detail goes in `references/hae-data-contract.md`.
+> **Working on this project?** Read `.claude/skills/maxact-development/` first: the HAE data
+> contract, the Xcode tooling limits, and the Strava API facts. **`HISTORY.md`** holds how we got
+> here — phase write-ups, fixed issues, the original research and the dated change log.
 
 | Phase | Status |
 |---|---|
@@ -1129,337 +19,215 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 | 4 — List UI | Complete |
 | 5 — Detail view | Complete |
 | 6 — Approximate location | Complete |
-| 7 — TCX + Strava | Built; three live checks left (see Where things stand) |
+| 7 — TCX + Strava | Built; three live checks left |
 | 8 — Polish | Not started |
 
-### Change log
+---
 
-- **2026-10-07 (late)** — **Tags and mute-on-upload built.** Probed the live API before designing:
-  commute and trainer are readable from the activity list, mute only from the full record, and
-  "With Kid"-style Activity Tags from neither. Local tags with Commute/Trainer mirrored to Strava
-  (imported on every check, sent on upload, pushed when edited, protected by a pending flag); batch
-  Tags menu with all/some/none state; sidebar, search, detail chips, optional column; mute as a
-  setting folded into the one post-upload `PUT`. Along the way, found the UI suite failing because
-  the real app had saved its sidebar as collapsed — the inspector squeezes it out at 1,300pt and
-  AppKit remembers that — and the tests share those defaults. The split view now starts with the
-  sidebar explicitly shown. A detour worth recording: an apparent "alert clears its binding before
-  the button runs" bug was a wrong guess, disproved by reverting the fix; the sidebar was the only
-  problem. 233 package tests, 28/28 app and UI tests.
+## 1. Where things stand — paused 2026-10-07
 
-- **2026-10-07 (evening)** — **Phase 7 upload proven live** by the user: the already-on-Strava
-  check matched two watch-uploaded rides, and a walk and a ride uploaded correctly (the walk as a
-  Walk, confirming the sport `PUT`). Merged to `main`. Then two UI fixes from using it: the found
-  rows read "Duplicate" in the detail pane — the internal name for found-already-there — which is
-  wrong when there's one copy here and one on Strava. Both states now say **"Synced to Strava"**
-  with an **orange check** (Strava's #FC4C02; a tinted symbol rather than their logo, which their
-  brand guidelines restrict), the tooltip and detail pane say how it got there, and failures
-  moved from orange to red so they can't be mistaken for synced.
+All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 233 in
+`MaxActCore` (`swift test`), 28 app and UI tests (`RunAllTests` — leave the Mac alone for ~3.5
+minutes, or mouse use breaks them).
 
-- **2026-10-07** — Recorded known issue 10: the detail inspector can only be closed from the menu
-  or ⌃⌘I. Proposed a trailing toolbar toggle bound to the same state, and flagged the related
-  auto-open rule (empty → non-empty selection only), which leaves the pane shut after a manual
-  close until the selection is cleared. For after Phase 7.
+**Pick up here — three live checks in the app, no code expected:**
 
-- **2026-10-07** — Noted mute-on-upload for Phase 7, to build alongside tags. Strava exposes it as
-  `hide_from_home` on `PUT /activities/{id}` — not at upload — so it joins the existing sport
-  correction in a single post-upload `PUT`. Matters most for backfills; whether backdated uploads
-  reach feeds at all is to be checked live before choosing a default.
+1. Settings → Strava → "Check for Workouts Already on Strava". The 9/18 (13:20 and 16:04) and 9/21
+   rides should come back tagged **Commute** (set by hand on Strava, so this proves importing).
+2. Untag Commute on one of them. The detail pane should show "Updating Strava…" briefly, and the
+   flag should clear on Strava. Re-tag it afterwards.
+3. Tag the next workout before uploading it. It should arrive with the commute flag and muted.
+   Note whether a *backdated* upload reaches followers' feeds even unmuted — that decides whether
+   mute stays on by default.
 
-- **2026-10-07** — Recorded known issue 9: search by region and country, so "British Columbia"
-  or "Switzerland" find workouts labelled "Vancouver BC" or "Geneva". Design is a hidden search
-  field beside the short label. The constraint worth knowing: MapKit supplies country names but not
-  full region names (its documented `regionName` doesn't exist in the SDK), so regions need a table
-  or more measurement. Not started.
+Also unseen live: the exact duplicate-error wording (no real duplicate rejected yet).
 
-- **2026-10-07 (latest)** — **Phase 7 built, paused before the live check.** TCX writer validated
-  against Garmin's XSD and every real stored series; two-bucket rate limiter; Strava client and
-  uploader behind a fake transport; Keychain, Settings → Strava, Upload with rate-limit pauses and
-  resume; and — added at the user's request — matching against the athlete's existing Strava
-  activities by time overlap, so workouts the watch already uploaded show "Already on Strava" and
-  are skipped by batches. Re-verifying Strava's spec changed two things: flags travel with the
-  upload, and the sport needs a follow-up `PUT` because uploads take no type. Also fixed the app
-  relaunching windowless (session restoration), which had been failing the UI suite
-  intermittently, and stopped UI tests leaking scratch directories (324 had accumulated).
-  220 package tests, 27/27 app and UI tests. Not yet run against the live API.
+**Then, in order:** known issue 10 (inspector close control + sidebar squeeze — smallest), 9
+(region/country search), 11 (odd splits on the 9/21 ride), 6 (chart/map linking), 8 (summary
+stats), Phase 8. Issue 7 (TrainingPeaks) starts with whether its API is open to us at all.
 
-- **2026-09-22 (latest)** — Refreshed *Where things stand*: current tree state (`4a2296a`, pushed),
-  a summary of the post-Phase-6 layout polish, and a sharper Phase 7 starting point including a
-  suggested order within it and two things worth deciding early.
+**Settled live 2026-10-07:** upload, the sport-correcting `PUT` and the already-on-Strava check work
+against the real account. Strava's Activity Tags ("With Kid", "With Pet") are **not in the API** —
+confirmed against an activity tagged "With Kid" — so such tags are Mac-only by necessity.
 
-  Also generalised the "measure, don't derive" note. It had been about the data series; the layout
-  work made the same point again in a new area, where three shipped-then-corrected values all came
-  from trusting arithmetic over a measurement. Added the two cheap instruments — decode the stored
-  blobs for data questions, read the persisted state back after a launch for layout ones — and
-  recorded that the centred Strava glyph is the one recent change not independently verified,
-  since the window's accessibility tree isn't reachable.
+---
 
-- **2026-09-22** — Widened the default window to 1,300 and centred the Strava glyph in
-  its column.
+## 2. Open issues and requests
 
-  The previous 1,090 was too narrow with the sidebar showing, and the arithmetic is why: the
-  sidebar (223) plus the persisted column widths (824) is 1,047, but an `.inset` table adds
-  roughly **185pt of gutters and insets that `currentWidth` does not include**. Measured by
-  widening in steps and watching when the columns stop sitting at their minimums — squeezed at
-  1,230, slack at 1,250 — after which the content's own ideal settles at 1,300 and a smaller
-  requested width is simply ignored.
+Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
+Issues 1–5 are fixed; their diagnoses are in `HISTORY.md`.
 
-- **2026-09-21** — Narrowed the Strava column and sized the default window to the table.
-  The Strava cell shows the **symbol alone** (44pt, down from 96): the six states have six
-  distinct symbol *shapes*, so colour was never carrying the meaning, and `help` plus the
-  accessibility label still give the wording. The detail pane keeps symbol-and-text.
+**6. Link the charts and the map to each other.** *(feature)*
+Clicking a chart point highlights that spot on the map, and clicking the route highlights that time
+in the charts. One `@State var highlighted: Date?` drives both — **timestamp, not array index**,
+since the series differ in length. `.chartXSelection(value:)` for charts → map; `MapReader` to turn a
+click into a coordinate for map → charts. Traps:
+- Look up against the full `series.cleanedRoute`, never the thinned chart data or simplified
+  polyline.
+- A time inside a pause has no position: snap only within a few seconds, else show nothing.
+- A click far from the track should highlight nothing: use a screen-space distance threshold.
+- The pace series drops stopped samples, so it may lack a mark the other charts have.
 
-  Two things measured on the way, both now in the skill reference. In the current two-column
-  layout the table settles at the sum of its column **minimums** and never stretches — the
-  opposite of the three-column finding below — so `min:` is the only lever that matters and the
-  earlier mins had been cut far enough to truncate "11.66 km". And **`.defaultSize` does not
-  take**: with no saved frame the window opened at SwiftUI's 700×780 fallback, narrower than the
-  table. An `idealWidth` on the scene's root content is what the window actually sizes to;
-  `.windowResizability(.contentMinSize)` made it worse, opening at the content minimum.
+Put nearest-by-time (binary search) and nearest-by-coordinate in `MaxActCore` next to
+`WorkoutCharts` so the tolerances are tested. Update the charts' `accessibilityValue` with the
+highlighted values.
 
-  Table is now 824pt (sidebar 223 + table = a 1,090pt window, verified at a clean first launch).
+**7. Sync to TrainingPeaks as well as Strava.** *(speculative, unresearched)*
+TrainingPeaks accepts TCX, so the file is free. **First establish whether its API is open** — it is
+understood to be partner-gated. If closed, offer a plain "Export TCX…" command instead, useful for
+Garmin, Runalyze and archiving anyway. The uploader sits behind `WorkoutDestination`, but upload
+*state* on `WorkoutRecord` is still Strava-shaped; a second destination means per-destination
+state, which is a schema and UI change.
 
-- **2026-09-21** — Narrowed the table's default column widths: the columns now need
-  992pt rather than 1,198, a 17% reduction, with the surplus left as trailing space instead of
-  inflating every column.
+**8. Summary statistics: weekly, monthly, yearly, all-time.** *(speculative)*
+Totals by period and kind, with a distance-per-month chart. `WorkoutAggregate` already does the
+arithmetic; the work is grouping and presentation, in the package so period boundaries are tested.
+Things that will bite:
+- `duration` is moving time for auto-paused activities and elapsed time for others (walks). Label
+  it plainly, or derive moving time from the series.
+- Missing distance/energy must not silently count as zero. Say how many couldn't be counted.
+- Week start is a locale setting. Use `Calendar.dateInterval(of:for:)` and choose explicitly.
+- Bucket by the current time zone, and say so.
 
-  Two measurements were needed, and the first attempt was wrong. `TableColumnCustomization`
-  persists a **`currentWidth` per column**, so the saved arrangement silently overrode the
-  declared widths and retuning them changed nothing until the `@AppStorage` key was bumped. Then,
-  with the key bumped, narrowing every `ideal:` *still* changed nothing: reading the persisted
-  widths back gave a total of exactly 1,094pt before and after, merely reapportioned between
-  columns, because the table distributes all available width across its flexible columns.
-  **`max:` is what actually stops a column growing**, so every column now has one. Reading the
-  defaults key back after a launch turned out to be the only reliable way to see what the table
-  really did — no screenshot required.
+**9. Search by region and country, not just the stored label.** *(feature)*
+"BC", "British Columbia", "Canada" should find Vancouver rides; "Switzerland" the Geneva ones.
+Search only reads `placeLabel` ("Vancouver BC"). Design: a hidden `placeSearchTerms` field (city,
+region abbreviation and full name, country name and ISO code), matched case- and
+diacritic-insensitively, never displayed. Known constraints:
+- MapKit gives `cityWithContext` and, via `.full`, the country. **`regionCode`/`regionName` don't
+  exist in the SDK**, so the full region name isn't available from MapKit.
+- `Locale.localizedString(forRegionCode:)` turns "CH" into "Switzerland". There is no equivalent
+  for subdivisions, so "BC" → "British Columbia" needs a small bundled ISO 3166-2 table.
+- City names depend on the geocoder's locale ("Geneva" vs "Genève"); store both when they differ.
+- Existing places need resolving again. That's one request per ~1 km cell, not per workout.
+  Version the terms so it happens once.
+- Privacy: still send only the snapped cell, and never store street-level fields.
 
-- **2026-09-21** — Recorded two speculative features: **TrainingPeaks** as a second sync
-  destination (7) and **summary statistics** by week, month, year and all time (8). Both are
-  unresearched wants rather than plans, written up mainly to capture constraints already
-  established elsewhere: that TrainingPeaks' API may be partner-gated and so the feature could be
-  impossible rather than hard; that upload state in `WorkoutRecord` is currently Strava-shaped, so
-  Phase 7 should put its uploader behind a `WorkoutDestination` protocol to avoid a later
-  migration; and that summing `duration` mixes moving time with elapsed time, which makes a naive
-  season total two different measurements added together.
+**10. A visible way to close the detail inspector.** *(small)*
+Today it closes only via View ▸ Hide Inspector or ⌃⌘I. Add a trailing **toolbar toggle**
+(`sidebar.trailing`, "Inspector") bound to `showsDetail`. Decide at the same time: the pane
+auto-opens only when the selection goes from empty to non-empty, so after closing it, clicking
+another row leaves it closed. Either reopen on any selection change unless closed during the current
+selection, or have an explicit close stick until reopened. Test it in the seeded UI suite.
 
-  Also noted where things stand: everything is merged, and Phase 7 is the next real build step.
+Same fix should address the **sidebar squeeze**. At the default 1,300pt width, opening the
+inspector leaves no room for three panes, so AppKit collapses the sidebar. Launch now forces
+`.all`, but selecting a workout still hides the sidebar until the window is widened. Either widen
+the window when the inspector opens, or let the table shrink further.
 
-- **2026-09-21** — Two layout defaults. **Place is now the third column**, beside the
-  date, since where a workout happened helps identify it. And the **detail pane starts hidden**,
-  with a 440pt minimum instead of 300 — at 300 a splits row's six columns wrapped and collided.
+**11. Strange pace splits around km 5 on the 2026-09-21 ~1 PM commute ride.**
+Not yet investigated. Measure first: print that ride's per-km splits from `WorkoutSplits` next to
+the raw route around 4–6 km (timestamps, gaps, speeds, accuracy), and compare with Strava's own
+splits for the same ride. Suspects: a GPS gap or stop inside the km, a jump the route cleaning
+missed, or route distance disagreeing with HealthKit's total. Fix in `MaxActCore` with a test built
+from the real points.
 
-  It is an **inspector** rather than a third `NavigationSplitView` column, because the split view
-  cannot express this: `columnVisibility` controls only the *leading* columns, and `.doubleColumn`
-  on a three-column view hides the **sidebar**. There is no value that hides the detail, and
-  trying it hid the wrong thing — caught by a test. An inspector is the macOS control for a
-  trailing pane that comes and goes: standard View ▸ Show Inspector toggle with its shortcut (now
-  wired up via `InspectorCommands`), a resizable width with a real minimum, and presentation state
-  restored by the framework. It reveals itself on the first selection and is then left alone.
+**Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
+setting.
 
-- **2026-09-21** — **Phase 6 complete.** The Place column fills in with coarse names.
-  `PlaceGrid` snaps a route's first fix to a ~1 km cell in the package; `PlaceResolver` is an actor
-  in the app that geocodes cells, caches them, throttles and backs off.
+### Known limitations
 
-  Measuring the API first changed two things. Reverse-geocoding an *unsnapped* start returns the
-  street address (`4629 Haggart St, Vancouver`), so snapping is a precondition of the request and
-  not merely of storage, and only `cityWithContext(.automatic)` is read — `name`, `shortAddress`
-  and `fullAddress` all leak it. And the plan's `cityName` + `regionCode` recipe is impossible:
-  **`regionCode` does not exist** on `MKAddressRepresentations` despite being documented.
-  `cityWithContext(.automatic)` returns MapKit's own localized "Vancouver BC" instead.
+- **No `.hae` reader.** It would give HealthKit's own laps, splits and pause events, which MaxAct
+  currently reconstructs from the route. Worth reconsidering if issue 11 traces back to splits.
+- **Visual details aren't covered by tests.** The map camera and chart contents aren't exposed to
+  accessibility, so they were checked by hand.
+- **Column widths are tuned for this Mac's content.** Longer place or activity names will
+  truncate. Retuning means bumping `workoutTableColumns.v5`.
+- **Performance tests have loose thresholds.** They catch 10× regressions; the printed figures are
+  the real measurements.
+- **`Spikes/` stays** as the quickest way to inspect a stored series file. It's excluded from every
+  build.
 
-  Verified against the real library: stored cells sit 132–491 m from the true starts, and five
-  workouts collapsed to three cells, so caching already saved two of five requests. Two unplanned
-  pieces were needed: a backfill that snaps from stored series, without which everything synced
-  before today would have needed a re-sync, and disabling geocoding under `--ui-testing`, because
-  a suite that depends on Apple's geocoder fails offline.
+---
 
-- **2026-09-21** — Paused here. Refreshed *Where things stand*, which still described
-  Phase 4 as the frontier: current test counts and real-data coverage, a suggested order for
-  picking up (Phase 6, then known issue 6, then Phase 7), a revised outstanding list, and the
-  habit that has repeatedly earned its keep — measure the stored blobs before building anything
-  derived from the series, because three of the last four designs were contradicted by doing so.
+## 3. Decisions
 
-- **2026-09-21** — Recorded known issue 6: linking the charts and the map to each other,
-  so clicking a point in either highlights the corresponding point in the other. Written up with
-  the shared-key decision (timestamp, not index) and the four traps that follow from Phase 5's
-  downsampling, pause handling and pace filtering. Not started.
+| Decision | Choice | Rationale |
+|---|---|---|
+| Targets | One macOS app (`MaxAct2`, display name **MaxAct**) + `MaxActCore` local SwiftPM package + unit and UI test bundles | Package logic is testable with `swift test` without launching the app. |
+| Minimum OS | macOS 26.0 | Liquid Glass, `MKReverseGeocodingRequest`, Swift-native `Network`. |
+| Sync | **MCP over HTTP** to HAE on the phone; chunked weekly and resumable | All three HAE paths carry full route and heart rate; only MCP can be driven by the Mac to completion for ~2,867 workouts. `.hae` backfill stalls; manual export needs GBs of phone storage. |
+| Sync shape | **Two passes.** List sync with no routes (`metadataAggregation: "minutes"`); per-workout detail with routes (`"seconds"`), fetched on demand or via "Download Missing Detail" | List sync is the only blocking cost (~1.9 h of foreground phone for 7 years). Fetching every route up front would double it. |
+| Units | Metric only, normalised to SI; anything else is a hard decode failure | HAE's unit strings follow its preferences. A loud failure beats reading `mi` as `km`. |
+| Model | Own value types in `MaxActCore`, decoded from HAE's shape; `ActivityKind.other(String)` | HAE sends activity display names, not HealthKit codes. |
+| Persistence | SwiftData rows for list fields and local state; series as LZFSE-compressed JSON files | Large routes stay out of the table's query path. `upsert` never overwrites local state (tags, Strava state, place). |
+| Thumbnails | Pre-rendered, disk-cached `MKMapSnapshotter` images — never a live `Map` per row | Live maps in a table are the easiest way to make the app slow. |
+| Location | Snap the start to a ~1 km grid **before** geocoding; store city-level names only | An unsnapped start geocodes to a street address. |
+| Strava format | **TCX only**; sport corrected afterwards with a `PUT` | Carries GPS, HR and calories, works for indoor workouts. TCX's `Sport` knows only Running/Biking/Other. |
+| Strava credentials | User's own client ID + secret in the Keychain | A bundled secret is extractable and shares one rate-limit budget. |
+| Tags | Local tags; **Commute/Trainer** mirrored to Strava's flags; everything else Mac-only | Strava's API has no Activity Tags. |
+| Concurrency | Swift 6, strict concurrency, `async`/`await`, no Combine; default actor isolation `MainActor` | Project style. |
 
-- **2026-09-21** — **Phase 5 complete.** Heart-rate, pace/speed and elevation charts plus
-  per-kilometre splits, with the derivation in `MaxActCore` (`WorkoutSplits`, `WorkoutCharts`) and
-  the view reduced to drawing. Splits had to be computed because the MCP path carries no lap data.
+**Out of scope for v1:** writing to HealthKit; non-workout health metrics; GPX/FIT export; Strava
+download; syncing between Macs; imperial units.
 
-  Measuring the five real workouts first again changed the design rather than confirming it: split
-  distance has to be scaled to the workout's stated total, split *time* has to be moving time (a
-  51.7-minute pause otherwise landed inside one kilometre as "57.80 min, 1.0 km/h"), elevation gain
-  needs smoothing **and** a 1 m hysteresis threshold to get from a claimed 590 m of climbing down
-  to the 45 m that matches HAE's own 43, pace needs its own reversed-axis series rather than a
-  relabelled speed axis, and the heart-rate min–max band turned out to be degenerate in all 2,580
-  real samples, so it is now emitted only when it actually spans something. Each is documented at
-  the code that implements it, including what was tried and rejected.
+---
 
-  Verified against real data: the Swift splits reproduce the Python prototype exactly (km 1 2:30,
-  km 2 1:56, km 11 3:14, 663 m tail 2:28) and the per-split gains total 70 m against HAE's 77 m
-  ascent for that ride, 45 m against 43 m for the walk.
+## 4. Architecture
 
-- **2026-09-21** — Fixed the last two known issues, both of which the list had
-  **misdiagnosed**; an hour measuring five real workouts first changed what got built.
+```
+MaxAct2.xcodeproj
+├── MaxAct2              app: AppModel, views, Keychain store, PlaceResolver, thumbnail renderer
+├── MaxAct2Tests         Swift Testing
+├── MaxAct2UITests       XCUIAutomation, seeded with --ui-testing --ui-testing-seed=N
+└── MaxActCore/          local SwiftPM package
+    ├── Ingest/          MCP client + endpoint parsing, HAE decoder, date parser, sync estimates
+    ├── Model/           Workout, WorkoutSeries, ActivityKind, tags, route quality/simplification,
+    │                    splits, chart data, place grid, sample data for UI tests
+    ├── Store/           WorkoutStore (@ModelActor), WorkoutRecord, SeriesStore, StravaState
+    ├── Formats/         TCXWriter
+    └── Strava/          client, uploader, rate limit, activity matcher
+```
 
-  *Pace (issue 1)* was blamed on stopped time. In fact HAE's `avgSpeed` is the mean of
-  instantaneous per-point speeds — matching to six significant figures — and `duration` is
-  already moving time. Preferring `distance ÷ duration` fixes it with no series dependency; the
-  walk went 19:40 → 14:50 /km and the rides tightened from a 3.75–4.87 m/s scatter to 5.37–5.55.
-  Moving time survives as a labelled refinement for activities the watch doesn't auto-pause.
+```
+iPhone / HAE MCP server ─→ MCPClient ─→ HAEWorkoutDecoder ─→ WorkoutStore (SwiftData + series files)
+                                                                  ↓
+                                   Table + detail ─→ TCXWriter ─→ StravaUploader ─→ Strava
+```
 
-  *Bad GPS fixes (issue 4)* were expected to need an implausible-speed detector. Measured, that
-  detector fires on 3–5 metre jitter at any useful threshold and on nothing at a safe one. The
-  real signature is a fix with **no speed and accuracy above 30 m**; dropping those removes every
-  kilometre-scale teleport for 0.0–0.7% of the points. Filtering is on read, the raw series is
-  untouched, and the detail pane says how many fixes it left out.
+Privacy: the start coordinate is coarsened before storage; full routes stay on the Mac; nothing
+leaves without an explicit action on an explicit selection. UI tests run fully isolated
+(`--ui-testing`: in-memory store, separate settings and Keychain service).
 
-  Also fixed, found while running the suite: **13 seeded UI tests could not launch the app at
-  all.** `--ui-testing-seed 40` as two tokens leaves a stray `40` after `NSUserDefaults` pairs
-  arguments, AppKit reads a stray argument as a file to open, and that suppresses `WindowGroup`'s
-  window — `App.body` runs, its content closure never does. Now passed as `--ui-testing-seed=40`.
-  Worth knowing that this is invisible under `open --args`, which launches fine.
+---
 
-- **2026-09-21** — Fixed the detail map inheriting the previous selection's region (known
-  issue 2) by driving it from a bound `MapCameraPosition` set after the series loads, rather than
-  `initialPosition`, which applies once per view and so never moved on a reused view. The same
-  reuse was silently showing the previous workout's route under the new header; the loaded series
-  is now tagged with its workout id and a mismatch can't be drawn. Region framing moved into
-  `CoordinateBounds.displaySpan` and is shared with the thumbnail renderer.
+## 5. Phase 8 — Polish
 
-  Two things surfaced on the way, neither related to the map. **Select All:** the app had a custom
-  "Select All Visible" on ⌘⇧A, which Zoom takes globally, so the keystroke never reached the app —
-  and rebinding it to ⌘A would have put two ⌘A items in one menu. The standard `.pasteboard`
-  command group already provides Edit ▸ Select All and SwiftUI wires it to the table's selection,
-  so ⌘A worked all along; the custom command and `AppModel.selectAllVisible` are gone, and a test
-  now asserts there is exactly one Select All. **Seed data:** every routed seed workout landed on
-  an index where the generator's arithmetic coincides, giving them all identical durations and so
-  identical series; route point count is now derived from distance, which also makes the seeded
-  thumbnails distinguishable by eye.
+First-run onboarding that walks through the HAE sync setup; `@SceneStorage` for selection and sort;
+empty states for every list; an error banner that distinguishes "phone not reachable" from "auth
+rejected" from "HAE returned nothing" (which, per HAE's docs, is indistinguishable from a
+permissions problem — say so, and point at Health → Sharing → Apps).
 
-- **2026-09-20** — Fixed the grey route lines (known issue 3). The empty `AccentColor`
-  colorset was deleted so the app follows the system accent, and route tracks stopped following the
-  accent at all: `RouteColor` in `MaxActCore` holds six saturated choices with Sunset (`#FA590F`)
-  as the default, chosen in Settings → Appearance. The colour is part of the thumbnail cache key,
-  so changing it redraws rather than leaving stale images in the old colour. Renamed `SyncSettings`
-  to `AppSettings`, since it now carries appearance too. Confirmed by decoding a rendered
-  thumbnail, not just by eye.
+---
 
-- **2026-09-20 (later)** — Added "Delete All Workouts" to Settings, with a confirmation naming the
-  count and the cost of re-downloading. Removes rows, series blobs and thumbnails together, since
-  all three are keyed on the HealthKit UUID and a leftover blob would be silently adopted by a
-  re-synced workout with the same id — there's a test for exactly that. Server address and token
-  are deliberately kept. Building it exposed that `RouteThumbnailRenderer`'s cache directory was
-  hardcoded, so UI tests had been reading and writing the real thumbnail cache despite their
-  isolated database and defaults; it is now injected, and the delete test would otherwise have
-  wiped it.
+## 6. Verification
 
-- **2026-09-20 (late)** — Seeded UI tests added: `SampleData` in `MaxActCore`, a
-  `--ui-testing-seed` launch argument, and seven tests over the table, scrolling, thumbnails,
-  selection and filtering. Two findings while writing them. SwiftUI's `Table` is exposed to
-  XCUIAutomation as an **outline**, not a table, so `app.tables` matches nothing — both it and the
-  sidebar now carry accessibility identifiers. And verifying the tests against reintroduced bugs
-  showed one genuinely catches its bug while the thumbnail test does not discriminate on
-  `withExtendedLifetime`, so that earlier fix cannot be credited with resolving the hang; the
-  comment now says so.
+- **Compile fast:** `XcodeRefreshCodeIssuesInFile` after each edit; `BuildProject` before committing.
+- **Package logic:** `swift test` in `MaxActCore/` — the fast inner loop.
+- **App and UI tests:** `RunAllTests`, with the Mac left alone.
+- **Data questions:** decode the stored series files (see `Spikes/`) rather than reasoning from
+  formulas. **Measure, don't derive:** in this project, measurement has repeatedly contradicted
+  plausible calculations, for both data and layout. Examples are in `HISTORY.md` §1.
+- **End to end:** sync from the phone, open a workout, upload a selection, confirm on Strava with
+  heart rate attached and no duplicates on re-run.
 
-- **2026-09-20 (evening)** — Used the app against the real phone for the first time and found five
-  bugs no test caught: a force-unwrapped URL that crashed on a pasted address, two separate
-  `@Environment` crashes in detached AppKit hosting (popover, then table cell), an indoor icon on
-  every outdoor ride, a `.task(id:)` that never retried after Download Detail, and an
-  `MKMapSnapshotter` released before its completion fired. All fixed; the environment one is now
-  structurally impossible since `@Environment(AppModel.self)` no longer exists in the codebase.
-  Confirmed working end to end: 13 workouts synced, 3311 route points and 664 HR samples fetched,
-  thumbnails rendering as real maps. Loosened two performance assertions that failed spuriously at
-  load average 86 — they are regression detectors, not benchmarks. Paused with seeded UI tests as
-  the agreed next step.
+---
 
-- **2026-09-20** — Phase 4 complete; the app is usable end to end for browsing. `NavigationSplitView`
-  with saved-filter sidebar, a sortable `Table` with persisted column customisation and multi-select,
-  search, an aggregate summary for multi-selection, and sync wired to the toolbar and menu bar.
-  Route thumbnails are pre-rendered bitmaps cached in memory and on disk — never a live `Map` in a
-  row. Getting simplification fast took three measured attempts, 259 ms → 42 ms → 8.1 ms per route.
-  `RouteThumbnailRenderer` ended up `@MainActor` rather than an `actor`, because `NSImage` and
-  `MKMapSnapshotter.Snapshot` are main-actor-isolated in this SDK and an actor would have meant
-  sending non-`Sendable` AppKit types across boundaries. Verified by launching the app and dumping
-  the accessibility hierarchy, which caught a detail column collapsing to 196 pt; screenshots were
-  not possible (no screen-recording permission), so the UI has not been reviewed visually.
+## 7. Keeping this plan current
 
-- **2026-09-20** — Phase 3 complete. `WorkoutRecord`, `WorkoutStore` (`@ModelActor`) and
-  `SeriesStore` added; 65 tests. The imported/local split is the load-bearing idea — a re-synced
-  window must not cost us `stravaActivityID`, or the next batch upload duplicates work already on
-  Strava. Switched series compression from zlib to LZFSE and measured the result: the largest real
-  route compresses 14.7× to 168 KB, opens in 55 ms, and listing all 2,867 rows takes 0.108 s, so
-  the denormalised-row/blob-on-disk split does what it was chosen for. Also made `Spikes/`
-  permanent but inert — browsable in Xcode, excluded from every build phase — after discovering it
-  (and `PLAN.md`) had been silently copied into the app bundle.
+This file is for **what's current**: status, next steps, open issues, decisions. Keep it short.
+- Edit sections in place, bump **Last updated**, and update the phase table.
+- Add a dated entry to the change log in **`HISTORY.md`**.
+- When an issue is fixed, move its diagnosis to `HISTORY.md` §2 and drop it here.
 
-- **2026-09-20** — Phase 2 complete. `MaxActCore` now holds the canonical model (metres, seconds,
-  kilocalories, m/s, bpm), the HAE v2 JSON decoder, an MCP Streamable HTTP client, `HAEWorkoutSource`
-  and the weekly chunker plus `SyncFrontier`. 47 tests, and a live suite gated behind
-  `MAXACT_LIVE_HOST`/`MAXACT_LIVE_TOKEN` that was run against the phone: handshake to
-  Health Auto Export 1.1.0, 13 workouts listed in 28.2 s (2.17 s each, matching the Phase 1
-  estimate), and detail returning 3311 route points with 664 heart-rate samples at a 5.0 s median.
-  Found an HAE bug on the way — `avgSpeed`/`maxSpeed` are km/h labelled `"km"` — adjudicated
-  against the `.hae` `measurements` block and handled for speed-dimension fields only. Also had to
-  detach `Spikes/` from the Xcode target: it had been absorbed automatically, putting raw GPS
-  captures into Copy Bundle Resources.
+Durable *how-to* knowledge goes in `.claude/skills/maxact-development/`:
 
-- **2026-09-20** — Phase 1 closed. Probe C decoded `.hae`: LZFSE, natively decodable, with a
-  versioned self-describing schema that is richer than MCP's (SI units with provenance, HealthKit
-  activity codes, laps/splits/pause events, IANA time zone) and exact wherever it lands — route
-  and heart-rate counts matched MCP exactly for the same workout, heart rate via a join against
-  `HealthMetrics/heart_rate` dailies. Chose MCP anyway, on bulk import rather than fidelity:
-  `.hae` backfill cannot be forced and stalled after two days, manual export writes multi-GB files
-  to a phone short on space, and MCP shares the v2 JSON schema with manual export so one decoder
-  covers both. Sized the job at ~2,867 workouts over 7 years and split sync into a blocking
-  ~1.9 h list pass plus lazy per-workout detail, chunked weekly so an interruption costs ~20 s and
-  peak phone memory stays small. Probe B was deliberately not run — its only distinct value was
-  hands-off capture, which evaporated once it emerged that no path runs without HAE open.
-  Corrected two of my own errors along the way: a claim that heart-rate units varied within one
-  payload, and a claim that `.hae` needed nothing from the user.
+| File | Holds |
+|---|---|
+| `SKILL.md` | Ground rules, the fast test loop, the facts that shape the data model. |
+| `references/hae-data-contract.md` | HAE payloads, units, dates, route and HR fields, all three sync paths, `.hae` format. |
+| `references/xcode-project-conventions.md` | Build settings, schemes, SwiftUI/AppKit traps, UI-test isolation, window state. |
+| `references/strava-api.md` | Rate limits, OAuth, upload flow, what the live API actually returns. |
 
-
-- **2026-09-18** — Replaced `OLD_PLAN.md`. Dropped the iOS HealthKit companion (developer-program
-  cost) in favour of Health Auto Export. Researched all three HAE export paths and found the REST
-  payload fully documented (route + heart rate present), the MCP server's route/HR coverage
-  unconfirmed, and `.hae` proprietary with no folder present on this Mac — so the sync decision
-  became Phase 1's measured spike rather than a documentation guess. Confirmed HAE Premium and a
-  Strava API app are in hand; no Apple Developer team, so signing stays ad-hoc. Chose TCX as the
-  single upload format. Recorded 2026 Strava limits, including that upload-status polls consume the
-  *read* budget. Recorded the template build settings Phase 0 has to undo.
-- **2026-09-18** — Reviewed `HealthyApps/health-auto-export-server`. It is a REST receiver
-  (Express + MongoDB + Grafana), **not** a `.hae` reader, so the iCloud probe is unchanged and all
-  three Phase 1 probes stand. It does pin down the REST contract (`POST /api/data`, `api-key`
-  header, `{"data":{"metrics","workouts"}}`, 207 on partial failure, 200 MB bodies), confirms
-  `route` and `heartRateData` are first-class, and adds three undocumented route accuracy fields to
-  `RoutePoint`. Two findings changed the plan beyond documentation: heart-rate data is a **bucketed
-  min/avg/max series rather than raw beats**, which bounds TCX quality and is now a Phase 1
-  measurement and a tracked risk; and Phase 1's REST probe now runs their server as the capture
-  harness instead of a hand-rolled listener. Repo has no license — reference only, no code reuse.
-- **2026-09-18** — Executed Phase 0. `MaxAct2` narrowed to macOS 26 (`SUPPORTED_PLATFORMS`,
-  `SDKROOT`, deployment target, `TARGETED_DEVICE_FAMILY` cleared), Swift 6 with complete
-  concurrency checking on all three targets, bundle ID fixed at `com.swiatlowski.MaxAct`, sandbox
-  opened for outgoing connections and read-write user-selected files, local-network usage
-  description set, `MyApp.swift` renamed to `MaxActApp.swift`, `.gitignore` added, `MaxActCore`
-  package created with a passing test, and both app test bundles added and wired. Both predicted
-  Xcode-UI test steps turned out to be scriptable via a checked-in shared scheme plus a
-  bundle-identifier launch in the UI test; only the local-package link remains manual. 3/3 app
-  tests and 2/2 package tests pass, build clean.
-- **2026-09-18** — Ran Phase 1 probe A (MCP over HTTP): passes, and is the presumptive winner.
-  Routes at 1 Hz; heart rate at a 5 s median with `metadataAggregation: "seconds"`, which retires
-  the coarse-heart-rate risk entirely. The transport turned out to be real MCP Streamable HTTP
-  rather than the simplified `callTool` the help pages document, and `tools/list` works. Cost is
-  ~2.4 s of phone time per workout almost regardless of payload size, so sync should fetch in two
-  tiers — minute-resolution metadata without routes for the list, per-workout re-fetch with routes
-  and second-resolution for detail and export. That also settles the long-standing question of
-  when detail gets fetched. Separately confirmed by experiment that unit strings track HAE's
-  preferences (including a "Localize Units" toggle) while conversion is lossless, so the app
-  normalises whatever arrives and no HAE setting is preferred; decided to support metric only and
-  fail loudly on imperial. Two fixtures committed, one per unit vocabulary. Probes B and C remain.
-
-- **2026-09-18** — `MaxActCore` linked into the app target, completing Phase 0. Captured the
-  research and Phase 0 findings as a skill at `.claude/skills/maxact-development/` so the HAE data
-  contract, Xcode tooling limits and Strava constraints don't have to be rediscovered each phase;
-  §7 now describes the split between plan and skill.
+Rule of thumb: if a fact will still be true two phases from now and cost research to establish, it
+belongs in the skill. A decision, a status or a sequencing choice belongs here.
