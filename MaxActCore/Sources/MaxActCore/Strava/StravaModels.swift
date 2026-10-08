@@ -145,3 +145,47 @@ extension ActivityKind {
         }
     }
 }
+
+/// The two activity flags Strava exposes, and the only tags that travel to it.
+public struct StravaFlags: Sendable, Equatable {
+    public var commute: Bool
+    public var trainer: Bool
+
+    public init(commute: Bool, trainer: Bool) {
+        self.commute = commute
+        self.trainer = trainer
+    }
+
+    public init(tags: [String]) {
+        commute = tags.contains(WorkoutTag.commute)
+        trainer = tags.contains(WorkoutTag.trainer)
+    }
+}
+
+/// The writable fields of Strava's `UpdatableActivity` that MaxAct uses. `nil` means "leave alone".
+public struct StravaActivityUpdate: Sendable, Equatable {
+    public var sportType: String?
+    public var commute: Bool?
+    public var trainer: Bool?
+    /// Strava's "Mute Activity": `hide_from_home`, documented as *"Whether this activity is
+    /// muted"*. Not accepted at upload, so it can only be set this way.
+    public var muted: Bool?
+
+    public init(sportType: String? = nil, commute: Bool? = nil, trainer: Bool? = nil, muted: Bool? = nil) {
+        self.sportType = sportType
+        self.commute = commute
+        self.trainer = trainer
+        self.muted = muted
+    }
+
+    public var isEmpty: Bool { sportType == nil && commute == nil && trainer == nil && muted == nil }
+
+    var json: [String: Any] {
+        var body: [String: Any] = [:]
+        if let sportType { body["sport_type"] = sportType }
+        if let commute { body["commute"] = commute }
+        if let trainer { body["trainer"] = trainer }
+        if let muted { body["hide_from_home"] = muted }
+        return body
+    }
+}

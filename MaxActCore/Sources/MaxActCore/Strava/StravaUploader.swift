@@ -12,12 +12,24 @@ public protocol WorkoutDestination: Sendable {
     /// Sends a workout and follows it to a settled state. `uploadStarted` reports the remote id
     /// as soon as there is one, so it can be persisted before the (slow) wait for processing.
     func send(
-        _ workout: Workout, series: WorkoutSeries,
+        _ workout: Workout, series: WorkoutSeries, options: UploadOptions,
         uploadStarted: @Sendable (Int) async -> Void
     ) async throws -> UploadResult
 
     /// Picks up an upload a previous run started but didn't see finish.
-    func resume(uploadID: Int, workout: Workout) async throws -> UploadResult
+    func resume(uploadID: Int, workout: Workout, options: UploadOptions) async throws -> UploadResult
+}
+
+/// What to set on the uploaded activity besides the file itself.
+public struct UploadOptions: Sendable, Equatable {
+    public var flags: StravaFlags
+    /// Mute it, so it stays off followers' home feeds — mostly for backfilling old workouts.
+    public var muted: Bool
+
+    public init(flags: StravaFlags = StravaFlags(commute: false, trainer: false), muted: Bool = false) {
+        self.flags = flags
+        self.muted = muted
+    }
 }
 
 public struct UploadResult: Sendable, Equatable {
@@ -68,7 +80,7 @@ public struct StravaUploader: WorkoutDestination {
     }
 
     public func send(
-        _ workout: Workout, series: WorkoutSeries,
+        _ workout: Workout, series: WorkoutSeries, options: UploadOptions = UploadOptions(),
         uploadStarted: @Sendable (Int) async -> Void
     ) async throws -> UploadResult {
         let document = TCXWriter.document(for: workout, series: series)
@@ -78,18 +90,22 @@ public struct StravaUploader: WorkoutDestination {
             name: Self.activityName(for: workout, in: timeZone),
             description: nil,
             externalID: workout.id,
-            commute: false,
-            trainer: workout.isIndoor == true
+            commute: options.flags.commute,
+            trainer: options.flags.trainer || workout.isIndoor == true
         )
         await uploadStarted(response.id)
-        return try await settle(response, workout: workout)
+        return try await settle(response, workout: workout, options: options)
     }
 
-    public func resume(uploadID: Int, workout: Workout) async throws -> UploadResult {
-        try await settle(try await client.uploadStatus(id: uploadID), workout: workout)
+    public func resume(
+        uploadID: Int, workout: Workout, options: UploadOptions = UploadOptions()
+    ) async throws -> UploadResult {
+        try await settle(try await client.uploadStatus(id: uploadID), workout: workout, options: options)
     }
 
-    private func settle(_ first: StravaUploadResponse, workout: Workout) async throws -> UploadResult {
+    private func settle(
+        _ first: StravaUploadResponse, workout: Workout, options: UploadOptions
+    ) async throws -> UploadResult {
         var response = first
         var schedule = Self.pollSchedule[...]
         while case .processing = response.outcome, let delay = schedule.popFirst() {
@@ -105,17 +121,26 @@ public struct StravaUploader: WorkoutDestination {
         case .duplicate(let activityID):
             return UploadResult(state: .duplicate, activityID: activityID, uploadID: response.id, warning: nil)
         case .ready(let activityID):
+            // Everything to change after upload goes in **one** `PUT`, and none at all when nothing
+            // needs changing. Commute and trainer were sent with the upload already; they're not
+            // repeated here, so a run or ride with no mute costs no extra write.
+            let update = StravaActivityUpdate(
+                sportType: workout.kind.stravaNeedsSportCorrection ? workout.kind.stravaSportType : nil,
+                muted: options.muted ? true : nil
+            )
             var warning: String?
-            if workout.kind.stravaNeedsSportCorrection {
-                do {
-                    try await client.updateActivity(id: activityID, sportType: workout.kind.stravaSportType)
-                } catch {
-                    warning = "Uploaded, but the activity type couldn't be set to "
-                        + "\(workout.kind.stravaSportType): \(error)"
-                }
+            do {
+                try await client.updateActivity(id: activityID, update)
+            } catch {
+                warning = "Uploaded, but \(Self.describe(update)) couldn't be set: \(error)"
             }
             return UploadResult(state: .uploaded, activityID: activityID, uploadID: response.id, warning: warning)
         }
+    }
+
+    private static func describe(_ update: StravaActivityUpdate) -> String {
+        [update.sportType.map { "the activity type (\($0))" }, update.muted == true ? "mute" : nil]
+            .compactMap { $0 }.joined(separator: " and ")
     }
 
     /// "Evening Walk", in the style Strava names activities itself.

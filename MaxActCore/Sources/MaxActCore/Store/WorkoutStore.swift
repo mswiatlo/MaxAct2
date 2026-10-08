@@ -100,6 +100,87 @@ public actor WorkoutStore {
         return try modelContext.fetch(descriptor).map(WorkoutListItem.init(record:))
     }
 
+    // MARK: - Tags
+
+    /// Every tag in use, plus the two Strava-backed ones even if nothing carries them yet, so they
+    /// are always offered.
+    public func allTagNames() throws -> [String] {
+        let used = try modelContext.fetch(FetchDescriptor<WorkoutRecord>()).flatMap(\.tagNames)
+        return WorkoutTag.sorted(Array(Set(used).union(WorkoutTag.stravaBacked)))
+    }
+
+    /// Adds a tag to every listed workout. Returns the ids of workouts already on Strava whose
+    /// Strava flags therefore need pushing — empty for a local-only tag.
+    @discardableResult
+    public func addTag(_ name: String, to workoutIDs: [String]) throws -> [String] {
+        try editTags(of: workoutIDs, touching: name) { tags in
+            tags.contains(name) ? nil : tags + [name]
+        }
+    }
+
+    @discardableResult
+    public func removeTag(_ name: String, from workoutIDs: [String]) throws -> [String] {
+        try editTags(of: workoutIDs, touching: name) { tags in
+            tags.contains(name) ? tags.filter { $0 != name } : nil
+        }
+    }
+
+    private func editTags(
+        of workoutIDs: [String], touching name: String, _ change: ([String]) -> [String]?
+    ) throws -> [String] {
+        var needsPush: [String] = []
+        for id in workoutIDs {
+            guard let record = try record(id: id), let updated = change(record.tagNames) else { continue }
+            record.tagNames = WorkoutTag.sorted(updated)
+            // A Strava-backed tag on a workout Strava already has: mark it, so the push isn't
+            // lost and a status check doesn't put the old value back before it happens.
+            if WorkoutTag.isStravaBacked(name), record.stravaActivityID != nil, record.stravaState.isOnStrava {
+                record.stravaFlagsPending = true
+                needsPush.append(id)
+            }
+        }
+        try modelContext.save()
+        return needsPush
+    }
+
+    /// Mirrors Strava's commute/trainer flags onto the workouts linked to those activities.
+    ///
+    /// Strava is the authority for a synced workout's flags — they may have been set on the
+    /// website or by the watch — *except* while a local edit is still waiting to be pushed, which
+    /// would otherwise be undone. Returns how many workouts changed.
+    @discardableResult
+    public func applyStravaFlags(_ flags: [Int: StravaFlags]) throws -> Int {
+        let records = try modelContext.fetch(FetchDescriptor<WorkoutRecord>(
+            predicate: #Predicate { $0.stravaActivityID != nil && $0.stravaFlagsPending == false }
+        ))
+        var changed = 0
+        for record in records {
+            guard let id = record.stravaActivityID, let flag = flags[id],
+                  let updated = WorkoutTag.applying(commute: flag.commute, trainer: flag.trainer,
+                                                    to: record.tagNames)
+            else { continue }
+            record.tagNames = updated
+            changed += 1
+        }
+        if changed > 0 { try modelContext.save() }
+        return changed
+    }
+
+    /// Local edits to Strava-backed tags not yet on Strava: what to send for each.
+    public func pendingStravaFlags() throws -> [(workoutID: String, activityID: Int, flags: StravaFlags)] {
+        try modelContext.fetch(FetchDescriptor<WorkoutRecord>(
+            predicate: #Predicate { $0.stravaFlagsPending == true && $0.stravaActivityID != nil }
+        )).compactMap { record in
+            record.stravaActivityID.map { (record.id, $0, StravaFlags(tags: record.tagNames)) }
+        }
+    }
+
+    public func clearStravaFlagsPending(_ workoutID: String) throws {
+        guard let record = try record(id: workoutID) else { return }
+        record.stravaFlagsPending = false
+        try modelContext.save()
+    }
+
     /// Records workouts found already on Strava, returning how many changed.
     ///
     /// Only touches workouts MaxAct hasn't itself put there: not-uploaded, failed, or queued.

@@ -11,7 +11,7 @@ import SwiftData
 ///
 /// * **Imported** — from Health Auto Export. Overwritten freely on every re-sync.
 /// * **Local** — `stravaState`, `stravaActivityID`, `stravaUploadID`, `lastUploadedAt`,
-///   `placeLabel`, `thumbnailFileName`, `hasDetail`. Earned by this app and never derivable from
+///   `placeLabel`, `thumbnailFileName`, `hasDetail`, `tagNames`. Earned by this app and never derivable from
 ///   a payload, so a re-sync must not clobber them. Losing `stravaActivityID` in particular would
 ///   mean re-uploading a workout that is already on Strava.
 @Model
@@ -72,6 +72,15 @@ public final class WorkoutRecord {
     /// `hasRoute`, which only says the workout *has* a route to fetch.
     public var hasDetail: Bool
     public var lastSyncedAt: Date
+
+    /// User and Strava-backed tags (``WorkoutTag``). Local state: a re-sync never touches it.
+    /// Default declared here so the existing store migrates without a mapping model.
+    public var tagNames: [String] = []
+
+    /// A Strava-backed tag was edited here on a workout already on Strava, and the change hasn't
+    /// reached Strava yet. While set, a sync-status check must not overwrite the local value with
+    /// Strava's stale one — that would silently undo the user's edit.
+    public var stravaFlagsPending: Bool = false
 
     public init(workout: Workout, now: Date = .now) {
         id = workout.id
@@ -183,6 +192,9 @@ extension WorkoutRecord {
 public struct WorkoutListItem: Identifiable, Hashable, Sendable {
     public let workout: Workout
     public let placeLabel: String?
+    /// Strava-backed first, then alphabetical.
+    public let tags: [String]
+    public let stravaFlagsPending: Bool
     public let stravaState: StravaState
     public let stravaActivityID: Int?
     public let hasDetail: Bool
@@ -193,6 +205,8 @@ public struct WorkoutListItem: Identifiable, Hashable, Sendable {
     init(record: WorkoutRecord) {
         workout = record.snapshot
         placeLabel = record.placeLabel
+        tags = WorkoutTag.sorted(record.tagNames)
+        stravaFlagsPending = record.stravaFlagsPending
         stravaState = record.stravaState
         stravaActivityID = record.stravaActivityID
         hasDetail = record.hasDetail

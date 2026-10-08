@@ -13,9 +13,14 @@ public struct StravaActivitySummary: Decodable, Sendable, Equatable {
     /// What the uploader set. Ours for anything MaxAct uploaded; usually nil or a device's own
     /// value for anything that arrived from the watch or another app.
     public let externalID: String?
+    /// Read from the live API, which returns both in the activity list (verified 2026-10-07).
+    public let commute: Bool?
+    public let trainer: Bool?
+
+    public var flags: StravaFlags { StravaFlags(commute: commute ?? false, trainer: trainer ?? false) }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, distance
+        case id, name, distance, commute, trainer
         case sportType = "sport_type"
         case startDate = "start_date"
         case elapsedTime = "elapsed_time"
@@ -23,7 +28,8 @@ public struct StravaActivitySummary: Decodable, Sendable, Equatable {
     }
 
     public init(id: Int, name: String? = nil, sportType: String? = nil, startDate: Date,
-                elapsedTime: TimeInterval, distance: Double? = nil, externalID: String? = nil) {
+                elapsedTime: TimeInterval, distance: Double? = nil, externalID: String? = nil,
+                commute: Bool? = nil, trainer: Bool? = nil) {
         self.id = id
         self.name = name
         self.sportType = sportType
@@ -31,6 +37,8 @@ public struct StravaActivitySummary: Decodable, Sendable, Equatable {
         self.elapsedTime = elapsedTime
         self.distance = distance
         self.externalID = externalID
+        self.commute = commute
+        self.trainer = trainer
     }
 
     var end: Date { startDate.addingTimeInterval(elapsedTime) }

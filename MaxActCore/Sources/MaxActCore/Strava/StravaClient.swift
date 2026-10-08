@@ -150,13 +150,20 @@ public actor StravaClient {
         return try decode(StravaUploadResponse.self, from: response)
     }
 
-    /// Sets the sport, which the upload itself can't: the TCX format only knows three.
-    public func updateActivity(id: Int, sportType: String) async throws {
-        let body = try JSONSerialization.data(withJSONObject: ["sport_type": sportType])
+    /// Changes an existing activity. Only the fields set are sent, and an empty update sends
+    /// nothing — every `PUT` is a write against the 200 / 15 min budget.
+    public func updateActivity(id: Int, _ update: StravaActivityUpdate) async throws {
+        guard !update.isEmpty else { return }
+        let body = try JSONSerialization.data(withJSONObject: update.json)
         _ = try await send(
             method: "PUT", path: "activities/\(id)", kind: .write,
             headers: ["Content-Type": "application/json"], body: body
         )
+    }
+
+    /// Sets the sport, which the upload itself can't: the TCX format only knows three.
+    public func updateActivity(id: Int, sportType: String) async throws {
+        try await updateActivity(id: id, StravaActivityUpdate(sportType: sportType))
     }
 
     /// One page of the athlete's activities. `after`/`before` are epoch seconds per the spec.
