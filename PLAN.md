@@ -57,8 +57,11 @@ Activity Tags ("With Kid", "With Pet") **in neither** — so they can't be read 
 
 **To confirm live**, on resuming: that a Commute toggle on a synced workout reaches Strava; that a
 muted upload really stays off the home feed; whether a backdated upload would have reached it
-anyway; and whether "With Kid" really is absent from the API — tag one activity on Strava and
-re-run the check script (the probe used is described in the Strava reference).
+anyway. The commute already on the 9/21 ride was set by hand on Strava, so it shows that importing
+works, not that sending at upload does.
+
+**Settled 2026-10-07:** Activity Tags really are absent. The user tagged the 2026-09-18 16:04 ride
+"With Kid" on Strava; its full record has no field or value mentioning it.
 
 **Not built:** writing local-only tags into the Strava description (`#withkid`), which the plan
 offered as optional. Easy to add behind a setting if wanted.

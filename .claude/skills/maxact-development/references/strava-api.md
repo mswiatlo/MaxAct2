@@ -111,5 +111,7 @@ from the Keychain (`com.swiatlowski.MaxAct.strava`, accounts `tokens` and `crede
   group-activity tagging by other athletes, not Activity Tags.
 - The full record (`DetailedActivity`) adds `hide_from_home` (mute), `description`, `private_note`,
   `perceived_exertion` — still **no Activity Tags**.
-- So "With Kid" / "With Pet" are neither readable nor writable. Caveat: if a field is omitted when
-  empty, the sample may simply have had none tagged; tagging one activity and re-probing settles it.
+- So "With Kid" / "With Pet" are neither readable nor writable. **Confirmed** against an activity
+  known to be tagged "With Kid" (2026-09-18 16:04 ride): no key or value in its full record mentions
+  kid, child, pet or tag (apart from the unrelated `from_accepted_tag`). Don't re-investigate unless
+  Strava announces API support.
