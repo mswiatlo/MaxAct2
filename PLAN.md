@@ -6,8 +6,8 @@ with batch upload to Strava.
 **Status:** Phases 0–6 complete. **Phase 7 (TCX + Strava) is built and fully tested offline, but
 not yet exercised against the live Strava API** — that needs the user's Strava app connected, and is
 the first thing to do on resuming. Work is on branch `phase-7-tcx-strava`, not yet merged to `main`.
-Four feature requests outstanding: chart/map linking (6), TrainingPeaks (7), summary stats (8),
-and region/country search (9).
+Five feature requests outstanding: chart/map linking (6), TrainingPeaks (7), summary stats (8),
+region/country search (9), and a visible close control for the detail inspector (10).
 **Last updated:** 2026-10-07.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first. It carries the
@@ -67,7 +67,8 @@ followers' feeds at all, which decides whether muting should default on.
   lives in the container's `tmp/`, and `Spikes/reset-window-state.sh` clears it.
 
 **After Phase 7**: known issue 6 (chart/map linking), known issue 8 (summary stats), known issue 9
-(search by region and country — small and self-contained), Phase 8 (polish). Known issue 7 (TrainingPeaks) still starts with whether its API is open to us;
+(search by region and country — small and self-contained), known issue 10 (a toolbar toggle to
+close the detail inspector — smaller still), Phase 8 (polish). Known issue 7 (TrainingPeaks) still starts with whether its API is open to us;
 the `WorkoutDestination` protocol is in place for it, though upload *state* is still Strava-shaped.
 
 **A habit worth keeping: measure, don't derive.** This has now paid off twice over, in two
@@ -145,7 +146,7 @@ picking it up doesn't start from scratch. Items marked *(feature)* are wants, no
 
 Issues 1–5 are all done, and are kept here rather than deleted because each records a diagnosis
 worth not rediscovering — in particular, issues 1 and 4 were both *misdiagnosed* in this list
-until the data was measured. Items 6–9 are open feature requests; 7 and 8 are speculative and
+until the data was measured. Items 6–10 are open feature requests; 7 and 8 are speculative and
 unresearched, written down so the constraints already learned elsewhere aren't rediscovered when
 someone picks them up.
 
@@ -408,6 +409,27 @@ What's already known, from the Phase 6 measurements, that shapes this:
 
 The same terms would also make a natural sidebar grouping later ("Places → Canada → British
 Columbia"), but search is the request; grouping is optional.
+
+**10. A visible way to close the detail inspector.** *(after Phase 7, small)*
+
+The detail pane is a SwiftUI `.inspector` that opens on the first selection. Today the only ways to
+close it are View ▸ Hide Inspector and ⌃⌘I (`InspectorCommands`) — there is nothing in the window
+itself, so it reads as a pane that can't be dismissed.
+
+The standard macOS answer is a **toolbar toggle**: a `ToolbarItem` bound to the same
+`showsDetail` state, with the `sidebar.trailing` symbol and the label "Inspector", placed at the
+trailing end the way Finder and Xcode do it. It mirrors the existing ⌃⌘I, so the shortcut and the
+button can't disagree. A close button inside the pane itself is a reasonable addition but not a
+substitute — it disappears along with the pane, so it can't reopen anything.
+
+One behaviour to decide at the same time, because the button makes it visible: the pane
+**auto-opens only when the selection goes from empty to non-empty** (`ContentView`,
+`onChange(of: model.selection.isEmpty)`). That was deliberate — so it doesn't flap open and shut
+while clicking down the list — but it means that after closing it with rows still selected,
+clicking a different row leaves it closed until the selection is cleared and remade. Options:
+reopen on *any* selection change unless the user closed it during the current selection; or treat
+an explicit close as "stay closed until reopened". Pick one and test it in the seeded UI suite,
+which already covers `testDetailPaneIsHiddenUntilSomethingIsSelected`.
 
 ### Seeded UI tests — done 2026-09-20
 
@@ -1093,6 +1115,11 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 | 8 — Polish | Not started |
 
 ### Change log
+
+- **2026-10-07** — Recorded known issue 10: the detail inspector can only be closed from the menu
+  or ⌃⌘I. Proposed a trailing toolbar toggle bound to the same state, and flagged the related
+  auto-open rule (empty → non-empty selection only), which leaves the pane shut after a manual
+  close until the selection is cleared. For after Phase 7.
 
 - **2026-10-07** — Noted mute-on-upload for Phase 7, to build alongside tags. Strava exposes it as
   `hide_from_home` on `PUT /activities/{id}` — not at upload — so it joins the existing sport
