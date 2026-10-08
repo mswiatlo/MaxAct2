@@ -151,11 +151,12 @@ struct WorkoutTable: View {
 struct StravaStateBadge: View {
     let state: StravaState
 
-    /// The table column omits the text: the six states have six *distinct symbol shapes*
-    /// (`circle.dashed`, `clock`, `arrow.up.circle`, `checkmark.circle.fill`,
-    /// `equal.circle.fill`, `exclamationmark.triangle.fill`), so shape — not colour — is what
-    /// distinguishes them, and the wording is still carried by `help` and the accessibility
-    /// label. The detail pane, which has room, keeps the text.
+    /// The table column omits the text. The five distinct outcomes have five distinct symbol
+    /// *shapes* — `circle.dashed`, `clock`, `arrow.up.circle`, `checkmark.circle.fill`,
+    /// `exclamationmark.triangle.fill` — so shape, not colour, is what tells them apart, and the
+    /// wording is still carried by `help` and the accessibility label. Uploaded and
+    /// found-already-there deliberately share the check: to the user both simply mean synced.
+    /// The detail pane, which has room, keeps the text.
     var showsLabel = true
 
     var body: some View {
@@ -174,16 +175,21 @@ struct StravaStateBadge: View {
         case .notUploaded: "—"
         case .queued: "Queued"
         case .uploading: "Uploading"
-        case .uploaded: "Uploaded"
-        case .duplicate: "Duplicate"
+        case .uploaded, .duplicate: "Synced to Strava"
         case .failed: "Failed"
         }
     }
 
+    /// Strava's own orange (#FC4C02), so a check in it reads as "on Strava" at a glance. A tinted
+    /// SF Symbol rather than Strava's logo: their brand guidelines restrict using the mark as an
+    /// icon, and a check says *done*, which the logo alone wouldn't.
+    static let stravaOrange = Color(.sRGB, red: 252 / 255, green: 76 / 255, blue: 2 / 255)
+
     private var tint: Color {
         switch state {
-        case .uploaded, .duplicate: .green
-        case .failed: .orange
+        case .uploaded, .duplicate: Self.stravaOrange
+        // Red, not orange: orange is now Strava's "synced", and a failure must not share it.
+        case .failed: .red
         case .queued, .uploading: .accentColor
         case .notUploaded: .secondary
         }

@@ -61,8 +61,9 @@ public enum StravaState: Sendable, Hashable {
         case .notUploaded: "circle.dashed"
         case .queued: "clock"
         case .uploading: "arrow.up.circle"
-        case .uploaded: "checkmark.circle.fill"
-        case .duplicate: "equal.circle.fill"
+        // One symbol for both ways a workout can be on Strava. To the user they are the same
+        // outcome — synced — and how it got there is a detail for the tooltip, not the icon.
+        case .uploaded, .duplicate: "checkmark.circle.fill"
         case .failed: "exclamationmark.triangle.fill"
         }
     }
@@ -72,8 +73,10 @@ public enum StravaState: Sendable, Hashable {
         case .notUploaded: "Not uploaded"
         case .queued: "Queued"
         case .uploading: "Uploading"
-        case .uploaded: "Uploaded to Strava"
-        case .duplicate: "Already on Strava"
+        case .uploaded: "Synced to Strava — uploaded by MaxAct"
+        // Not "duplicate": there is one copy here and one on Strava. It got there another way —
+        // almost always straight from the watch — and the check found it.
+        case .duplicate: "Synced to Strava — already there, uploaded from another app"
         case .failed(let reason): "Upload failed: \(reason)"
         }
     }

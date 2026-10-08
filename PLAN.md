@@ -3,12 +3,12 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**,
 with batch upload to Strava.
 
-**Status:** Phases 0–6 complete. **Phase 7 (TCX + Strava) is built and fully tested offline, but
-not yet exercised against the live Strava API** — that needs the user's Strava app connected, and is
-the first thing to do on resuming. Work is on branch `phase-7-tcx-strava`, not yet merged to `main`.
-Five feature requests outstanding: chart/map linking (6), TrainingPeaks (7), summary stats (8),
-region/country search (9), and a visible close control for the detail inspector (10).
-**Last updated:** 2026-10-07.
+**Status:** Phases 0–6 complete. **Phase 7's upload path is proven against the live Strava API**
+(2026-10-07): the "already on Strava" check matched correctly, and a walk and a ride uploaded with
+the right sport. Merged to `main`. Remaining in Phase 7: **tags and mute-on-upload**, built
+together. Five feature requests outstanding: chart/map linking (6), TrainingPeaks (7), summary
+stats (8), region/country search (9), and a visible close control for the detail inspector (10).
+**Last updated:** 2026-10-07 (evening).
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first. It carries the
 > Health Auto Export data contract, the Xcode tooling limits we hit, and the Strava API facts —
@@ -34,7 +34,16 @@ is.** What exists, on `phase-7-tcx-strava` (pushed to `origin`, not merged):
 | Tests | 220 in `MaxActCore` (`swift test`), 27 app/UI tests (`RunAllTests` — needs the Mac left alone ~3 min) |
 | Working tree | clean; `phase-7-tcx-strava` at `6a0667c`, `main` at `74a0f06` |
 
-**Pick up here — the live Strava check, in this order:**
+**Live check — done 2026-10-07.** The user connected, the automatic check marked two rides already
+on Strava (uploaded by the watch), and a walk and a ride uploaded: both `uploaded`, each with an
+upload id and an activity id, and the walk arrived as a Walk — so the sport-correcting `PUT`
+works. Still unconfirmed live: `commute`/`trainer` at upload (nothing uploaded so far needed
+either), and the exact duplicate-error phrasing (no real duplicate has been rejected yet).
+
+**Next: tags and mute-on-upload**, together, since both are post-upload activity changes that
+should share one `PUT`. See the Phase 7 notes.
+
+*Original pick-up steps, kept for reference:*
 
 1. **Connect.** On strava.com/settings/api set the *Authorization Callback Domain* to `localhost`.
    In MaxAct, Settings → Strava: paste client ID and secret, Connect, leave "Upload your
@@ -1111,10 +1120,19 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 | 4 — List UI | Complete |
 | 5 — Detail view | Complete |
 | 6 — Approximate location | Complete |
-| 7 — TCX + Strava | Built and tested offline; live API check and tags outstanding |
+| 7 — TCX + Strava | Upload proven live; tags and mute-on-upload outstanding |
 | 8 — Polish | Not started |
 
 ### Change log
+
+- **2026-10-07 (evening)** — **Phase 7 upload proven live** by the user: the already-on-Strava
+  check matched two watch-uploaded rides, and a walk and a ride uploaded correctly (the walk as a
+  Walk, confirming the sport `PUT`). Merged to `main`. Then two UI fixes from using it: the found
+  rows read "Duplicate" in the detail pane — the internal name for found-already-there — which is
+  wrong when there's one copy here and one on Strava. Both states now say **"Synced to Strava"**
+  with an **orange check** (Strava's #FC4C02; a tinted symbol rather than their logo, which their
+  brand guidelines restrict), the tooltip and detail pane say how it got there, and failures
+  moved from orange to red so they can't be mistaken for synced.
 
 - **2026-10-07** — Recorded known issue 10: the detail inspector can only be closed from the menu
   or ⌃⌘I. Proposed a trailing toolbar toggle bound to the same state, and flagged the related

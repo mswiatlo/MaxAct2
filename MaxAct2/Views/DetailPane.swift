@@ -167,6 +167,13 @@ struct WorkoutDetailView: View {
                 }
                 .font(.callout)
             }
+            // Found rather than uploaded: say how it got there, so "synced" with no upload from
+            // MaxAct doesn't look like something went missing.
+            if item.stravaState == .duplicate {
+                Text("Already on Strava — uploaded from another app, most likely the watch.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
             // Failures are never swallowed: Strava's own reason, in words, where the user looks.
             if let reason = item.stravaState.failureReason {
                 Label(reason, systemImage: "exclamationmark.triangle")
