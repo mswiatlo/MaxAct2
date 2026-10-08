@@ -68,7 +68,7 @@ setting.
 
 **After Phase 7**: known issue 10 (a visible close control for the detail inspector, plus the
 sidebar squeeze — smallest), known issue 9 (search by region and country — small and
-self-contained), known issue 6 (chart/map linking), known issue 8 (summary stats), then Phase 8
+self-contained), known issue 11 (odd pace splits on the 9/21 commute), known issue 6 (chart/map linking), known issue 8 (summary stats), then Phase 8
 (polish). Known issue 7 (TrainingPeaks) still starts with whether its API is open to us; the
 `WorkoutDestination` protocol is in place for it, though upload *state* is still Strava-shaped.
 
@@ -438,6 +438,16 @@ so the next launch also opened without a sidebar. Fixed for launches (the split 
 with an explicit `.all`), but the squeeze itself remains: selecting a workout still hides the
 sidebar until the window is widened. Worth deciding with the inspector toggle — either widen the
 window when the inspector opens, or let the table shrink further so all three fit.
+
+**11. Strange pace splits around km 5 on the 2026-09-21 ~1 PM commute ride.** *(after Phase 7)*
+
+Reported 2026-10-07 by the user from the detail pane's splits; not yet investigated. Start by
+measuring, not guessing: load that workout's stored series and print the per-km splits from
+`WorkoutSplits` alongside the raw route around the 4–6 km mark (timestamps, gaps, speeds,
+accuracy). Likely suspects, unverified: a GPS gap or a stop (traffic light, pause) landing inside
+the km, a jump the route cleaning didn't catch, or the route distance disagreeing with HealthKit's
+total. Compare with Strava's own splits for the same ride, since it's on Strava, before deciding
+what "right" looks like. Fix in `MaxActCore` with a test built from the real points.
 
 ### Seeded UI tests — done 2026-09-20
 
