@@ -92,3 +92,11 @@ within 10 minutes plus ≥50% overlap of the shorter interval, one-to-one. Those
 `activity.json` beside it. The HTML reference page is too long to fetch whole; query the JSON.
 The September note above about the upload ignoring `commute`/`trainer` came from community
 reports and predates the current spec, which documents both — unconfirmed live either way.
+
+## Muting *(added 2026-10-07)*
+
+"Mute Activity" is `hide_from_home` (boolean, *"Whether this activity is muted"*) on
+`UpdatableActivity`, set with `PUT /activities/{id}`. Not an upload parameter. Combine it with the
+sport-type correction into a single post-upload `PUT`, and issue none when nothing needs changing.
+Unverified live: whether it applies via the API for `activity:write`, whether it can be set the
+moment `activity_id` appears, and whether backdated uploads reach followers' feeds at all.

@@ -50,10 +50,13 @@ is.** What exists, on `phase-7-tcx-strava` (pushed to `origin`, not merged):
    "Other" into a Walk, and the duplicate-error phrasing the parser expects. Then a ride.
 4. **Then merge** `phase-7-tcx-strava` to `main`, and decide on tags (below).
 
-**Not built in Phase 7: tags.** The plan's local tagging (Commute/Trainer mapped to Strava flags,
-the rest local-only, batch editing, sidebar filters) is a feature of its own. The 2026 spec
-confirms there is still no Activity Tags field in the API. Worth doing after the live upload is
-proven, not before.
+**Not built in Phase 7: tags, and mute-on-upload.** The plan's local tagging (Commute/Trainer
+mapped to Strava flags, the rest local-only, batch editing, sidebar filters) is a feature of its
+own; the 2026 spec confirms there is still no Activity Tags field in the API. **Muting uploads**
+(`hide_from_home`, set by `PUT` — see the Phase 7 note) belongs with it, since both are
+post-upload activity changes and should share one `PUT`. Worth doing after the live upload is
+proven, not before — and check on that first live upload whether a backdated activity shows in
+followers' feeds at all, which decides whether muting should default on.
 
 **Two findings from this round worth not rediscovering** — both now in the skill reference:
 - **The upload API takes no activity type**; Strava infers it from TCX `Sport`, which knows only
@@ -985,6 +988,31 @@ batch-operate on seven years of workouts.
   `#withkid`), behind a setting. That is the only honest way to get them across today, and it is
   lossy — worth offering, not worth pretending it is real tag support.
 
+**Mute on upload — to check, and to build alongside tags.** *(added 2026-10-07)*
+
+Strava's "Mute Activity" keeps an activity off followers' home feeds. It is in the API:
+`hide_from_home` on `UpdatableActivity`, documented as *"Whether this activity is muted"* (spec
+checked 2026-10-07). It is **not** an upload parameter — `POST /uploads` takes only `file`, `name`,
+`description`, `trainer`, `commute`, `data_type` and `external_id` — so muting means
+`PUT /activities/{id}` once processing finishes.
+
+That is the same call the uploader already makes to correct the sport for anything but runs and
+rides, so the cost is small and the shape obvious: **fold every post-upload change into one
+`PUT`** — sport type, mute, and later any tag-derived flags — and skip the call entirely when
+nothing needs changing. For walks and hikes muting is then free; for runs and rides it adds one
+write against the 200 / 15 min overall budget.
+
+Why it matters most here: a multi-year backfill could put hundreds of old workouts in front of
+followers. Whether backdated uploads actually appear in feeds at all is **unverified** — check it
+on the live run before deciding the default. Likely shape: a Settings toggle ("Mute uploaded
+activities"), on by default for batch uploads, plus a per-batch override in the upload action.
+
+Things to confirm live: that `hide_from_home` takes effect via `PUT` for an app with
+`activity:write` (some fields are owner-only in the UI); that it can be set as soon as
+`activity_id` appears, rather than after Strava's own post-processing; and whether muting after
+the fact still briefly shows the activity in a feed — if so, muting can't fully prevent the
+notification, and the setting's description should say that.
+
 **Tests:** golden-file TCX; the rate-limit actor under a simulated 429 and header sequence; the
 duplicate-activity response path; token refresh on 401; tags surviving a re-sync; batch tag apply
 and remove over a selection; and that a workout with no flag changes issues no `PUT`.
@@ -1065,6 +1093,11 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 | 8 — Polish | Not started |
 
 ### Change log
+
+- **2026-10-07** — Noted mute-on-upload for Phase 7, to build alongside tags. Strava exposes it as
+  `hide_from_home` on `PUT /activities/{id}` — not at upload — so it joins the existing sport
+  correction in a single post-upload `PUT`. Matters most for backfills; whether backdated uploads
+  reach feeds at all is to be checked live before choosing a default.
 
 - **2026-10-07** — Recorded known issue 9: search by region and country, so "British Columbia"
   or "Switzerland" find workouts labelled "Vancouver BC" or "Geneva". Design is a hidden search
