@@ -34,6 +34,8 @@ struct WorkoutActions: View {
               ? "Fetch routes and heart rate from your iPhone"
               : "Set your iPhone's address in Settings first")
 
+        TagsMenu(model: model, ids: ids)
+
         let counts = model.stravaUploadCount(items)
         Button {
             model.startStravaUpload(for: items)
@@ -82,6 +84,14 @@ final class AppSettings {
         didSet { defaults.set(token, forKey: "syncToken") }
     }
 
+    /// Mute activities MaxAct uploads (Strava's `hide_from_home`), keeping them off followers'
+    /// home feeds. On by default: uploading years of old workouts at once is the main use, and
+    /// that shouldn't flood anyone's feed. Costs one extra write per run or ride; walks and hikes
+    /// already need a post-upload `PUT` for their sport, so for them it's free.
+    var muteStravaUploads: Bool {
+        didSet { defaults.set(muteStravaUploads, forKey: "muteStravaUploads") }
+    }
+
     /// Colour of route tracks on thumbnails and the detail map.
     var routeColor: RouteColor {
         didSet { defaults.set(routeColor.rawValue, forKey: "routeColor") }
@@ -92,6 +102,7 @@ final class AppSettings {
         host = defaults.string(forKey: "syncHost") ?? ""
         token = defaults.string(forKey: "syncToken") ?? ""
         routeColor = RouteColor(storageKey: defaults.string(forKey: "routeColor"))
+        muteStravaUploads = defaults.object(forKey: "muteStravaUploads") as? Bool ?? true
     }
 
     /// The address as actually parsed, or `nil` if it can't be. Shown in the UI so there is no

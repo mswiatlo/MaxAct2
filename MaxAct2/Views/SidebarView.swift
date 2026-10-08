@@ -19,6 +19,16 @@ struct SidebarView: View {
                     }
                 }
             }
+
+            // Only tags actually in use — an empty "With Kid: 0" row would be clutter, unlike an
+            // empty saved filter, which answers a question.
+            if !model.usedTags.isEmpty {
+                Section("Tags") {
+                    ForEach(model.usedTags, id: \.self) { name in
+                        row(for: .tag(name), symbol: TagsMenu.symbol(for: name))
+                    }
+                }
+            }
         }
         .navigationSplitViewColumnWidth(min: 190, ideal: 215, max: 300)
     }

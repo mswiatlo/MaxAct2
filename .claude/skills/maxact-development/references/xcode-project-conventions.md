@@ -435,3 +435,18 @@ id>.savedState`, written through the `com.apple.appkit.restoration_storage` serv
 never runs. `AppModel.inMemoryFallback` sweeps `MaxActFallback-*` directories older than an hour at
 the next launch instead (324 had accumulated). Doing it from the test runner would mean reaching
 into another app's container, which triggers a privacy prompt.
+
+## Split-view state leaks between the real app and the UI tests
+
+The UI tests isolate settings, the database and the Keychain — but **AppKit's split-view autosave
+(`NSSplitView Subview Frames …`) is written to the app's standard defaults**, which the tests share.
+After a real session saved the sidebar as collapsed (`223, 780, YES` — the `YES` is "collapsed"),
+every sidebar UI test failed: the sidebar simply wasn't in the window. Reverting code changed
+nothing, which was the tell; reading the container plist found it.
+
+The collapse itself came from the inspector: at the default width there's no room for three panes,
+so AppKit squeezes the sidebar out and then remembers it as a preference. The fix is
+`NavigationSplitView(columnVisibility:)` with `@State … = .all`, so launch state is stated rather
+than restored. Two debugging lessons: **dump the hierarchy before theorising** — the sidebar's
+absence was visible immediately in `app.windows.firstMatch.debugDescription` — and **when a fix
+"works", revert it to check** — a plausible alert-binding fix turned out to be unnecessary.

@@ -21,6 +21,11 @@ struct StravaSettingsSection: View {
         Section {
             if model.isStravaConnected {
                 LabeledContent("Connected as", value: model.stravaAthlete ?? "")
+                Toggle("Mute uploaded activities", isOn: Binding(
+                    get: { model.settings.muteStravaUploads },
+                    set: { model.settings.muteStravaUploads = $0 }
+                ))
+                .help("Keeps uploads off followers' home feeds — useful when uploading old workouts in bulk")
                 Button("Check for Workouts Already on Strava") { model.startStravaCheck() }
                     .disabled(model.syncStatus.isRunning)
                     .help("Matches by time, so it finds workouts the watch uploaded, not only MaxAct's")

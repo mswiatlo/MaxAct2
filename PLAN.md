@@ -3,11 +3,10 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**,
 with batch upload to Strava.
 
-**Status:** Phases 0–6 complete. **Phase 7's upload path is proven against the live Strava API**
-(2026-10-07): the "already on Strava" check matched correctly, and a walk and a ride uploaded with
-the right sport. Merged to `main`. Remaining in Phase 7: **tags and mute-on-upload**, built
-together. Five feature requests outstanding: chart/map linking (6), TrainingPeaks (7), summary
-stats (8), region/country search (9), and a visible close control for the detail inspector (10).
+**Status:** Phases 0–6 complete. **Phase 7 is complete pending a live check of tag sync**: upload
+proven live (2026-10-07), and tags plus mute-on-upload built and tested offline. Five feature
+requests outstanding: chart/map linking (6), TrainingPeaks (7), summary stats (8), region/country
+search (9), and a visible close control for the detail inspector (10).
 **Last updated:** 2026-10-07 (evening).
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first. It carries the
@@ -40,8 +39,29 @@ upload id and an activity id, and the walk arrived as a Walk — so the sport-co
 works. Still unconfirmed live: `commute`/`trainer` at upload (nothing uploaded so far needed
 either), and the exact duplicate-error phrasing (no real duplicate has been rejected yet).
 
-**Next: tags and mute-on-upload**, together, since both are post-upload activity changes that
-should share one `PUT`. See the Phase 7 notes.
+**Tags and mute-on-upload — built 2026-10-07.** Measured the live API first: `commute` and
+`trainer` are returned in the activity list, `hide_from_home` only in the full record, and the app's
+Activity Tags ("With Kid", "With Pet") **in neither** — so they can't be read or written. What exists:
+
+- Local tags on workouts (never touched by a re-sync), with **Commute** and **Trainer** built in and
+  mapped to Strava's fields; any other tag stays on the Mac.
+- A **Tags menu** in the toolbar and context menu that edits the whole selection, showing whether
+  all, some or none of it carries each tag; "New Tag…"; a Tags sidebar section; tags in search; tag
+  chips in the detail pane; an optional Tags column (hidden by default).
+- The sync-status check **imports Commute/Trainer** from Strava for every synced workout, from the
+  same activity listing, at no extra cost. Uploads **send** them. Editing either on an
+  already-synced workout **pushes** it, and marks it pending until it lands, so a check can't put
+  Strava's stale value back over the edit.
+- **Mute uploaded activities** (Settings → Strava, on by default), combined with the sport
+  correction into a single post-upload `PUT`; a ride with no mute costs no extra write.
+
+**To confirm live**, on resuming: that a Commute toggle on a synced workout reaches Strava; that a
+muted upload really stays off the home feed; whether a backdated upload would have reached it
+anyway; and whether "With Kid" really is absent from the API — tag one activity on Strava and
+re-run the check script (the probe used is described in the Strava reference).
+
+**Not built:** writing local-only tags into the Strava description (`#withkid`), which the plan
+offered as optional. Easy to add behind a setting if wanted.
 
 *Original pick-up steps, kept for reference:*
 
@@ -439,6 +459,13 @@ clicking a different row leaves it closed until the selection is cleared and rem
 reopen on *any* selection change unless the user closed it during the current selection; or treat
 an explicit close as "stay closed until reopened". Pick one and test it in the seeded UI suite,
 which already covers `testDetailPaneIsHiddenUntilSomethingIsSelected`.
+
+**Related, found 2026-10-07:** at the default 1,300pt width, opening the inspector leaves no room for
+three panes, so AppKit **collapses the sidebar** — and then saves that as if the user had chosen it,
+so the next launch also opened without a sidebar. Fixed for launches (the split view now starts
+with an explicit `.all`), but the squeeze itself remains: selecting a workout still hides the
+sidebar until the window is widened. Worth deciding with the inspector toggle — either widen the
+window when the inspector opens, or let the table shrink further so all three fit.
 
 ### Seeded UI tests — done 2026-09-20
 
@@ -1120,10 +1147,22 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 | 4 — List UI | Complete |
 | 5 — Detail view | Complete |
 | 6 — Approximate location | Complete |
-| 7 — TCX + Strava | Upload proven live; tags and mute-on-upload outstanding |
+| 7 — TCX + Strava | Complete; tag sync and mute to confirm live |
 | 8 — Polish | Not started |
 
 ### Change log
+
+- **2026-10-07 (late)** — **Tags and mute-on-upload built.** Probed the live API before designing:
+  commute and trainer are readable from the activity list, mute only from the full record, and
+  "With Kid"-style Activity Tags from neither. Local tags with Commute/Trainer mirrored to Strava
+  (imported on every check, sent on upload, pushed when edited, protected by a pending flag); batch
+  Tags menu with all/some/none state; sidebar, search, detail chips, optional column; mute as a
+  setting folded into the one post-upload `PUT`. Along the way, found the UI suite failing because
+  the real app had saved its sidebar as collapsed — the inspector squeezes it out at 1,300pt and
+  AppKit remembers that — and the tests share those defaults. The split view now starts with the
+  sidebar explicitly shown. A detour worth recording: an apparent "alert clears its binding before
+  the button runs" bug was a wrong guess, disproved by reverting the fix; the sidebar was the only
+  problem. 233 package tests, 28/28 app and UI tests.
 
 - **2026-10-07 (evening)** — **Phase 7 upload proven live** by the user: the already-on-Strava
   check matched two watch-uploaded rides, and a walk and a ride uploaded correctly (the walk as a

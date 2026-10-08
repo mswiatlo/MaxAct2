@@ -30,6 +30,9 @@ final class AppModel {
     /// indirection with no benefit and one more thing that could silently not fire.
     var isSyncPanelPresented = false
 
+    /// The selection a "New Tag…" prompt will apply to, while it's showing.
+    var newTagTargets: Set<String>?
+
     // MARK: Sync
 
     private(set) var syncStatus: SyncStatus = .idle
@@ -129,6 +132,7 @@ final class AppModel {
     private(set) var stravaAthlete: String?
     var isStravaConnected: Bool { stravaAthlete != nil }
     private var hasResumedUploads = false
+    private var flagPushTask: Task<Void, Never>?
 
     /// The redirect Strava sends the browser back to. Strava only checks the *host* against the
     /// app's "Authorization Callback Domain", so that has to be set to `localhost` on
@@ -245,6 +249,16 @@ final class AppModel {
             .sorted { ($0.count, $1.kind.displayName) > ($1.count, $0.kind.displayName) }
     }
 
+    /// Tags on at least one workout, in display order.
+    var usedTags: [String] {
+        WorkoutTag.sorted(Array(Set(items.flatMap(\.tags))))
+    }
+
+    /// Every tag worth offering in a menu: the ones in use, plus Commute and Trainer always.
+    var allTags: [String] {
+        WorkoutTag.sorted(Array(Set(items.flatMap(\.tags)).union(WorkoutTag.stravaBacked)))
+    }
+
     func count(for selection: SidebarSelection) -> Int {
         items.count(where: selection.matches)
     }
@@ -284,6 +298,57 @@ final class AppModel {
     }
 
     // MARK: Strava
+
+    // MARK: Tags
+
+    func addTag(_ name: String, to ids: Set<String>) {
+        guard let name = WorkoutTag.normalized(name, existing: allTags) else { return }
+        Task {
+            let needsPush = (try? await store.addTag(name, to: Array(ids))) ?? []
+            await refreshItems()
+            if !needsPush.isEmpty { pushPendingStravaFlags() }
+        }
+    }
+
+    func removeTag(_ name: String, from ids: Set<String>) {
+        Task {
+            let needsPush = (try? await store.removeTag(name, from: Array(ids))) ?? []
+            await refreshItems()
+            if !needsPush.isEmpty { pushPendingStravaFlags() }
+        }
+    }
+
+    /// Sends Commute/Trainer edits on already-synced workouts to Strava. One write each.
+    ///
+    /// Quiet unless it fails: tagging shouldn't light up a progress banner. If anything else is
+    /// running it simply waits — the edits stay marked pending, and the next check or upload batch
+    /// pushes them first, so nothing is lost and no stale value can overwrite them meanwhile.
+    func pushPendingStravaFlags() {
+        guard isStravaConnected, !syncStatus.isRunning, flagPushTask == nil else { return }
+        flagPushTask = Task {
+            defer { flagPushTask = nil }
+            if let error = await sendPendingStravaFlags() { syncStatus = .failed(error) }
+            await refreshItems()
+        }
+    }
+
+    /// Returns a description of the first failure, if any; everything that succeeded is cleared.
+    private func sendPendingStravaFlags() async -> String? {
+        guard let pending = try? await store.pendingStravaFlags() else { return nil }
+        for entry in pending {
+            do {
+                try await strava.updateActivity(
+                    id: entry.activityID,
+                    StravaActivityUpdate(commute: entry.flags.commute, trainer: entry.flags.trainer)
+                )
+                try? await store.clearStravaFlagsPending(entry.workoutID)
+            } catch {
+                return "Couldn't update tags on Strava: \(Self.describeUpload(error)). "
+                    + "They'll be sent again with the next check or upload."
+            }
+        }
+        return nil
+    }
 
     /// Re-reads what the Keychain holds, for the Settings pane and for enabling Upload.
     func refreshStravaConnection() async {
@@ -341,10 +406,13 @@ final class AppModel {
     /// Looks for every workout in the library on Strava, and marks the ones already there.
     func startStravaCheck() {
         guard !syncStatus.isRunning, isStravaConnected, !items.isEmpty else { return }
-        let workouts = items.filter { !$0.stravaState.isOnStrava }.map(\.workout)
+        let workouts = items.map(\.workout)
         syncTask = Task {
             syncStatus = .running(.checkingStrava, completed: 0, total: 1, found: 0)
             do {
+                // Local edits go first, so the import below sees them as settled rather than
+                // overwriting them with Strava's stale value.
+                _ = await sendPendingStravaFlags()
                 let found = try await markWorkoutsAlreadyOnStrava(workouts)
                 syncStatus = .finished(.checkingStrava, found: found)
             } catch let error as StravaError {
@@ -355,8 +423,10 @@ final class AppModel {
         }
     }
 
-    /// Lists Strava's activities over the workouts' span and marks the matches. Costs one read
-    /// request per 200 activities in the span — about a dozen for seven years.
+    /// Lists Strava's activities over the workouts' span, marks the matches, and mirrors Strava's
+    /// commute/trainer flags onto every synced workout in that span — the same listing carries
+    /// both, so the flags cost nothing extra. One read request per 200 activities: about a dozen
+    /// for seven years.
     @discardableResult
     private func markWorkoutsAlreadyOnStrava(_ workouts: [Workout]) async throws -> Int {
         guard let earliest = workouts.map(\.start).min(), let latest = workouts.map(\.end).max() else { return 0 }
@@ -364,8 +434,14 @@ final class AppModel {
         // started a few minutes before it.
         let span = DateInterval(start: earliest.addingTimeInterval(-86_400), end: latest.addingTimeInterval(86_400))
         let activities = try await strava.activities(in: span)
-        let matches = StravaActivityMatcher.match(workouts, against: activities)
+        let onStrava = Set(items.filter { $0.stravaState.isOnStrava }.map(\.id))
+        let matches = StravaActivityMatcher.match(
+            workouts.filter { !onStrava.contains($0.id) }, against: activities
+        )
         let marked = try await store.markAlreadyOnStrava(matches)
+        try await store.applyStravaFlags(Dictionary(
+            activities.map { ($0.id, $0.flags) }, uniquingKeysWith: { first, _ in first }
+        ))
         await refreshItems()
         return marked
     }
@@ -399,6 +475,7 @@ final class AppModel {
         // duplicate, after spending a write and a few polls to find that out. If the check itself
         // fails, carry on — Strava's own duplicate detection still stands behind the upload.
         syncStatus = .running(.checkingStrava, completed: 0, total: 1, found: 0)
+        _ = await sendPendingStravaFlags()
         _ = try? await markWorkoutsAlreadyOnStrava(requested.map(\.workout))
         let alreadyThere = Set(self.items.filter { $0.stravaState.isOnStrava }.map(\.id))
         let items = requested.filter { !alreadyThere.contains($0.id) }
@@ -448,8 +525,9 @@ final class AppModel {
     /// Sends one workout — or, if a previous attempt got as far as an upload id, follows that
     /// instead. Re-uploading an accepted workout would only earn a "duplicate" and spend a write.
     private func uploadOne(_ item: WorkoutListItem, with uploader: StravaUploader) async throws -> UploadResult {
+        let options = UploadOptions(flags: StravaFlags(tags: item.tags), muted: settings.muteStravaUploads)
         if let inFlight = try? await store.itemsUploadingToStrava().first(where: { $0.id == item.id }) {
-            return try await uploader.resume(uploadID: inFlight.uploadID, workout: item.workout)
+            return try await uploader.resume(uploadID: inFlight.uploadID, workout: item.workout, options: options)
         }
         guard let series = await seriesStore.loadIfAvailable(item.id) else {
             return UploadResult(state: .failed(reason: "No route or heart rate stored — download detail first"),
@@ -457,7 +535,7 @@ final class AppModel {
         }
         let store = store
         let id = item.id
-        return try await uploader.send(item.workout, series: series) { uploadID in
+        return try await uploader.send(item.workout, series: series, options: options) { uploadID in
             // Persisted before polling starts, so a quit mid-wait resumes instead of re-uploading.
             try? await store.setStravaState(.uploading, uploadID: uploadID, for: id)
         }
@@ -473,7 +551,10 @@ final class AppModel {
             let uploader = StravaUploader(client: strava)
             for entry in inFlight {
                 guard let item = items.first(where: { $0.id == entry.id }) else { continue }
-                if let result = try? await uploader.resume(uploadID: entry.uploadID, workout: item.workout) {
+                let options = UploadOptions(flags: StravaFlags(tags: item.tags),
+                                            muted: settings.muteStravaUploads)
+                if let result = try? await uploader.resume(uploadID: entry.uploadID, workout: item.workout,
+                                                           options: options) {
                     try? await store.setStravaState(
                         result.state, activityID: result.activityID, uploadID: result.uploadID, for: entry.id
                     )

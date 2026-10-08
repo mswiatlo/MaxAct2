@@ -49,11 +49,13 @@ enum WorkoutFilter: Hashable, Identifiable, CaseIterable {
 enum SidebarSelection: Hashable {
     case filter(WorkoutFilter)
     case kind(String)   // ActivityKind.storageKey
+    case tag(String)
 
     func matches(_ item: WorkoutListItem) -> Bool {
         switch self {
         case .filter(let filter): filter.matches(item)
         case .kind(let key): item.workout.kind.storageKey == key
+        case .tag(let name): item.tags.contains(name)
         }
     }
 
@@ -61,6 +63,7 @@ enum SidebarSelection: Hashable {
         switch self {
         case .filter(let filter): filter.title
         case .kind(let key): ActivityKind(storageKey: key).displayName
+        case .tag(let name): name
         }
     }
 }
@@ -74,6 +77,7 @@ extension WorkoutListItem {
         if workout.kind.displayName.lowercased().contains(needle) { return true }
         if let placeLabel, placeLabel.lowercased().contains(needle) { return true }
         if let sourceName, sourceName.lowercased().contains(needle) { return true }
+        if tags.contains(where: { $0.lowercased().contains(needle) }) { return true }
         return false
     }
 

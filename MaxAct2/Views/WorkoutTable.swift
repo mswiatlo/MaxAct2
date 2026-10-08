@@ -73,43 +73,58 @@ struct WorkoutTable: View {
             .width(min: 128, ideal: 134, max: 156)
             .customizationID("activity")
 
-            TableColumn("Duration", value: \.workout.duration) { item in
-                Text(WorkoutFormatting.duration(item.workout.duration))
-                    .monospacedDigit()
-            }
-            .width(min: 68, ideal: 72, max: 78)
-            .customizationID("duration")
+            // Grouped only because a `Table`'s column builder accepts at most ten columns per
+            // block, and the Tags column made eleven. A `Group` counts as one.
+            Group {
+                TableColumn("Duration", value: \WorkoutListItem.workout.duration) { item in
+                    Text(WorkoutFormatting.duration(item.workout.duration))
+                        .monospacedDigit()
+                }
+                .width(min: 68, ideal: 72, max: 78)
+                .customizationID("duration")
 
-            TableColumn("Distance", value: \.sortDistance) { item in
-                Text(WorkoutFormatting.distance(item.workout.distanceMeters))
-                    .monospacedDigit()
-            }
-            .width(min: 70, ideal: 76, max: 82)
-            .customizationID("distance")
+                TableColumn("Distance", value: \WorkoutListItem.sortDistance) { item in
+                    Text(WorkoutFormatting.distance(item.workout.distanceMeters))
+                        .monospacedDigit()
+                }
+                .width(min: 70, ideal: 76, max: 82)
+                .customizationID("distance")
 
-            TableColumn("Pace", value: \.sortPace) { item in
-                Text(WorkoutFormatting.paceOrSpeed(
-                    metersPerSecond: item.workout.effectiveSpeedMetersPerSecond,
-                    for: item.workout.kind
-                ))
-                .monospacedDigit()
-            }
-            .width(min: 76, ideal: 80, max: 90)
-            .customizationID("pace")
-
-            TableColumn("Energy", value: \.sortEnergy) { item in
-                Text(WorkoutFormatting.energy(kilocalories: item.workout.activeEnergyKilocalories))
+                TableColumn("Pace", value: \WorkoutListItem.sortPace) { item in
+                    Text(WorkoutFormatting.paceOrSpeed(
+                        metersPerSecond: item.workout.effectiveSpeedMetersPerSecond,
+                        for: item.workout.kind
+                    ))
                     .monospacedDigit()
-            }
-            .width(min: 64, ideal: 68, max: 74)
-            .customizationID("energy")
+                }
+                .width(min: 76, ideal: 80, max: 90)
+                .customizationID("pace")
 
-            TableColumn("Avg HR", value: \.sortHeartRate) { item in
-                Text(WorkoutFormatting.heartRate(item.workout.averageHeartRate))
-                    .monospacedDigit()
+                TableColumn("Energy", value: \WorkoutListItem.sortEnergy) { item in
+                    Text(WorkoutFormatting.energy(kilocalories: item.workout.activeEnergyKilocalories))
+                        .monospacedDigit()
+                }
+                .width(min: 64, ideal: 68, max: 74)
+                .customizationID("energy")
+
+                TableColumn("Avg HR", value: \WorkoutListItem.sortHeartRate) { item in
+                    Text(WorkoutFormatting.heartRate(item.workout.averageHeartRate))
+                        .monospacedDigit()
+                }
+                .width(min: 64, ideal: 70, max: 76)
+                .customizationID("heartRate")
             }
-            .width(min: 64, ideal: 70, max: 76)
-            .customizationID("heartRate")
+
+            // Hidden by default — most workouts have none, and the column would be mostly blank.
+            // Turned on from the header's context menu; the sidebar and search work regardless.
+            TableColumn("Tags") { item in
+                Text(item.tags.joined(separator: ", "))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .width(min: 80, ideal: 120, max: 200)
+            .defaultVisibility(.hidden)
+            .customizationID("tags")
 
             TableColumn("Strava") { item in
                 // Centred: a lone glyph pinned to the leading edge of its column reads as

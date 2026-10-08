@@ -100,3 +100,16 @@ reports and predates the current spec, which documents both — unconfirmed live
 sport-type correction into a single post-upload `PUT`, and issue none when nothing needs changing.
 Unverified live: whether it applies via the API for `activity:write`, whether it can be set the
 moment `activity_id` appears, and whether backdated uploads reach followers' feeds at all.
+
+## What the live API actually returns *(measured 2026-10-07)*
+
+From the user's last 30 activities and one full record, via a throwaway script that read the token
+from the Keychain (`com.swiatlowski.MaxAct.strava`, accounts `tokens` and `credentials`):
+
+- Activity list (`SummaryActivity`) includes `commute`, `trainer`, `workout_type`, `visibility`,
+  `private`, `location_city/state/country` — and **no tags field**. `from_accepted_tag` concerns
+  group-activity tagging by other athletes, not Activity Tags.
+- The full record (`DetailedActivity`) adds `hide_from_home` (mute), `description`, `private_note`,
+  `perceived_exertion` — still **no Activity Tags**.
+- So "With Kid" / "With Pet" are neither readable nor writable. Caveat: if a field is omitted when
+  empty, the sample may simply have had none tagged; tagging one activity and re-probing settles it.

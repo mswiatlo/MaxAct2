@@ -18,6 +18,15 @@ struct ContentView: View {
     /// Whether the detail pane is showing. Starts **hidden**, so the table gets the whole window
     /// until there is something to put in it.
     @State private var showsDetail = false
+    @State private var newTagName = ""
+
+    /// The sidebar starts **shown**, stated explicitly rather than left to AppKit's saved split-view
+    /// state. That state was persisting a *collapse the user never chose*: opening the inspector at
+    /// the default width leaves no room for all three panes, AppKit squeezes the sidebar out, and
+    /// then remembers that as the preference — so the next launch opened without a sidebar. UI
+    /// tests share the app's defaults, which is how it surfaced: every sidebar test failed after a
+    /// real session had saved `…, YES` (collapsed) for the sidebar's frame.
+    @State private var columns: NavigationSplitViewVisibility = .all
 
     /// An **inspector**, not a third `NavigationSplitView` column.
     ///
@@ -27,7 +36,7 @@ struct ContentView: View {
     /// goes — it has a standard toggle, a resizable width with a real minimum, and the framework
     /// restores whether it was open.
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columns) {
             SidebarView(model: model)
         } detail: {
             workoutList
@@ -41,7 +50,23 @@ struct ContentView: View {
         .onChange(of: model.selection.isEmpty) { _, isEmpty in
             if !isEmpty { showsDetail = true }
         }
-        .searchable(text: $model.searchText, prompt: "Activity, place or app")
+        .searchable(text: $model.searchText, prompt: "Activity, place, tag or app")
+        // "New Tag…" from the Tags menu. Hosted here because a menu can't contain a text field.
+        .alert("New Tag", isPresented: Binding(
+            get: { model.newTagTargets != nil },
+            set: { if !$0 { model.newTagTargets = nil } }
+        )) {
+            TextField("Name", text: $newTagName)
+            Button("Add") {
+                if let targets = model.newTagTargets { model.addTag(newTagName, to: targets) }
+                newTagName = ""
+            }
+            .keyboardShortcut(.defaultAction)
+            Button("Cancel", role: .cancel) { newTagName = "" }
+        } message: {
+            Text("Commute and Trainer are also set on Strava. Other tags stay on this Mac.")
+        }
+
         .toolbar { toolbarContent }
         .safeAreaInset(edge: .bottom) { syncBanner }
         .task { await model.load() }

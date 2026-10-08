@@ -512,6 +512,48 @@ final class SeededTableUITests: XCTestCase {
     /// Uses the system's ⌘A, which SwiftUI routes to the table's selection binding once a row has
     /// been clicked and the table has focus. This previously typed ⌘⇧A for a custom command; that
     /// shortcut is taken globally by Zoom, so the keystroke never reached the app.
+    /// Batch tagging — the reason tags are worth having. Select everything, tag it from the
+    /// context menu, and the tag must appear in the sidebar covering every workout.
+    @MainActor
+    func testTaggingASelectionTagsEveryWorkout() throws {
+        let app = launchSeeded()
+        let table = app.outlines["WorkoutTable"]
+        XCTAssertTrue(table.waitForExistence(timeout: 15))
+
+        table.cells.element(boundBy: 0).click()
+        app.typeKey("a", modifierFlags: [.command])
+        table.cells.element(boundBy: 0).rightClick()
+
+        let tagsMenu = app.menuItems["Tags"]
+        XCTAssertTrue(tagsMenu.waitForExistence(timeout: 5), "The context menu has no Tags submenu.")
+        tagsMenu.hover()
+        let newTag = app.menuItems["New Tag…"]
+        XCTAssertTrue(newTag.waitForExistence(timeout: 5))
+        newTag.click()
+
+        let field = app.dialogs.textFields.firstMatch.exists
+            ? app.dialogs.textFields.firstMatch : app.sheets.textFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "No name field for the new tag.")
+        field.click()
+        field.typeText("With Kid")
+        let add = app.sheets.buttons["Add"].exists ? app.sheets.buttons["Add"] : app.dialogs.buttons["Add"]
+        XCTAssertTrue(add.waitForExistence(timeout: 3), "No Add button")
+        add.click()
+
+        // Verified through search rather than the sidebar's Tags section: with rows selected the
+        // inspector opens, and at the default width SwiftUI collapses the sidebar to make room —
+        // so the sidebar isn't in the window to read. Search for the tag must find all 40.
+        let search = app.searchFields.firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: 5))
+        search.click()
+        search.typeText("With Kid")
+        XCTAssertTrue(
+            app.staticTexts.containing(NSPredicate(format: "value CONTAINS %@", "40 workouts"))
+                .firstMatch.waitForExistence(timeout: 10),
+            "Searching the new tag should find all 40 tagged workouts."
+        )
+    }
+
     @MainActor
     func testSelectAllShowsAnAggregateSummary() throws {
         let app = launchSeeded()

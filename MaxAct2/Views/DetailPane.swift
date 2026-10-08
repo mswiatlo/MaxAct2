@@ -159,6 +159,8 @@ struct WorkoutDetailView: View {
             }
             .font(.callout)
 
+            TagChips(tags: item.tags, pendingOnStrava: item.stravaFlagsPending)
+
             // The activity itself, once Strava has one — a duplicate links to the existing copy.
             if let activityID = item.stravaActivityID,
                let url = URL(string: "https://www.strava.com/activities/\(activityID)") {
