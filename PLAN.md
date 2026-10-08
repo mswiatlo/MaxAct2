@@ -3,105 +3,74 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**,
 with batch upload to Strava.
 
-**Status:** Phases 0–6 complete. **Phase 7 is complete pending a live check of tag sync**: upload
-proven live (2026-10-07), and tags plus mute-on-upload built and tested offline. Five feature
+**Status:** Phases 0–7 built. Phase 7 has three live checks left (tag push, flags and mute at
+upload) — see "Where things stand". Five feature
 requests outstanding: chart/map linking (6), TrainingPeaks (7), summary stats (8), region/country
 search (9), and a visible close control for the detail inspector (10).
-**Last updated:** 2026-10-07 (evening).
+**Last updated:** 2026-10-07 (night).
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first. It carries the
 > Health Auto Export data contract, the Xcode tooling limits we hit, and the Strava API facts —
 > the things that cost research to establish and aren't visible in the code.
 
-### Where things stand — paused 2026-10-07, mid-Phase 7
+### Where things stand — paused 2026-10-07, Phase 7 built
 
-**Phase 7 is code-complete except tags, and everything that can be tested without a Strava account
-is.** What exists, on `phase-7-tcx-strava` (pushed to `origin`, not merged):
+**Phase 7 is complete; only live checks remain.** All on `main` (pushed); no open branches.
 
 | Layer | What it does | Verified by |
 |---|---|---|
-| `TCXWriter` | TCX v2 from a workout and its cleaned series; a pause starts a new `<Track>`; distance scaled to HealthKit's total | Golden files + Garmin's XSD via `xmllint`; all 8 real stored series validate, and the rides with long stops produce the predicted 2–3 tracks |
-| `StravaRateLimit` | Both buckets from headers; reads spend both; quarter-hour / midnight-UTC rollover; 429 backoff | 13 unit tests with injected time |
-| `StravaClient` | OAuth exchange + refresh (proactive and on 401), upload, status, sport `PUT`, activity listing | Scripted fake transport — **no live call yet** |
-| `StravaUploader` | TCX → upload with `external_id` → persist upload id → poll → correct sport | Same |
-| `StravaActivityMatcher` | Finds workouts already on Strava by time overlap (most arrived from the watch, not MaxAct) | Unit tests with constructed activities |
-| App | Keychain store, Settings → Strava, Upload (⇧⌘U) with rate-limit pauses and resume, "Already on Strava" check, activity link and failure reason in detail | 27/27 UI tests; the live flow untested |
+| `TCXWriter` | TCX v2 from a workout and its cleaned series; a pause starts a new `<Track>`; distance scaled to HealthKit's total | Golden files + Garmin's XSD via `xmllint`; all real stored series validate |
+| `StravaRateLimit` | Both buckets from headers; quarter-hour / midnight-UTC rollover; 429 backoff | Unit tests with injected time |
+| `StravaClient` / `StravaUploader` | OAuth + refresh, upload with `external_id`, resumable polling, one combined post-upload `PUT` (sport correction + mute), activity listing | Scripted fake transport, **and live**: a walk and a ride uploaded 2026-10-07, the walk correctly corrected to Walk |
+| `StravaActivityMatcher` | Finds workouts already on Strava by time overlap | Unit tests, **and live**: found the two watch-uploaded rides |
+| Tags | Local tags; Commute/Trainer mirrored to Strava (imported on every check, sent at upload, pushed when edited, protected by a pending flag); other tags Mac-only | Unit tests + a batch-tagging UI test; import path matches live data |
+| App | Settings → Strava (connect, mute toggle, check), Upload (⇧⌘U), "Synced to Strava" orange check, Tags menu/sidebar/search/chips/column | 28/28 app and UI tests |
 
 | | |
 |---|---|
 | Builds | clean, **zero warnings** |
-| Tests | 220 in `MaxActCore` (`swift test`), 27 app/UI tests (`RunAllTests` — needs the Mac left alone ~3 min) |
-| Working tree | clean; `phase-7-tcx-strava` at `6a0667c`, `main` at `74a0f06` |
+| Tests | 233 in `MaxActCore` (`swift test`), 28 app/UI tests (`RunAllTests` — needs the Mac left alone ~3.5 min) |
+| Working tree | clean; `main` pushed |
 
-**Live check — done 2026-10-07.** The user connected, the automatic check marked two rides already
-on Strava (uploaded by the watch), and a walk and a ride uploaded: both `uploaded`, each with an
-upload id and an activity id, and the walk arrived as a Walk — so the sport-correcting `PUT`
-works. Still unconfirmed live: `commute`/`trainer` at upload (nothing uploaded so far needed
-either), and the exact duplicate-error phrasing (no real duplicate has been rejected yet).
+**Settled live, 2026-10-07:**
+- Upload, the sport-correcting `PUT`, and the "already on Strava" check all work against the real
+  account.
+- The activity list returns `commute` and `trainer`; `hide_from_home` is only in the full record.
+- **Strava's Activity Tags ("With Kid", "With Pet") are not in the API at all.** Confirmed against
+  the 2026-09-18 16:04 ride, which the user tagged "With Kid": no field or value mentions it. So
+  such tags are Mac-only in MaxAct, by necessity.
+- The commute flags on the 9/18 and 9/21 rides were set by hand on Strava — they prove importing,
+  not sending.
 
-**Tags and mute-on-upload — built 2026-10-07.** Measured the live API first: `commute` and
-`trainer` are returned in the activity list, `hide_from_home` only in the full record, and the app's
-Activity Tags ("With Kid", "With Pet") **in neither** — so they can't be read or written. What exists:
+**Pick up here — three live checks, in the app, no code expected:**
+1. Settings → Strava → "Check for Workouts Already on Strava". The 9/18 (13:20 and 16:04) and 9/21
+   rides should come back tagged **Commute**.
+2. Untag Commute on one of them. The detail pane should show "Updating Strava…" briefly, and the
+   flag should clear on Strava. Re-tag it afterwards.
+3. Tag the next workout before uploading it. It should arrive with the commute flag and muted.
+   While there, note whether a *backdated* upload shows in followers' feeds even unmuted — that
+   decides whether mute should stay on by default.
 
-- Local tags on workouts (never touched by a re-sync), with **Commute** and **Trainer** built in and
-  mapped to Strava's fields; any other tag stays on the Mac.
-- A **Tags menu** in the toolbar and context menu that edits the whole selection, showing whether
-  all, some or none of it carries each tag; "New Tag…"; a Tags sidebar section; tags in search; tag
-  chips in the detail pane; an optional Tags column (hidden by default).
-- The sync-status check **imports Commute/Trainer** from Strava for every synced workout, from the
-  same activity listing, at no extra cost. Uploads **send** them. Editing either on an
-  already-synced workout **pushes** it, and marks it pending until it lands, so a check can't put
-  Strava's stale value back over the edit.
-- **Mute uploaded activities** (Settings → Strava, on by default), combined with the sport
-  correction into a single post-upload `PUT`; a ride with no mute costs no extra write.
+Also still unseen live: the exact duplicate-error phrasing (no real duplicate rejected yet).
 
-**To confirm live**, on resuming: that a Commute toggle on a synced workout reaches Strava; that a
-muted upload really stays off the home feed; whether a backdated upload would have reached it
-anyway. The commute already on the 9/21 ride was set by hand on Strava, so it shows that importing
-works, not that sending at upload does.
+**Not built, optional:** writing Mac-only tags into the Strava description (`#withkid`) behind a
+setting.
 
-**Settled 2026-10-07:** Activity Tags really are absent. The user tagged the 2026-09-18 16:04 ride
-"With Kid" on Strava; its full record has no field or value mentioning it.
+**Findings worth not rediscovering** — all in the skill references:
+- **The upload API takes no activity type**; Strava infers it from TCX `Sport` (Running/Biking/
+  Other only), so walks and hikes are written as "Other" and corrected with a `PUT`.
+- **The app relaunched with no window** whenever the last session ended with it closed — session
+  restoration. Fixed with a registered `ApplePersistenceIgnoreState`;
+  `Spikes/reset-window-state.sh` clears the state.
+- **The sidebar vanished** in the real app and in every sidebar UI test: the inspector squeezes it
+  out at the default width and AppKit saves that collapse. The split view now starts with an
+  explicit `.all`; the squeeze itself is tracked under known issue 10.
 
-**Not built:** writing local-only tags into the Strava description (`#withkid`), which the plan
-offered as optional. Easy to add behind a setting if wanted.
-
-*Original pick-up steps, kept for reference:*
-
-1. **Connect.** On strava.com/settings/api set the *Authorization Callback Domain* to `localhost`.
-   In MaxAct, Settings → Strava: paste client ID and secret, Connect, leave "Upload your
-   activities" ticked. The Keychain may ask once ("Always Allow"); being ad-hoc signed, it may ask
-   again after rebuilds.
-2. **Read the automatic "already on Strava" check.** It runs straight after connecting and reports
-   "Found N workouts already on Strava". The 10-minute start tolerance and 50% overlap rule were
-   *chosen*, not measured — if N looks low against what is known to be there, measure the real
-   HealthKit-vs-Strava start gaps before changing anything.
-3. **Upload one walk.** That single upload confirms the three things only checked against the
-   published spec: that `commute`/`trainer` are honoured at upload (September's community reports
-   said no; the 2026 spec documents them), that the follow-up `PUT sport_type` turns the TCX's
-   "Other" into a Walk, and the duplicate-error phrasing the parser expects. Then a ride.
-4. **Then merge** `phase-7-tcx-strava` to `main`, and decide on tags (below).
-
-**Not built in Phase 7: tags, and mute-on-upload.** The plan's local tagging (Commute/Trainer
-mapped to Strava flags, the rest local-only, batch editing, sidebar filters) is a feature of its
-own; the 2026 spec confirms there is still no Activity Tags field in the API. **Muting uploads**
-(`hide_from_home`, set by `PUT` — see the Phase 7 note) belongs with it, since both are
-post-upload activity changes and should share one `PUT`. Worth doing after the live upload is
-proven, not before — and check on that first live upload whether a backdated activity shows in
-followers' feeds at all, which decides whether muting should default on.
-
-**Two findings from this round worth not rediscovering** — both now in the skill reference:
-- **The upload API takes no activity type**; Strava infers it from TCX `Sport`, which knows only
-  Running/Biking/Other. Hence walks and hikes are written as "Other" and corrected with a `PUT`.
-- **The app relaunched with no window at all** whenever the last session ended with it closed —
-  macOS session restoration, not focus. That is also what made the UI suite fail in a different
-  subset each run. Fixed with a registered `ApplePersistenceIgnoreState`; restoration state now
-  lives in the container's `tmp/`, and `Spikes/reset-window-state.sh` clears it.
-
-**After Phase 7**: known issue 6 (chart/map linking), known issue 8 (summary stats), known issue 9
-(search by region and country — small and self-contained), known issue 10 (a toolbar toggle to
-close the detail inspector — smaller still), Phase 8 (polish). Known issue 7 (TrainingPeaks) still starts with whether its API is open to us;
-the `WorkoutDestination` protocol is in place for it, though upload *state* is still Strava-shaped.
+**After Phase 7**: known issue 10 (a visible close control for the detail inspector, plus the
+sidebar squeeze — smallest), known issue 9 (search by region and country — small and
+self-contained), known issue 6 (chart/map linking), known issue 8 (summary stats), then Phase 8
+(polish). Known issue 7 (TrainingPeaks) still starts with whether its API is open to us; the
+`WorkoutDestination` protocol is in place for it, though upload *state* is still Strava-shaped.
 
 **A habit worth keeping: measure, don't derive.** This has now paid off twice over, in two
 different areas, and in nearly every case the measurement *contradicted* a reasonable-looking
@@ -1150,7 +1119,7 @@ and the change log, and any new payload detail goes in `references/hae-data-cont
 | 4 — List UI | Complete |
 | 5 — Detail view | Complete |
 | 6 — Approximate location | Complete |
-| 7 — TCX + Strava | Complete; tag sync and mute to confirm live |
+| 7 — TCX + Strava | Built; three live checks left (see Where things stand) |
 | 8 — Polish | Not started |
 
 ### Change log
