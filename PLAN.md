@@ -4,7 +4,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 (HAE), with batch upload to Strava.
 
 **Status:** Phases 0–7 complete and verified live. Next: known issues, then Phase 8.
-**Last updated:** 2026-10-09.
+**Last updated:** 2026-10-09 (evening).
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first: the HAE data
 > contract, the Xcode tooling limits, and the Strava API facts. **`HISTORY.md`** holds how we got
@@ -35,12 +35,16 @@ check imports Commute from Strava, editing a Strava-backed tag on a synced worko
 change, and tagged uploads arrive with the flag set and muted. Together with the earlier run, that
 covers upload, sport correction, duplicate detection, tag import, tag push and mute.
 
-**Known issue 10 is done** (2026-10-09): a toolbar Inspector toggle, and an explicit close now
-sticks instead of being undone by the next row click.
+**Known issues 10 and 9 are done** (2026-10-09): a toolbar Inspector toggle with a close that
+sticks, and search by region and country.
 
-**Next:** known issue 9 (region/country search), 11 (odd splits on the 9/21 ride), 12 (the table
-gets cramped with the inspector open), 6 (chart/map linking), 8 (summary stats), then Phase 8.
-Issue 7 (TrainingPeaks) starts with whether its API is open to us at all.
+**On next launch** the app re-resolves every stored place once, to add the region and country
+terms — one geocoder request per distinct place, in the background, with the Place column
+unchanged. Nothing to do; worth knowing if the Place column looks busy for a minute.
+
+**Next:** known issue 11 (odd splits on the 9/21 ride), 12 (the table gets cramped with the
+inspector open), 6 (chart/map linking), 8 (summary stats), then Phase 8. Issue 7 (TrainingPeaks)
+starts with whether its API is open to us at all.
 
 **Still unseen live:** the exact duplicate-error wording — no real duplicate has been rejected yet.
 
@@ -81,19 +85,29 @@ Things that will bite:
 - Week start is a locale setting. Use `Calendar.dateInterval(of:for:)` and choose explicitly.
 - Bucket by the current time zone, and say so.
 
-**9. Search by region and country, not just the stored label.** *(feature)*
-"BC", "British Columbia", "Canada" should find Vancouver rides; "Switzerland" the Geneva ones.
-Search only reads `placeLabel` ("Vancouver BC"). Design: a hidden `placeSearchTerms` field (city,
-region abbreviation and full name, country name and ISO code), matched case- and
-diacritic-insensitively, never displayed. Known constraints:
-- MapKit gives `cityWithContext` and, via `.full`, the country. **`regionCode`/`regionName` don't
-  exist in the SDK**, so the full region name isn't available from MapKit.
-- `Locale.localizedString(forRegionCode:)` turns "CH" into "Switzerland". There is no equivalent
-  for subdivisions, so "BC" → "British Columbia" needs a small bundled ISO 3166-2 table.
-- City names depend on the geocoder's locale ("Geneva" vs "Genève"); store both when they differ.
-- Existing places need resolving again. That's one request per ~1 km cell, not per workout.
-  Version the terms so it happens once.
-- Privacy: still send only the snapped cell, and never store street-level fields.
+**9. ~~Search by region and country, not just the stored label.~~ — done 2026-10-09.**
+
+Searching "British Columbia", "Canada" or "Switzerland" now finds rides whose visible label only
+says "Greater Vancouver BC" or "Geneva, Switzerland". A hidden `placeSearchTerms` field holds city,
+subdivision as given *and* expanded, and country; it is stored pre-folded for case and diacritics,
+so "geneve" finds Genève. `placeTermsVersion` makes the backfill automatic — a row below the
+current version re-resolves itself, at one request per ~1 km cell rather than per workout.
+
+**Two geocoders, which the measurement forced.** MapKit composes the label well ("Boulder, CO
+United States" but "Geneva, Switzerland") and exposes no subdivision — `regionCode` is documented
+but **absent from the SDK**, and `regionName` is the country. `CLPlacemark` has the structure
+(`locality`, `administrativeArea`, `country`, `isoCountryCode`) and no composer. Each is used for
+what it does well, two requests per new cell, both throttled.
+
+Also measured, and the reason the label didn't regress: `cityWithContext` returns an **empty
+string** for a place in the device's own region, not just over water — Vancouver came back blank on
+a Canadian Mac. Composing `locality + administrativeArea` as the second fallback reproduces
+"Greater Vancouver BC" exactly; falling straight through to `cityName` would have quietly demoted
+every local label to "Vancouver" on the first re-resolve.
+
+`administrativeArea` is an abbreviation in Canada, the US and Switzerland but a full name in the UK
+("Scotland"), so expansion uses a bundled ISO 3166-2 table for CA, US and AU, keyed by country
+because "WA" and "NT" collide. Anywhere else the raw value is still stored and searchable.
 
 **10. ~~A visible way to close the detail inspector.~~ — done 2026-10-09.**
 

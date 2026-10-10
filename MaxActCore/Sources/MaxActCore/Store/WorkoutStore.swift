@@ -228,14 +228,23 @@ public actor WorkoutStore {
         return try modelContext.fetch(descriptor).map(WorkoutListItem.init(record:))
     }
 
-    /// Workouts with a coarse start but no resolved name yet, newest first.
+    /// Workouts with a coarse start whose place still needs resolving, newest first.
+    ///
+    /// That means **either** no name yet **or** search terms built by an older
+    /// ``PlaceTerms/version``. The second case is what backfills region and country onto a library
+    /// resolved before those existed: it costs one geocoder request per distinct ~1 km cell, not
+    /// per workout, because the resolver caches by cell.
     ///
     /// Indoor workouts are excluded by having no route to snap in the first place, so there is no
     /// need to filter on `isIndoor` — and filtering on it would be wrong for an outdoor workout
     /// the watch happened to mark indoor.
     public func itemsNeedingPlace(limit: Int? = nil) throws -> [(id: String, coordinate: Coordinate)] {
+        let currentVersion = PlaceTerms.version
         var descriptor = FetchDescriptor<WorkoutRecord>(
-            predicate: #Predicate { $0.placeLabel == nil && $0.placeLatitude != nil }
+            predicate: #Predicate {
+                $0.placeLatitude != nil
+                    && ($0.placeLabel == nil || $0.placeTermsVersion < currentVersion)
+            }
         )
         descriptor.sortBy = [SortDescriptor(\.start, order: .reverse)]
         if let limit { descriptor.fetchLimit = limit }
@@ -291,9 +300,28 @@ public actor WorkoutStore {
         try record(id: workoutID)?.placeCoordinate
     }
 
-    public func setPlaceLabel(_ label: String?, for workoutID: String) throws {
+    /// Stores a resolved place: the short visible label, and the hidden region/country terms.
+    ///
+    /// Stamping the version here is what stops a resolved row coming back round in
+    /// ``itemsNeedingPlace(limit:)`` for ever — including when the geocoder knew a name but
+    /// nothing structural, which legitimately leaves `searchTerms` nil.
+    public func setPlace(
+        label: String?,
+        searchTerms: String? = nil,
+        for workoutID: String
+    ) throws {
         guard let record = try record(id: workoutID) else { return }
         record.placeLabel = label
+        record.placeSearchTerms = searchTerms
+        record.placeTermsVersion = PlaceTerms.version
+        try modelContext.save()
+    }
+
+    /// Internal, and only so a test can reproduce a library resolved before a given terms version.
+    /// Production code always stamps the current version through ``setPlace(label:searchTerms:for:)``.
+    func setPlaceTermsVersion(_ version: Int, for workoutID: String) throws {
+        guard let record = try record(id: workoutID) else { return }
+        record.placeTermsVersion = version
         try modelContext.save()
     }
 

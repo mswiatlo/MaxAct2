@@ -68,21 +68,8 @@ enum SidebarSelection: Hashable {
     }
 }
 
-extension WorkoutListItem {
-    /// Free-text match over the fields a person would plausibly type: activity, place, source.
-    /// Deliberately not the id — nobody searches for a UUID.
-    func matches(searchText: String) -> Bool {
-        guard !searchText.isEmpty else { return true }
-        let needle = searchText.lowercased()
-        if workout.kind.displayName.lowercased().contains(needle) { return true }
-        if let placeLabel, placeLabel.lowercased().contains(needle) { return true }
-        if let sourceName, sourceName.lowercased().contains(needle) { return true }
-        if tags.contains(where: { $0.lowercased().contains(needle) }) { return true }
-        return false
-    }
-
-    var sourceName: String? { workout.sourceName }
-}
+// `matches(searchText:)` and `sourceName` live in `MaxActCore` beside `WorkoutListItem`, so the
+// matching rules — folding, and the hidden region/country terms — are covered by `swift test`.
 
 // MARK: - Sort keys
 

@@ -16,8 +16,15 @@ import MaxActCore
 actor PlaceResolver {
     private let store: WorkoutStore
 
-    /// Snapped-cell key → resolved name. The reason a corpus costs a request per *place*.
-    private var resolved: [String: String] = [:]
+    /// What one cell resolves to: the short label the column shows, and the hidden terms that let
+    /// search match a region or country.
+    private struct Place {
+        let label: String
+        let searchTerms: String?
+    }
+
+    /// Snapped-cell key → resolved place. The reason a corpus costs a request per *place*.
+    private var resolved: [String: Place] = [:]
 
     /// Cells that came back with nothing. Retried on a later launch but not again this session —
     /// a start in the middle of a park or a bay legitimately has no city, and asking again in a
@@ -70,16 +77,18 @@ actor PlaceResolver {
             if unresolvable.contains(key) { continue }
 
             if let hit = resolved[key] {
-                if (try? await store.setPlaceLabel(hit, for: entry.id)) != nil { stored += 1 }
+                if (try? await store.setPlace(label: hit.label, searchTerms: hit.searchTerms,
+                                              for: entry.id)) != nil { stored += 1 }
                 continue
             }
 
             await waitForSlot()
             switch await lookUp(entry.coordinate) {
-            case .found(let name):
-                resolved[key] = name
+            case .found(let place):
+                resolved[key] = place
                 consecutiveFailures = 0
-                if (try? await store.setPlaceLabel(name, for: entry.id)) != nil { stored += 1 }
+                if (try? await store.setPlace(label: place.label, searchTerms: place.searchTerms,
+                                              for: entry.id)) != nil { stored += 1 }
             case .nothingThere:
                 // Not a failure — the geocoder answered, and the answer was "nowhere named".
                 unresolvable.insert(key)
@@ -95,39 +104,87 @@ actor PlaceResolver {
     }
 
     private enum Outcome {
-        case found(String)
+        case found(Place)
         case nothingThere
         case failed
     }
 
-    /// One reverse-geocoding request.
+    /// Resolves one cell: MapKit for the label, Core Location for the parts search needs.
     ///
-    /// Takes only `cityWithContext(.automatic)`, which gives MapKit's own localized "Vancouver BC".
-    /// **Never `name`, `shortAddress` or `fullAddress`** — measured, those return the street
-    /// address ("4629 Haggart St, Vancouver"), which is the whole thing the snapping exists to
-    /// avoid ever handling.
+    /// **Two geocoders, on purpose.** MapKit composes the label well — it knows to write
+    /// "Boulder, CO United States" but "Geneva, Switzerland" — yet it exposes no structured
+    /// subdivision: `regionCode` is documented but *absent from the SDK*, and `regionName` is the
+    /// country. `CLPlacemark` has the structure (`locality`, `administrativeArea`, `country`,
+    /// `isoCountryCode`) and no equivalent composer. So each is used for what it does well.
+    ///
+    /// Costs two requests per *new cell*, not per workout; both go through the same throttle, and
+    /// the cache means a repeat trailhead costs nothing.
+    ///
+    /// Reads only city-level fields from either. **Never `name`, `shortAddress` or `fullAddress`,
+    /// nor a placemark's `thoroughfare`** — measured, those return the street address
+    /// ("4629 Haggart St, Vancouver"), which is the whole thing the snapping exists to avoid.
     private func lookUp(_ coordinate: Coordinate) async -> Outcome {
-        guard let request = MKReverseGeocodingRequest(
-            location: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-        ) else { return .nothingThere }
+        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        guard let request = MKReverseGeocodingRequest(location: location) else {
+            return .nothingThere
+        }
 
+        let context: String?
+        let cityName: String?
         do {
             let items = try await request.mapItems
             guard let representations = items.first?.addressRepresentations else {
                 return .nothingThere
             }
-            // Measured: a start over water returns an *empty string* rather than nil, and storing
-            // that would show a blank cell that never retries.
-            let name = representations.cityWithContext(.automatic)?
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            if let name, !name.isEmpty { return .found(name) }
-
-            let city = representations.cityName?.trimmingCharacters(in: .whitespacesAndNewlines)
-            if let city, !city.isEmpty { return .found(city) }
-            return .nothingThere
+            context = representations.cityWithContext(.automatic)?.cleaned
+            cityName = representations.cityName?.cleaned
         } catch {
             return .failed
         }
+
+        // Core Location's turn. A failure here is survivable — the label is what the column needs,
+        // and a later `PlaceTerms.version` bump will try the terms again.
+        await waitForSlot()
+        let parts = await describe(location)
+
+        guard let label = label(context: context, cityName: cityName, parts: parts) else {
+            return .nothingThere
+        }
+        return .found(Place(label: label, searchTerms: parts.flatMap(PlaceTerms.searchTerms(for:))))
+    }
+
+    /// Picks the most informative short label available.
+    ///
+    /// The order matters, and the second entry is why this isn't just MapKit's string. Measured:
+    /// `cityWithContext` returns an **empty string** both for a start over water *and* for a place
+    /// in the device's own region — on a Canadian Mac, Vancouver came back blank. Falling straight
+    /// to `cityName` would then have quietly demoted every local label from "Greater Vancouver BC"
+    /// to "Vancouver" the first time a library was re-resolved.
+    private func label(context: String?, cityName: String?, parts: PlaceDescription?) -> String? {
+        if let context { return context }
+        if let city = parts?.city, let subdivision = parts?.subdivision {
+            return "\(city) \(subdivision)"
+        }
+        return cityName ?? parts?.city
+    }
+
+    /// The structured half, via Core Location — the only one of the two that exposes a
+    /// subdivision. Reads four city-level fields and nothing finer.
+    private func describe(_ location: CLLocation) async -> PlaceDescription? {
+        guard let placemark = try? await CLGeocoder().reverseGeocodeLocation(location).first else {
+            return nil
+        }
+        // `CLPlacemark` is `@MainActor`-isolated under this project's default isolation, so its
+        // fields are read in one hop rather than four.
+        let description = await MainActor.run {
+            PlaceDescription(
+                city: placemark.locality?.cleaned,
+                subdivision: placemark.administrativeArea?.cleaned,
+                country: placemark.country?.cleaned,
+                countryCode: placemark.isoCountryCode?.cleaned
+            )
+        }
+        return description.isEmpty ? nil : description
     }
 
     private func waitForSlot() async {
@@ -139,5 +196,18 @@ actor PlaceResolver {
             }
         }
         lastRequest = ContinuousClock.now
+    }
+}
+
+private extension String {
+    /// Trimmed, and `nil` rather than empty. Both geocoders return `""` often enough — over water,
+    /// and for the device's own region — that storing it unchecked would leave a blank cell that
+    /// never retries.
+    ///
+    /// `nonisolated` because the project defaults to `MainActor` isolation and this is called from
+    /// inside the resolver actor.
+    nonisolated var cleaned: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }

@@ -76,7 +76,7 @@ import Testing
         let store = try makeStore()
         try await store.upsert([ingested(workout())])
         try await store.setStravaState(.uploaded, activityID: 998877, for: "W1")
-        try await store.setPlaceLabel("Vancouver, BC", for: "W1")
+        try await store.setPlace(label: "Vancouver, BC", for: "W1")
         try await store.setThumbnailFileName("W1.png", for: "W1")
 
         // A later sync brings the same workout back with slightly different imported numbers.
@@ -123,9 +123,45 @@ import Testing
         #expect(pending.map(\.id) == ["withRoute"])
 
         // Once named, it drops out and is not asked about again.
-        try await store.setPlaceLabel("Vancouver BC", for: "withRoute")
+        try await store.setPlace(label: "Vancouver BC", searchTerms: "vancouver · bc",
+                                 for: "withRoute")
         pending = try await store.itemsNeedingPlace()
         #expect(pending.isEmpty)
+    }
+
+    @Test("a place resolved under an older terms version re-resolves itself")
+    func staleTermsBecomePendingAgain() async throws {
+        let store = try makeStore()
+        let seriesStore = try makeSeriesStore()
+        try await store.upsert(
+            [ingested(workout(hasRoute: true), series: series())], seriesStore: seriesStore
+        )
+
+        // Exactly the state of a library resolved before region search existed: a label, and
+        // terms from version 0. This is what makes the backfill automatic rather than a chore.
+        try await store.setPlace(label: "Greater Vancouver BC", for: "W1")
+        try await store.setPlaceTermsVersion(0, for: "W1")
+        #expect(try await store.itemsNeedingPlace().count == 1)
+
+        try await store.setPlace(label: "Greater Vancouver BC",
+                                 searchTerms: "greater vancouver · bc · british columbia · canada",
+                                 for: "W1")
+        #expect(try await store.itemsNeedingPlace().isEmpty)
+        #expect(try await store.item(id: "W1")?.matches(searchText: "British Columbia") == true)
+    }
+
+    @Test("a place the geocoder could name but not break down is not asked about for ever")
+    func namedWithoutTermsSettles() async throws {
+        let store = try makeStore()
+        let seriesStore = try makeSeriesStore()
+        try await store.upsert(
+            [ingested(workout(hasRoute: true), series: series())], seriesStore: seriesStore
+        )
+
+        // Terms are a bonus, so nil is a legitimate outcome — but it must still count as resolved,
+        // or the resolver would re-request this cell on every launch.
+        try await store.setPlace(label: "Somewhere", searchTerms: nil, for: "W1")
+        #expect(try await store.itemsNeedingPlace().isEmpty)
     }
 
     @Test("records synced before places existed gain a cell without a re-sync")

@@ -60,6 +60,16 @@ public final class WorkoutRecord {
     /// optional pair keeps "never had a route" distinguishable from "on the equator".
     public var placeLatitude: Double?
     public var placeLongitude: Double?
+
+    /// Hidden text that makes this workout findable by region and country — "British Columbia",
+    /// "Canada" — while ``placeLabel`` stays short. Already folded for case and diacritics; see
+    /// ``PlaceTerms``. Defaulted so the existing store migrates without a mapping model.
+    public var placeSearchTerms: String?
+
+    /// Which ``PlaceTerms/version`` built ``placeSearchTerms``. `0` means "never resolved", which
+    /// is what every row written before this existed reports — and what makes them re-resolve
+    /// themselves, one request per place rather than per workout.
+    public var placeTermsVersion: Int = 0
     public var stravaStateKey: String
     public var stravaFailureReason: String?
     public var stravaActivityID: Int?
@@ -104,6 +114,8 @@ public final class WorkoutRecord {
         hasRoute = workout.hasRoute
 
         placeLabel = nil
+        placeSearchTerms = nil
+        placeTermsVersion = 0
         placeLatitude = nil
         placeLongitude = nil
         stravaStateKey = StravaState.notUploaded.storageKey
@@ -192,6 +204,8 @@ extension WorkoutRecord {
 public struct WorkoutListItem: Identifiable, Hashable, Sendable {
     public let workout: Workout
     public let placeLabel: String?
+    /// Folded search text for region and country. Never displayed.
+    public let placeSearchTerms: String?
     /// Strava-backed first, then alphabetical.
     public let tags: [String]
     public let stravaFlagsPending: Bool
@@ -205,11 +219,33 @@ public struct WorkoutListItem: Identifiable, Hashable, Sendable {
     init(record: WorkoutRecord) {
         workout = record.snapshot
         placeLabel = record.placeLabel
+        placeSearchTerms = record.placeSearchTerms
         tags = WorkoutTag.sorted(record.tagNames)
         stravaFlagsPending = record.stravaFlagsPending
         stravaState = record.stravaState
         stravaActivityID = record.stravaActivityID
         hasDetail = record.hasDetail
         thumbnailFileName = record.thumbnailFileName
+    }
+}
+
+extension WorkoutListItem {
+    public var sourceName: String? { workout.sourceName }
+
+    /// Free-text match over the fields a person would plausibly type: activity, place, source,
+    /// tags. Deliberately not the id — nobody searches for a UUID.
+    ///
+    /// Folded for case **and diacritics**, so "geneve" finds a ride in Genève. `placeSearchTerms`
+    /// is what makes "British Columbia" and "Canada" find rides whose visible label only says
+    /// "Greater Vancouver BC"; it is stored pre-folded, so it is compared directly.
+    public func matches(searchText: String) -> Bool {
+        guard !searchText.isEmpty else { return true }
+        let needle = PlaceTerms.folded(searchText)
+        if PlaceTerms.contains(workout.kind.displayName, foldedNeedle: needle) { return true }
+        if let placeLabel, PlaceTerms.contains(placeLabel, foldedNeedle: needle) { return true }
+        if let placeSearchTerms, placeSearchTerms.contains(needle) { return true }
+        if let sourceName, PlaceTerms.contains(sourceName, foldedNeedle: needle) { return true }
+        if tags.contains(where: { PlaceTerms.contains($0, foldedNeedle: needle) }) { return true }
+        return false
     }
 }

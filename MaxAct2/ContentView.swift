@@ -70,7 +70,10 @@ struct ContentView: View {
         .onChange(of: showsDetail) { _, isShowing in
             hasClosedDetail = !isShowing
         }
-        .searchable(text: $model.searchText, prompt: "Activity, place, tag or app")
+        // "Region" earns its place in the prompt: matching "British Columbia" or "Switzerland"
+        // against a label that only says "Greater Vancouver BC" is not something anyone would
+        // guess works.
+        .searchable(text: $model.searchText, prompt: "Activity, place, region, tag or app")
         // "New Tag…" from the Tags menu. Hosted here because a menu can't contain a text field.
         .alert("New Tag", isPresented: Binding(
             get: { model.newTagTargets != nil },

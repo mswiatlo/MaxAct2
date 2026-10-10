@@ -828,6 +828,17 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-09 (evening)** — **Known issue 9 done: search by region and country.** Measured both
+  geocoders first, which changed the design twice. MapKit has no structured subdivision
+  (`regionCode` is documented but absent from the SDK), so Core Location supplies the parts while
+  MapKit still composes the visible label. And `cityWithContext` turned out to return an empty
+  string for the *device's own region*, not just over water — so a naive fallback would have
+  demoted every local label from "Greater Vancouver BC" to "Vancouver" the moment the library
+  re-resolved. Composing `locality + administrativeArea` as the second fallback reproduces the old
+  label exactly, verified against four countries. Terms are stored folded for case and diacritics,
+  and `placeTermsVersion` makes the backfill self-starting at one request per place. Search
+  matching moved into `MaxActCore` so the rules are covered by `swift test`. 248 package tests.
+
 - **2026-10-09** — **Phase 7 confirmed live and known issue 10 done.** The user ran the three
   outstanding checks: tag import, tag push on a synced workout, and a tagged, muted upload all
   work. Then built the inspector's toolbar toggle, and made an explicit close stick rather than be

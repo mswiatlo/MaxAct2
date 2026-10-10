@@ -482,3 +482,28 @@ Assert on **relative** geometry (this pane kept its width) rather than absolute 
 `XCUIElement.exists` — and `isHittable` — stayed true for a `NavigationSplitView` sidebar that had
 been squeezed down by the inspector, so an existence check passed throughout the original bug.
 Assert on `frame.width` when the question is whether something still has room.
+
+## Reverse geocoding: MapKit composes, Core Location structures
+
+Measured 2026-10-09 against four countries, because the two APIs are not interchangeable:
+
+| | `MKAddressRepresentations` | `CLPlacemark` |
+|---|---|---|
+| City | `cityName` | `locality` ("Greater Vancouver" where MapKit says "Vancouver") |
+| Subdivision | **none** — `regionCode` is documented but *absent from the SDK*; `regionName` is the **country** | `administrativeArea` |
+| Country | `regionName` | `country`, `isoCountryCode` |
+| Composed label | `cityWithContext(_:)` — knows to write "Boulder, CO United States" but "Geneva, Switzerland" | none |
+
+So MaxAct uses MapKit for the displayed label and Core Location for the structured parts that feed
+region search. `CLGeocoder` is not deprecated on macOS 26.
+
+**`cityWithContext` returns an empty string for the device's own region**, not only over water: on
+a Canadian Mac, Vancouver came back blank while Geneva and Boulder resolved. Any fallback chain has
+to treat `""` as absent, and dropping straight to `cityName` loses the province.
+
+`administrativeArea` is an abbreviation in CA/US/CH ("BC", "CO", "GE") but a full name in GB
+("Scotland"), so expanding it needs a per-country table — Foundation has no subdivision equivalent
+of `Locale.localizedString(forRegionCode:)`.
+
+**Privacy line, unchanged:** only the snapped ~1 km cell is ever sent, and only city-level fields
+are read back. `fullAddress`, `shortAddress`, `name` and `thoroughfare` all return a street address.
