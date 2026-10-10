@@ -4,7 +4,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 (HAE), with batch upload to Strava.
 
 **Status:** Phases 0–7 complete and verified live. Next: known issues, then Phase 8.
-**Last updated:** 2026-10-09 (evening).
+**Last updated:** 2026-10-10.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first: the HAE data
 > contract, the Xcode tooling limits, and the Strava API facts. **`HISTORY.md`** holds how we got
@@ -45,6 +45,10 @@ unchanged. Nothing to do; worth knowing if the Place column looks busy for a min
 **Next:** known issue 11 (odd splits on the 9/21 ride), 12 (the table gets cramped with the
 inspector open), 6 (chart/map linking), 8 (summary stats), then Phase 8. Issue 7 (TrainingPeaks)
 starts with whether its API is open to us at all.
+
+**2026-10-10:** View ▸ Hide Sidebar (⌃⌘S), and MaxAct is now **one window** — no tabs, no
+File ▸ New Window. Extra windows had shared the model's filter, search and selection, so they only
+looked independent; the user chose removing them over making them independent.
 
 **Still unseen live:** the exact duplicate-error wording — no real duplicate has been rejected yet.
 
@@ -182,6 +186,7 @@ setting.
 | Strava format | **TCX only**; sport corrected afterwards with a `PUT` | Carries GPS, HR and calories, works for indoor workouts. TCX's `Sport` knows only Running/Biking/Other. |
 | Strava credentials | User's own client ID + secret in the Keychain | A bundled secret is extractable and shares one rate-limit budget. |
 | Tags | Local tags; **Commute/Trainer** mirrored to Strava's flags; everything else Mac-only | Strava's API has no Activity Tags. |
+| Windows | **One.** No tabs, no New Window | Filter, search and selection live on the shared `AppModel`, so extra windows only looked independent. Making them independent was the alternative, judged not worth it for a one-library app. |
 | Concurrency | Swift 6, strict concurrency, `async`/`await`, no Combine; default actor isolation `MainActor` | Project style. |
 
 **Out of scope for v1:** writing to HealthKit; non-workout health metrics; GPX/FIT export; Strava

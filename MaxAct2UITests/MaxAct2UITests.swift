@@ -128,6 +128,35 @@ final class MaxAct2UITests: XCTestCase {
         app.typeKey(.escape, modifierFlags: [])
     }
 
+    /// One library, one window: no tabs, no New Window, and ⌘N doesn't make a second window.
+    ///
+    /// Multiple windows came free with `WindowGroup` and only looked independent — they all
+    /// shared the model's filter, search and selection. The keystroke is checked as well as the
+    /// menus, because removing a menu item and removing its behaviour are different things.
+    @MainActor
+    func testThereIsOnlyEverOneWindow() throws {
+        let app = launchApp()
+
+        let fileMenu = app.menuBars.menuBarItems["File"]
+        fileMenu.click()
+        XCTAssertTrue(app.menuItems["Sync from iPhone…"].waitForExistence(timeout: 3),
+                      "Removing New Window must not take the File menu's own items with it.")
+        XCTAssertFalse(app.menuItems["New Window"].exists, "File ▸ New Window is still offered.")
+        app.typeKey(.escape, modifierFlags: [])
+
+        let viewMenu = app.menuBars.menuBarItems["View"]
+        viewMenu.click()
+        XCTAssertTrue(app.menuItems["Hide Sidebar"].waitForExistence(timeout: 3))
+        for tabItem in ["Show Tab Bar", "Hide Tab Bar", "Show All Tabs"] {
+            XCTAssertFalse(app.menuItems[tabItem].exists, "View ▸ \(tabItem) is still offered.")
+        }
+        app.typeKey(.escape, modifierFlags: [])
+
+        app.typeKey("n", modifierFlags: .command)
+        Thread.sleep(forTimeInterval: 1)
+        XCTAssertEqual(app.windows.count, 1, "⌘N opened a second window.")
+    }
+
     /// View ▸ Hide Sidebar exists, ⌃⌘S really toggles it, and the title tells the truth.
     ///
     /// The title is the point. The first version used `SidebarCommands()`, whose shortcut worked

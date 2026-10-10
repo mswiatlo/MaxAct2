@@ -828,6 +828,13 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-10** — **One window.** The user asked what tabs were for. Nothing: `WindowGroup`
+  supplied them, and every window shared the model's filter, search, selection and sync panel, so
+  a second tab differed only in scroll position and inspector. Offered removing them or making
+  windows independent; the user chose removal. Done with `allowsAutomaticWindowTabbing = false`
+  and an empty `.newItem` group, keeping the `WindowGroup` rather than switching to a `Window`
+  scene so the hard-won launch behaviour is untouched. Tested on the menus *and* on ⌘N.
+
 - **2026-10-10** — **View ▸ Hide Sidebar with ⌃⌘S**, requested by the user. `SidebarCommands()`
   was tried first and toggled correctly, but its title read "Show Sidebar" in both states, because
   it validates against AppKit's split-view item rather than the SwiftUI binding that owns

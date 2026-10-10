@@ -42,6 +42,16 @@ struct MaxActApp: App {
         // still restored the saved, windowless session and SwiftUI then opened nothing.
         UserDefaults.standard.register(defaults: ["ApplePersistenceIgnoreState": true])
 
+        // One library, one window — like Photos or Music. Tabs and extra windows came free with
+        // `WindowGroup` and were never designed in: every window shares the model's filter,
+        // search, selection and sync panel, so a second tab only *looked* independent. This
+        // removes View ▸ Show Tab Bar and Show All Tabs; `MaxActCommands` removes New Window.
+        //
+        // Kept as a `WindowGroup` rather than switched to a single `Window` scene on purpose: the
+        // launch behaviour above was hard-won, and a `Window` scene restores and reopens
+        // differently. Removing the two ways to get a second window is the smaller change.
+        NSWindow.allowsAutomaticWindowTabbing = false
+
         if Self.isUITesting {
             let domain = "com.swiatlowski.MaxAct.uitests"
             UserDefaults.standard.removePersistentDomain(forName: domain)
@@ -163,6 +173,11 @@ struct MaxActCommands: Commands {
     @Bindable var model: AppModel
 
     var body: some Commands {
+        // No File ▸ New Window (⌘N). A second window would share this one's filter, search and
+        // selection — see `allowsAutomaticWindowTabbing` in `MaxActApp.init`. Closing the window
+        // and clicking the Dock icon still brings it back.
+        CommandGroup(replacing: .newItem) {}
+
         CommandGroup(after: .newItem) {
             // Opens the panel rather than starting immediately: how much history to import is a
             // per-sync choice, and starting a multi-hour job from a keystroke with no visible
