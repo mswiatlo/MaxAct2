@@ -15,9 +15,6 @@ struct ContentView: View {
 
     private var settings: AppSettings { model.settings }
 
-    /// Whether the detail pane is showing. Starts **hidden**, so the table gets the whole window
-    /// until there is something to put in it.
-    @State private var showsDetail = false
     @State private var newTagName = ""
 
     /// Whether the pane is closed because the user closed it, as opposed to never having opened.
@@ -35,12 +32,12 @@ struct ContentView: View {
     /// tests share the app's defaults, which is how it surfaced: every sidebar test failed after a
     /// real session had saved `…, YES` (collapsed) for the sidebar's frame.
     ///
-    /// Stating the visibility also stopped the live squeeze, not just its persistence — measured
-    /// 2026-10-09: with the inspector open the sidebar keeps its full 217pt, and the **table**
-    /// absorbs the loss instead, 1,079pt down to 562pt. Narrow, and tracked as a known issue, but
-    /// it is also what Xcode, Finder and Mail do. Resizing the window instead was built and then
-    /// removed: AppKit's frame autosave made the new width stick, so one selection would have left
-    /// the window permanently wider even with the inspector shut.
+    /// Stating the visibility also stopped the live squeeze, not just its persistence: with the
+    /// inspector open the sidebar keeps its width and the **table** absorbs the loss instead, which
+    /// is also what Xcode, Finder and Mail do. Growing the window by the inspector's width was
+    /// built and then removed: AppKit's frame autosave made the new width stick, so one selection
+    /// would have left the window permanently wider even with the inspector shut. What remains is
+    /// a *minimum* width while the inspector is open — see `AppModel.minimumWidthWithInspector`.
     @State private var columns: NavigationSplitViewVisibility = .all
 
     /// An **inspector**, not a third `NavigationSplitView` column.
@@ -56,7 +53,7 @@ struct ContentView: View {
         } detail: {
             workoutList
         }
-        .inspector(isPresented: $showsDetail) {
+        .inspector(isPresented: $model.showsDetail) {
             DetailPane(model: model)
         }
         // Lets View ▸ Hide Sidebar read and write the same state the split view uses.
@@ -65,11 +62,11 @@ struct ContentView: View {
         // deselect would make the pane flap in and out as someone clicks down a list, and once
         // it's open the user has told us they want it.
         .onChange(of: model.selection.isEmpty) { _, isEmpty in
-            if !isEmpty && !hasClosedDetail { showsDetail = true }
+            if !isEmpty && !hasClosedDetail { model.showsDetail = true }
         }
         // Closing by *any* route — the toolbar toggle, ⌃⌘I, dragging the divider shut — counts as
         // the user closing it; opening by any route clears that.
-        .onChange(of: showsDetail) { _, isShowing in
+        .onChange(of: model.showsDetail) { _, isShowing in
             hasClosedDetail = !isShowing
         }
         // "Region" earns its place in the prompt: matching "British Columbia" or "Switzerland"
@@ -149,14 +146,14 @@ struct ContentView: View {
         // that couldn't be dismissed.
         //
         // A `Toggle` rather than a button, so it carries its own on/off state and can't disagree
-        // with the menu item: both drive `showsDetail`. Trailing, with `sidebar.trailing`, where
+        // with the menu item: both drive `model.showsDetail`. Trailing, with `sidebar.trailing`, where
         // Finder and Xcode put theirs. A close button inside the pane would be a fair addition but
         // no substitute — it vanishes with the pane, so it can't bring it back.
         ToolbarItem {
-            Toggle(isOn: $showsDetail) {
+            Toggle(isOn: $model.showsDetail) {
                 Label("Inspector", systemImage: "sidebar.trailing")
             }
-            .help(showsDetail ? "Hide the workout details" : "Show the workout details")
+            .help(model.showsDetail ? "Hide the workout details" : "Show the workout details")
         }
     }
 

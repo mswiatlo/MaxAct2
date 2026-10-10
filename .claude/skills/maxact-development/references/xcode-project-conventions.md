@@ -516,3 +516,26 @@ over four presses. It validates against AppKit's split-view item, which doesn't 
 SwiftUI owns. MaxAct uses its own `SidebarToggleCommand` instead, reading and writing the same
 binding through `focusedSceneValue(\.sidebarVisibility, $columns)`, so the title can't drift.
 The UI test asserts the title flips, not just that the item exists.
+
+## Content wider than the window is centred and clipped, not shrunk
+
+If the panes' combined minimums exceed the window, SwiftUI lays the content out at its own width
+and **centres** it, clipping equally off both edges — measured, 1,318pt of panes in a 1,300pt
+window lost 9pt each side, which looked like the sidebar "losing its inset". Two causes to check:
+
+- **An inspector opens at its `ideal` width and does not shrink toward `min` to fit.** MaxAct's
+  inspector now has `ideal == min`.
+- **The window's `minWidth` must cover the panes actually showing.** It's `1,200` with the
+  inspector open, `1,040` without; the scene reads `AppModel.showsDetail` for that.
+
+Measure with `app.windows.firstMatch.splitGroups` frames against the window frame — the split
+group being *wider than its window* is the tell.
+
+**Don't move the window's `.frame` modifier between views casually:** the autosaved window frame is
+keyed by the root view's *type* (`NSWindow Frame SwiftUI.ModifiedContent<…_FlexFrameLayout…>`), so
+changing that type resets every user's saved window size and position once.
+
+**UI tests that resize the window must restore it in a teardown block.** The frame is autosaved
+into the shared defaults; a failing assertion that skipped an inline restore left a narrow window
+saved for every later test and for the real app on that display. Leave ~1.5 s after the restoring
+drag, or termination can beat the autosave.

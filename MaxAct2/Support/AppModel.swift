@@ -33,6 +33,22 @@ final class AppModel {
     /// The selection a "New Tag…" prompt will apply to, while it's showing.
     var newTagTargets: Set<String>?
 
+    /// Whether the detail inspector is open. Starts **hidden**, so the table gets the whole window
+    /// until there is something to put in it.
+    ///
+    /// Held here rather than as view state because the *scene* needs it: the window's minimum
+    /// width depends on it (see `MaxActApp`). Safe to share now that the app is one window.
+    var showsDetail = false
+
+    /// The narrowest window that holds sidebar, table and inspector at their minimums.
+    ///
+    /// Measured, not summed: at 1,300pt with the inspector open the table sat at 664pt against a
+    /// floor of 562pt, so the three panes need 1,300 − 102 ≈ 1,200. Below that SwiftUI doesn't
+    /// shrink anything further — it lays the content out wider than the window and centres it,
+    /// which clipped 9pt off both edges and is what erased the sidebar's inset.
+    static let minimumWidthWithInspector: CGFloat = 1200
+    static let minimumWidth: CGFloat = 1040
+
     // MARK: Sync
 
     private(set) var syncStatus: SyncStatus = .idle

@@ -4,7 +4,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 (HAE), with batch upload to Strava.
 
 **Status:** Phases 0–7 complete and verified live. Next: known issues, then Phase 8.
-**Last updated:** 2026-10-10.
+**Last updated:** 2026-10-10 (afternoon).
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first: the HAE data
 > contract, the Xcode tooling limits, and the Strava API facts. **`HISTORY.md`** holds how we got
@@ -136,17 +136,21 @@ splits for the same ride. Suspects: a GPS gap or stop inside the km, a jump the 
 missed, or route distance disagreeing with HealthKit's total. Fix in `MaxActCore` with a test built
 from the real points.
 
-**12. The table gets cramped when the inspector is open.** *(measured 2026-10-09)*
+**12. The table gets cramped when the inspector is open.** *(eased 2026-10-10)*
 
-At the default window width, opening the inspector takes the table from 1,079pt to **562pt** —
-below the sum of its own column minimums, so columns compress and truncate. The window is wide
-enough for all three panes only in the sense that none disappears.
+At the default 1,300pt window the table now gets **664pt** with the inspector open, up from 562pt,
+because the inspector opens at its 440pt minimum instead of a 560pt ideal (see the fix below).
+Still below the sum of the column minimums, so some columns compress. Remaining options, none
+measured: automatically hiding low-value columns under some width, or accepting it — widening the
+window once is sticky and solves it per-user. Decide with real content in the window.
 
-Not a defect so much as a consequence of eleven columns and a 440pt inspector. Options, none yet
-measured: a narrower inspector minimum (440 was set by the splits row, which could wrap instead);
-automatically hiding low-value columns under some width; or accepting it, since widening the window
-once is sticky and solves it per-user. Decide with real content in the window, not from these
-numbers.
+**Fixed alongside it, 2026-10-10 — the sidebar's inset vanished with the inspector open.** Not an
+inset problem: the panes laid out **1,318pt wide in a 1,300pt window**, and SwiftUI centres
+oversized content, clipping 9pt off *both* edges. Cause: the inspector opened at its 560pt ideal and
+never shrank toward its minimum to fit. Now it opens at the minimum, and while it's open the
+window's minimum width rises from 1,040 to 1,200 (measured: the three panes' floor), so even a
+window dragged narrow can't reproduce it. Tested at both widths, and the test fails with the guard
+removed.
 
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.
@@ -245,6 +249,11 @@ permissions problem — say so, and point at Health → Sharing → Apps).
 ---
 
 ## 7. Keeping this plan current
+
+**Work on a branch.** Before starting any feature, fix or batch of changes, create a branch from
+`main` (`git switch -c <short-name>`). Commit there, verify (build, `swift test`, `RunAllTests`),
+then merge to `main` and push once the work is verified or the user approves. Don't commit
+directly to `main`. *(Requested by the user, 2026-10-10.)*
 
 This file is for **what's current**: status, next steps, open issues, decisions. Keep it short.
 - Edit sections in place, bump **Last updated**, and update the phase table.

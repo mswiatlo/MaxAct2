@@ -11,6 +11,8 @@ will otherwise be rediscovered the hard way.
 
 ## Ground rules
 
+- **Branch first.** Every feature, fix or batch of work starts on a new branch from `main`; merge
+  and push only once verified or approved. Never commit straight to `main`.
 - **Read `PLAN.md` first** and keep it current. Edit affected sections in place rather than leaving
   a contradiction, bump *Last updated*, and update the phase table. Keep it short: the dated
   change log, fixed issues and phase write-ups live in `HISTORY.md`.

@@ -102,8 +102,17 @@ struct MaxActApp: App {
                 // column widths don't include.
                 //
                 // `minWidth` stays well below: the window should still drag narrow, it just
-                // means the table scrolls.
-                .frame(minWidth: 1040, idealWidth: 1300, minHeight: 480, idealHeight: 780)
+                // means the table scrolls — **unless the inspector is open**, when three panes need
+                // more room than that and anything narrower clips the window's edges. Raising the
+                // minimum then grows the window only if it is genuinely too small, and only to the
+                // width that fits. Kept on this frame, rather than moved into `ContentView`, because
+                // the window's saved frame is keyed by this view's type, and moving it would reset
+                // everyone's window position once.
+                .frame(
+                    minWidth: model.showsDetail
+                        ? AppModel.minimumWidthWithInspector : AppModel.minimumWidth,
+                    idealWidth: 1300, minHeight: 480, idealHeight: 780
+                )
                 .alert(
                     "MaxAct couldn't open its database",
                     isPresented: .constant(startupError != nil)

@@ -12,7 +12,13 @@ struct DetailPane: View {
             // heart rate and climb across six columns. At the old 300pt minimum those wrapped and
             // collided; 440 fits a row with room to spare, verified by rendering the table at
             // exactly that width. Capped so a wide inspector can't squeeze the table away.
-            .inspectorColumnWidth(min: 440, ideal: 560, max: 760)
+            //
+            // **Opens at its minimum.** With an ideal of 560 it opened at 560 even when that
+            // didn't fit: SwiftUI doesn't shrink an opening inspector toward its minimum, it lays
+            // the content out wider than the window and centres it — measured, 1,318pt in a
+            // 1,300pt window, clipping 9pt off each edge and erasing the sidebar's inset. Dragging
+            // it wider still works up to the maximum.
+            .inspectorColumnWidth(min: 440, ideal: 440, max: 760)
     }
 
     @ViewBuilder

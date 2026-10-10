@@ -591,6 +591,72 @@ final class SeededTableUITests: XCTestCase {
                       "The toggle should reopen the inspector it closed.")
     }
 
+    /// The sidebar keeps the same inset from the window's left edge whether or not the inspector
+    /// is open, and the panes never spill past the window.
+    ///
+    /// The bug this pins: with the inspector open the three panes laid out 1,318pt wide in a
+    /// 1,300pt window, and SwiftUI centres oversized content — so 9pt was clipped off each side,
+    /// which the user saw as the sidebar losing its inset. Cause was the inspector opening at its
+    /// 560pt ideal rather than shrinking to fit.
+    ///
+    /// Checked twice: at the default width, and after dragging the window as narrow as it will go,
+    /// where the minimum-width guard has to hold the line instead.
+    @MainActor
+    func testTheInspectorNeverPushesThePanesPastTheWindow() throws {
+        let app = launchSeeded()
+        let table = app.outlines["WorkoutTable"]
+        let sidebar = app.outlines["Sidebar"]
+        let window = app.windows.firstMatch
+        XCTAssertTrue(table.waitForExistence(timeout: 15))
+
+        // The window's frame is autosaved into the app's real defaults, which UI tests share, so a
+        // width left narrow would leak into later tests and into the user's own window. Restored in
+        // a teardown block so that a failing assertion can't skip it — which it did, once.
+        let launchWidth = window.frame.width
+        addTeardownBlock { @MainActor in
+            let shortfall = launchWidth - window.frame.width
+            guard shortfall > 1 else { return }
+            let edge = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5))
+                .withOffset(CGVector(dx: -1, dy: 0))
+            edge.press(forDuration: 0.3, thenDragTo: edge.withOffset(CGVector(dx: shortfall, dy: 0)))
+            // Time for AppKit to autosave the restored frame before the app is terminated; one
+            // run with less left 1,200 saved instead of 1,300.
+            Thread.sleep(forTimeInterval: 1.5)
+        }
+
+        func assertContained(_ when: String, inset expected: CGFloat? = nil) -> CGFloat {
+            let inset = sidebar.frame.minX - window.frame.minX
+            XCTAssertGreaterThan(inset, 0, "The sidebar is clipped by the window edge \(when).")
+            for group in window.splitGroups.allElementsBoundByIndex {
+                XCTAssertLessThanOrEqual(group.frame.width, window.frame.width + 0.5,
+                                         "Panes are wider than the window \(when).")
+            }
+            if let expected {
+                XCTAssertEqual(inset, expected, accuracy: 0.5,
+                               "The sidebar's inset changed \(when).")
+            }
+            return inset
+        }
+
+        let inset = assertContained("with the inspector closed")
+        table.cells.element(boundBy: 0).click()
+        let detail = app.staticTexts.containing(NSPredicate(format: "value CONTAINS[c] 'Duration'"))
+        XCTAssertTrue(detail.firstMatch.waitForExistence(timeout: 10))
+        Thread.sleep(forTimeInterval: 1)
+        _ = assertContained("with the inspector open", inset: inset)
+
+        // As narrow as the window allows, with the inspector still open.
+        let rightEdge = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5))
+            .withOffset(CGVector(dx: -1, dy: 0))
+        let widthBefore = window.frame.width
+        rightEdge.press(forDuration: 0.3, thenDragTo: rightEdge.withOffset(CGVector(dx: -600, dy: 0)))
+        Thread.sleep(forTimeInterval: 1)
+        let narrowed = window.frame.width
+        XCTAssertLessThan(narrowed, widthBefore, "The drag didn't resize the window, so the "
+                          + "narrow case went untested.")
+        _ = assertContained("in the narrowest window", inset: inset)
+    }
+
     /// Opening the inspector must not cost the sidebar.
     ///
     /// The regression test for the collapse that broke every other sidebar test: the inspector

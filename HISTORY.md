@@ -828,6 +828,17 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-10 (afternoon)** — **Sidebar inset with the inspector open**, reported by the user, and
+  a standing rule to **work on branches**. Measuring the pane frames showed the inset wasn't being
+  removed: the content was 1,318pt in a 1,300pt window and SwiftUI centred it, clipping 9pt off each
+  side, because the inspector opened at its ideal width and never shrank to fit. Opening at the
+  minimum fixed the default window and gave the table 100pt back (issue 12). A minimum window width
+  of 1,200 while the inspector is open covers narrow windows; the test drags the window narrow and
+  was confirmed to fail without that guard. `showsDetail` moved onto `AppModel` so the scene can
+  read it, which kept the window's frame autosave key — and so everyone's saved window position —
+  unchanged. The test restores the window width in a teardown block, after a failing run left a
+  narrow frame saved into the shared defaults.
+
 - **2026-10-10** — **One window.** The user asked what tabs were for. Nothing: `WindowGroup`
   supplied them, and every window shared the model's filter, search, selection and sync panel, so
   a second tab differed only in scroll position and inspector. Offered removing them or making
