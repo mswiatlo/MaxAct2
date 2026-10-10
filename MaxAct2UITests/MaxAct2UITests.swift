@@ -483,6 +483,72 @@ final class SeededTableUITests: XCTestCase {
         )
     }
 
+    /// The inspector's toolbar toggle closes it, and the close is **obeyed**.
+    ///
+    /// Both halves matter. Before the toggle the pane could only be dismissed from the menu, so it
+    /// read as undismissable; and had the old "reopen on the next selection" rule survived, the
+    /// close would have been undone by the very next click, which is the same thing from the
+    /// user's side.
+    @MainActor
+    func testTheInspectorCanBeClosedAndStaysClosed() throws {
+        let app = launchSeeded()
+        let table = app.outlines["WorkoutTable"]
+        XCTAssertTrue(table.waitForExistence(timeout: 15))
+
+        table.cells.element(boundBy: 0).click()
+        let detail = app.staticTexts.containing(NSPredicate(format: "value CONTAINS[c] 'Duration'"))
+        XCTAssertTrue(detail.firstMatch.waitForExistence(timeout: 10),
+                      "Selecting a row should have revealed the inspector.")
+
+        let toggle = app.checkBoxes["Inspector"].exists
+            ? app.checkBoxes["Inspector"] : app.buttons["Inspector"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5),
+                      "The toolbar has no Inspector control, so the pane can't be closed.")
+        toggle.click()
+
+        // `waitForNonExistence` rather than a bare check: the pane animates out.
+        XCTAssertTrue(detail.firstMatch.waitForNonExistence(timeout: 10),
+                      "The toolbar toggle didn't close the inspector.")
+
+        table.cells.element(boundBy: 1).click()
+        XCTAssertFalse(detail.firstMatch.waitForExistence(timeout: 3),
+                       "Selecting another row reopened the inspector after it was closed.")
+
+        toggle.click()
+        XCTAssertTrue(detail.firstMatch.waitForExistence(timeout: 10),
+                      "The toggle should reopen the inspector it closed.")
+    }
+
+    /// Opening the inspector must not cost the sidebar.
+    ///
+    /// The regression test for the collapse that broke every other sidebar test: the inspector
+    /// squeezed the sidebar out, and AppKit then saved that as if it had been chosen, so later
+    /// launches opened without one. Stating `columnVisibility` fixed both.
+    ///
+    /// Asserts on the sidebar's **width**, not on `exists` — a squeezed pane stays in the
+    /// accessibility tree, so an existence check passed throughout the original bug.
+    @MainActor
+    func testOpeningTheInspectorKeepsTheSidebar() throws {
+        let app = launchSeeded()
+        let table = app.outlines["WorkoutTable"]
+        let sidebar = app.outlines["Sidebar"]
+        XCTAssertTrue(table.waitForExistence(timeout: 15))
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 5))
+        let sidebarBefore = sidebar.frame.width
+        XCTAssertGreaterThan(sidebarBefore, 100, "The sidebar started collapsed.")
+
+        table.cells.element(boundBy: 0).click()
+        XCTAssertTrue(
+            app.staticTexts.containing(NSPredicate(format: "value CONTAINS[c] 'Duration'"))
+                .firstMatch.waitForExistence(timeout: 10)
+        )
+
+        XCTAssertEqual(
+            sidebar.frame.width, sidebarBefore, accuracy: 1,
+            "Opening the inspector squeezed the sidebar. The table is what should give way."
+        )
+    }
+
     /// The Place column's three states, which are three different claims.
     ///
     /// Geocoding is disabled under `--ui-testing`, so this is deterministic and offline: no

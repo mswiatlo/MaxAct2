@@ -20,12 +20,27 @@ struct ContentView: View {
     @State private var showsDetail = false
     @State private var newTagName = ""
 
+    /// Whether the pane is closed because the user closed it, as opposed to never having opened.
+    ///
+    /// An explicit close **sticks**: clicking another row afterwards leaves it closed, the way
+    /// Finder and Xcode treat their inspectors. The alternative — reopening on the next selection
+    /// — means the close button can't actually be obeyed while a row is selected, which is most of
+    /// the time. Now that there's a toolbar toggle and ⌃⌘I, reopening is cheap and visible.
+    @State private var hasClosedDetail = false
+
     /// The sidebar starts **shown**, stated explicitly rather than left to AppKit's saved split-view
     /// state. That state was persisting a *collapse the user never chose*: opening the inspector at
-    /// the default width leaves no room for all three panes, AppKit squeezes the sidebar out, and
-    /// then remembers that as the preference — so the next launch opened without a sidebar. UI
+    /// the default width left no room for all three panes, AppKit squeezed the sidebar out, and
+    /// then remembered that as the preference — so the next launch opened without a sidebar. UI
     /// tests share the app's defaults, which is how it surfaced: every sidebar test failed after a
     /// real session had saved `…, YES` (collapsed) for the sidebar's frame.
+    ///
+    /// Stating the visibility also stopped the live squeeze, not just its persistence — measured
+    /// 2026-10-09: with the inspector open the sidebar keeps its full 217pt, and the **table**
+    /// absorbs the loss instead, 1,079pt down to 562pt. Narrow, and tracked as a known issue, but
+    /// it is also what Xcode, Finder and Mail do. Resizing the window instead was built and then
+    /// removed: AppKit's frame autosave made the new width stick, so one selection would have left
+    /// the window permanently wider even with the inspector shut.
     @State private var columns: NavigationSplitViewVisibility = .all
 
     /// An **inspector**, not a third `NavigationSplitView` column.
@@ -48,7 +63,12 @@ struct ContentView: View {
         // deselect would make the pane flap in and out as someone clicks down a list, and once
         // it's open the user has told us they want it.
         .onChange(of: model.selection.isEmpty) { _, isEmpty in
-            if !isEmpty { showsDetail = true }
+            if !isEmpty && !hasClosedDetail { showsDetail = true }
+        }
+        // Closing by *any* route — the toolbar toggle, ⌃⌘I, dragging the divider shut — counts as
+        // the user closing it; opening by any route clears that.
+        .onChange(of: showsDetail) { _, isShowing in
+            hasClosedDetail = !isShowing
         }
         .searchable(text: $model.searchText, prompt: "Activity, place, tag or app")
         // "New Tag…" from the Tags menu. Hosted here because a menu can't contain a text field.
@@ -117,6 +137,21 @@ struct ContentView: View {
             .popover(isPresented: $model.isSyncPanelPresented, arrowEdge: .bottom) {
                 SyncPanel(model: model)
             }
+        }
+
+        // The inspector's only visible control. Until this existed the pane could be opened by
+        // selecting a row but closed only from View ▸ Hide Inspector or ⌃⌘I, so it read as a pane
+        // that couldn't be dismissed.
+        //
+        // A `Toggle` rather than a button, so it carries its own on/off state and can't disagree
+        // with the menu item: both drive `showsDetail`. Trailing, with `sidebar.trailing`, where
+        // Finder and Xcode put theirs. A close button inside the pane would be a fair addition but
+        // no substitute — it vanishes with the pane, so it can't bring it back.
+        ToolbarItem {
+            Toggle(isOn: $showsDetail) {
+                Label("Inspector", systemImage: "sidebar.trailing")
+            }
+            .help(showsDetail ? "Hide the workout details" : "Show the workout details")
         }
     }
 

@@ -828,6 +828,18 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-09** — **Phase 7 confirmed live and known issue 10 done.** The user ran the three
+  outstanding checks: tag import, tag push on a synced workout, and a tagged, muted upload all
+  work. Then built the inspector's toolbar toggle, and made an explicit close stick rather than be
+  undone by the next row click. The "sidebar squeeze" the issue was paired with **did not
+  reproduce**: measuring the panes found the sidebar keeping its full 217pt and the table dropping
+  1,079 → 562pt instead, so stating `columnVisibility` had fixed the collapse itself, not just its
+  persistence. A window-widening fix was written, worked, and was deleted — AppKit's frame autosave
+  made the width stick, so one selection would have left the window permanently wider, and the
+  platform shrinks content instead. The cramped table is recorded as issue 12 with its numbers.
+  Two testing lessons went to the skill reference: a squeezed pane still reports `exists`, and
+  window geometry is shared with the real app and keyed per display.
+
 - **2026-10-07 (night)** — **Split the plan.** `PLAN.md` had grown to 1,465 lines, mostly
   history. It is now ~230 lines of current status, open issues, decisions and architecture; this
   file holds the rest verbatim. The one durable fact found only in the plan (the

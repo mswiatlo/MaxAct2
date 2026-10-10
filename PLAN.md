@@ -3,8 +3,8 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**
 (HAE), with batch upload to Strava.
 
-**Status:** Phases 0–7 built. Phase 7 has three live checks left; then known issues and Phase 8.
-**Last updated:** 2026-10-07.
+**Status:** Phases 0–7 complete and verified live. Next: known issues, then Phase 8.
+**Last updated:** 2026-10-09.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first: the HAE data
 > contract, the Xcode tooling limits, and the Strava API facts. **`HISTORY.md`** holds how we got
@@ -19,38 +19,30 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 | 4 — List UI | Complete |
 | 5 — Detail view | Complete |
 | 6 — Approximate location | Complete |
-| 7 — TCX + Strava | Built; three live checks left |
+| 7 — TCX + Strava | Complete, verified live |
 | 8 — Polish | Not started |
 
 ---
 
-## 1. Where things stand — paused 2026-10-07
+## 1. Where things stand — 2026-10-09
 
 All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 233 in
-`MaxActCore` (`swift test`), 28 app and UI tests (`RunAllTests` — leave the Mac alone for ~3.5
+`MaxActCore` (`swift test`), 30 app and UI tests (`RunAllTests` — leave the Mac alone for ~4
 minutes, or mouse use breaks them).
 
-**Pick up here — three live checks in the app, no code expected:**
+**Phase 7 is done.** The three remaining live checks all passed against the real account: the sync
+check imports Commute from Strava, editing a Strava-backed tag on a synced workout pushes the
+change, and tagged uploads arrive with the flag set and muted. Together with the earlier run, that
+covers upload, sport correction, duplicate detection, tag import, tag push and mute.
 
-1. Settings → Strava → "Check for Workouts Already on Strava". The 9/18 (13:20 and 16:04) and 9/21
-   rides should come back tagged **Commute** (set by hand on Strava, so this proves importing).
-2. Untag Commute on one of them. The detail pane should show "Updating Strava…" briefly, and the
-   flag should clear on Strava. Re-tag it afterwards.
-3. Tag the next workout before uploading it. It should arrive with the commute flag and muted.
-   Note whether a *backdated* upload reaches followers' feeds even unmuted — that decides whether
-   mute stays on by default.
+**Known issue 10 is done** (2026-10-09): a toolbar Inspector toggle, and an explicit close now
+sticks instead of being undone by the next row click.
 
-Also unseen live: the exact duplicate-error wording (no real duplicate rejected yet).
+**Next:** known issue 9 (region/country search), 11 (odd splits on the 9/21 ride), 12 (the table
+gets cramped with the inspector open), 6 (chart/map linking), 8 (summary stats), then Phase 8.
+Issue 7 (TrainingPeaks) starts with whether its API is open to us at all.
 
-**Then, in order:** known issue 10 (inspector close control + sidebar squeeze — smallest), 9
-(region/country search), 11 (odd splits on the 9/21 ride), 6 (chart/map linking), 8 (summary
-stats), Phase 8. Issue 7 (TrainingPeaks) starts with whether its API is open to us at all.
-
-**Settled live 2026-10-07:** upload, the sport-correcting `PUT` and the already-on-Strava check work
-against the real account. Strava's Activity Tags ("With Kid", "With Pet") are **not in the API** —
-confirmed against an activity tagged "With Kid" — so such tags are Mac-only by necessity.
-
----
+**Still unseen live:** the exact duplicate-error wording — no real duplicate has been rejected yet.
 
 ## 2. Open issues and requests
 
@@ -103,17 +95,21 @@ diacritic-insensitively, never displayed. Known constraints:
   Version the terms so it happens once.
 - Privacy: still send only the snapped cell, and never store street-level fields.
 
-**10. A visible way to close the detail inspector.** *(small)*
-Today it closes only via View ▸ Hide Inspector or ⌃⌘I. Add a trailing **toolbar toggle**
-(`sidebar.trailing`, "Inspector") bound to `showsDetail`. Decide at the same time: the pane
-auto-opens only when the selection goes from empty to non-empty, so after closing it, clicking
-another row leaves it closed. Either reopen on any selection change unless closed during the current
-selection, or have an explicit close stick until reopened. Test it in the seeded UI suite.
+**10. ~~A visible way to close the detail inspector.~~ — done 2026-10-09.**
 
-Same fix should address the **sidebar squeeze**. At the default 1,300pt width, opening the
-inspector leaves no room for three panes, so AppKit collapses the sidebar. Launch now forces
-`.all`, but selecting a workout still hides the sidebar until the window is widened. Either widen
-the window when the inspector opens, or let the table shrink further.
+A trailing toolbar **Toggle** bound to the same state as ⌃⌘I, so the button and the menu item can't
+disagree. An explicit close now **sticks**: clicking another row leaves it closed, as in Finder and
+Xcode. The old rule reopened it on the next selection, which meant the close button could not be
+obeyed while a row was selected — most of the time.
+
+**The sidebar squeeze turned out not to exist**, which only measuring found. Stating
+`columnVisibility = .all` had fixed the live collapse, not merely its persistence: with the
+inspector open the sidebar keeps its full 217pt. The table is what gives way — see issue 12.
+
+Resizing the window to fit all three was built and then **removed**. It worked, but AppKit's frame
+autosave made the new width stick, so a single selection would have left the window permanently
+wider even with the inspector shut — and Xcode, Finder and Mail all shrink the content instead.
+Worth not rebuilding.
 
 **11. Strange pace splits around km 5 on the 2026-09-21 ~1 PM commute ride.**
 Not yet investigated. Measure first: print that ride's per-km splits from `WorkoutSplits` next to
@@ -122,6 +118,18 @@ splits for the same ride. Suspects: a GPS gap or stop inside the km, a jump the 
 missed, or route distance disagreeing with HealthKit's total. Fix in `MaxActCore` with a test built
 from the real points.
 
+**12. The table gets cramped when the inspector is open.** *(measured 2026-10-09)*
+
+At the default window width, opening the inspector takes the table from 1,079pt to **562pt** —
+below the sum of its own column minimums, so columns compress and truncate. The window is wide
+enough for all three panes only in the sense that none disappears.
+
+Not a defect so much as a consequence of eleven columns and a 440pt inspector. Options, none yet
+measured: a narrower inspector minimum (440 was set by the splits row, which could wrap instead);
+automatically hiding low-value columns under some width; or accepting it, since widening the window
+once is sticky and solves it per-user. Decide with real content in the window, not from these
+numbers.
+
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.
 
@@ -129,6 +137,10 @@ setting.
 
 - **No `.hae` reader.** It would give HealthKit's own laps, splits and pause events, which MaxAct
   currently reconstructs from the route. Worth reconsidering if issue 11 traces back to splits.
+- **UI tests share the app's window geometry.** AppKit's frame autosave and split-view state live
+  in the standard defaults, which `--ui-testing` does not isolate, and the saved frame is **per
+  display configuration**. So a test run can change where the real app opens, and a test can't
+  assume a starting width.
 - **Visual details aren't covered by tests.** The map camera and chart contents aren't exposed to
   accessibility, so they were checked by hand.
 - **Column widths are tuned for this Mac's content.** Longer place or activity names will

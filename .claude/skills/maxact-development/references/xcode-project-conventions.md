@@ -461,3 +461,24 @@ so AppKit squeezes the sidebar out and then remembers it as a preference. The fi
 than restored. Two debugging lessons: **dump the hierarchy before theorising** — the sidebar's
 absence was visible immediately in `app.windows.firstMatch.debugDescription` — and **when a fix
 "works", revert it to check** — a plausible alert-binding fix turned out to be unnecessary.
+
+## Window geometry is shared with the UI tests, and is per-display
+
+`--ui-testing` isolates settings, the database and the Keychain, but **not** AppKit's window frame
+autosave (`NSWindow Frame …`) or split-view state, which live in the standard defaults. Two
+consequences:
+
+- A test run can change where the **real** app opens. Anything that resizes the window in response
+  to UI state will leak into the user's session.
+- The saved frame is keyed **per display configuration** (`… 0 0 3008 1661` is the screen), so a
+  test can't assume a starting width: a test that grew the window to the screen's full width then
+  failed its own "did it grow?" assertion on the next run, because it was already at the maximum.
+
+Assert on **relative** geometry (this pane kept its width) rather than absolute numbers, and treat
+"resize the window for the user" as a thing that needs a strong reason.
+
+## A squeezed pane is still in the accessibility tree
+
+`XCUIElement.exists` — and `isHittable` — stayed true for a `NavigationSplitView` sidebar that had
+been squeezed down by the inspector, so an existence check passed throughout the original bug.
+Assert on `frame.width` when the question is whether something still has room.
