@@ -128,6 +128,49 @@ final class MaxAct2UITests: XCTestCase {
         app.typeKey(.escape, modifierFlags: [])
     }
 
+    /// View ▸ Hide Sidebar exists, ⌃⌘S really toggles it, and the title tells the truth.
+    ///
+    /// The title is the point. The first version used `SidebarCommands()`, whose shortcut worked
+    /// but whose item read "Show Sidebar" in *both* states — the split view's visibility is SwiftUI
+    /// state, and that command validated against AppKit's. Asserts on width, not `exists`, since a
+    /// collapsed sidebar can linger in the accessibility tree.
+    @MainActor
+    func testTheSidebarCanBeToggledFromTheViewMenu() throws {
+        let app = launchApp()
+        let sidebar = app.outlines["Sidebar"]
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 5))
+        XCTAssertGreaterThan(sidebar.frame.width, 100)
+
+        let viewMenu = app.menuBars.menuBarItems["View"]
+        func menuTitles() -> [String] {
+            viewMenu.click()
+            _ = viewMenu.menuItems.firstMatch.waitForExistence(timeout: 3)
+            let titles = viewMenu.menuItems.allElementsBoundByIndex.map(\.title)
+            app.typeKey(.escape, modifierFlags: [])
+            return titles
+        }
+        func wait(_ condition: @escaping () -> Bool, _ message: String) {
+            let expectation = XCTNSPredicateExpectation(
+                predicate: NSPredicate { _, _ in condition() }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 5), .completed, message)
+        }
+
+        var titles = menuTitles()
+        XCTAssertTrue(titles.contains("Hide Sidebar"), "View menu was \(titles)")
+        XCTAssertEqual(titles.filter { $0.hasSuffix("Sidebar") }.count, 1,
+                       "Two sidebar items would mean two ⌃⌘S entries.")
+
+        app.typeKey("s", modifierFlags: [.command, .control])
+        wait({ !sidebar.exists || sidebar.frame.width < 10 }, "⌃⌘S didn't hide the sidebar.")
+        titles = menuTitles()
+        XCTAssertTrue(titles.contains("Show Sidebar"),
+                      "With the sidebar hidden the item should offer to show it; was \(titles)")
+
+        app.typeKey("s", modifierFlags: [.command, .control])
+        wait({ sidebar.exists && sidebar.frame.width > 100 }, "⌃⌘S didn't bring the sidebar back.")
+        XCTAssertTrue(menuTitles().contains("Hide Sidebar"))
+    }
+
     @MainActor
     func testSettingsExplainsTheForegroundRequirement() throws {
         let app = launchApp()

@@ -113,6 +113,7 @@ struct MaxActApp: App {
         .defaultSize(width: 1300, height: 780)
         .commands {
             MaxActCommands(model: model)
+            SidebarToggleCommand()
             // View ▸ Show/Hide Inspector with its standard shortcut. The detail pane starts
             // hidden, so there has to be a way to open it that isn't "select something".
             InspectorCommands()
@@ -122,6 +123,36 @@ struct MaxActApp: App {
             SettingsView(settings: model.settings, model: model)
         }
     }
+}
+
+/// View ▸ Hide/Show Sidebar, with the system's ⌃⌘S.
+///
+/// Before this the sidebar could be toggled only from the toolbar button `NavigationSplitView`
+/// adds — no menu item, no shortcut — while the inspector opposite had both.
+///
+/// **Not `SidebarCommands()`, which was tried first.** Its shortcut toggled correctly, but its
+/// title stayed "Show Sidebar" in both states, measured across four presses: it validates against
+/// AppKit's split-view item, which doesn't track a visibility that SwiftUI owns through a binding.
+/// This reads and writes that same binding instead, so the title can't disagree with the window.
+struct SidebarToggleCommand: Commands {
+    @FocusedBinding(\.sidebarVisibility) private var visibility
+
+    var body: some Commands {
+        CommandGroup(before: .sidebar) {
+            Button(isShown ? "Hide Sidebar" : "Show Sidebar") {
+                visibility = isShown ? .detailOnly : .all
+            }
+            .keyboardShortcut("s", modifiers: [.command, .control])
+            .disabled(visibility == nil)
+        }
+    }
+
+    private var isShown: Bool { visibility != .detailOnly }
+}
+
+extension FocusedValues {
+    /// The key window's sidebar visibility, for `SidebarToggleCommand`.
+    @Entry var sidebarVisibility: Binding<NavigationSplitViewVisibility>?
 }
 
 /// Menu-bar commands.

@@ -507,3 +507,12 @@ of `Locale.localizedString(forRegionCode:)`.
 
 **Privacy line, unchanged:** only the snapped ~1 km cell is ever sent, and only city-level fields
 are read back. `fullAddress`, `shortAddress`, `name` and `thoroughfare` all return a street address.
+
+## `SidebarCommands()` mislabels a bound split view
+
+With `NavigationSplitView(columnVisibility:)` bound to SwiftUI state, `SidebarCommands()` adds a
+View-menu item whose ⌃⌘S works but whose **title reads "Show Sidebar" in both states** — measured
+over four presses. It validates against AppKit's split-view item, which doesn't track visibility
+SwiftUI owns. MaxAct uses its own `SidebarToggleCommand` instead, reading and writing the same
+binding through `focusedSceneValue(\.sidebarVisibility, $columns)`, so the title can't drift.
+The UI test asserts the title flips, not just that the item exists.

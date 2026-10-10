@@ -828,6 +828,12 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-10** — **View ▸ Hide Sidebar with ⌃⌘S**, requested by the user. `SidebarCommands()`
+  was tried first and toggled correctly, but its title read "Show Sidebar" in both states, because
+  it validates against AppKit's split-view item rather than the SwiftUI binding that owns
+  visibility. Replaced with a command that drives the same binding via `focusedSceneValue`, and a
+  test that the title flips.
+
 - **2026-10-09 (evening)** — **Known issue 9 done: search by region and country.** Measured both
   geocoders first, which changed the design twice. MapKit has no structured subdivision
   (`regionCode` is documented but absent from the SDK), so Core Location supplies the parts while

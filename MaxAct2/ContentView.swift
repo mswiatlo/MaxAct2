@@ -59,6 +59,8 @@ struct ContentView: View {
         .inspector(isPresented: $showsDetail) {
             DetailPane(model: model)
         }
+        // Lets View ▸ Hide Sidebar read and write the same state the split view uses.
+        .focusedSceneValue(\.sidebarVisibility, $columns)
         // Revealed on the first selection, and then left alone. Collapsing it again on every
         // deselect would make the pane flap in and out as someone clicks down a list, and once
         // it's open the user has told us they want it.
