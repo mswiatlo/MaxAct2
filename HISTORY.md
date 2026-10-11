@@ -828,6 +828,9 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-11** — Place reset closed: the user confirmed the re-resolved places, and the pre-reset
+  database backup was deleted at their request.
+
 - **2026-10-11 (late)** — **Borrowing the province for places MapKit gives none**, requested by the
   user after the reset showed UBC rides losing "BC". Places now store city, province and country
   (`PlaceTerms.version` 2), and a local pass after each round of lookups lends a city's agreed

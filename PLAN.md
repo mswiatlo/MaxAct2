@@ -49,10 +49,8 @@ starts with whether its API is open to us at all.
 File ▸ New Window. Extra windows had shared the model's filter, search and selection, so they only
 looked independent; the user chose removing them over making them independent.
 
-**Place names reset, 2026-10-11:** at the user's request the 8 stored places were cleared
-(backup alongside the database, `backup-before-place-reset-2026-10-11`) and have since re-resolved
-with province borrowing — all 8 match "British Columbia". The re-resolve was triggered by a
-`RunCodeSnippet` launch rather than the user, which is now a recorded pitfall.
+**Place names reset, 2026-10-11 — done.** The user confirmed the re-resolved places look right, and
+the backup taken before the reset has been deleted.
 
 **Still unseen live:** the exact duplicate-error wording — no real duplicate has been rejected yet.
 
