@@ -11,7 +11,7 @@ Durable *how-to* facts (API behaviour, Xcode quirks, data contract) are in
 ## Contents
 
 1. Notes from the Phase 6–7 pauses (lessons and bugs found by use)
-2. Fixed known issues 1–5
+2. Fixed known issues (1–5, 9–11, 13)
 3. Seeded UI tests
 4. Original context and research
 5. Original architecture sketch
@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed known issues 1–5
+## 2. Fixed known issues (1–5, 9–11, 13)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -219,6 +219,99 @@ two estimates can't drift, with the measured 2.4 s pinned by a test since the UI
 
 Not built: the opt-in background trickle. The manual action covers the need, and an automatic one
 that occupies the phone for hours deserves its own design pass rather than being tacked on.
+
+
+**Issues 9, 10, 11 and 13**, moved from `PLAN.md` on 2026-10-11 as written there (issue 12 remains open; the sidebar-inset fix that was recorded under it follows issue 10).
+
+**9. ~~Search by region and country, not just the stored label.~~ — done 2026-10-09.**
+
+Searching "British Columbia", "Canada" or "Switzerland" now finds rides whose visible label only
+says "Greater Vancouver BC" or "Geneva, Switzerland". A hidden `placeSearchTerms` field holds city,
+subdivision as given *and* expanded, and country; it is stored pre-folded for case and diacritics,
+so "geneve" finds Genève. `placeTermsVersion` makes the backfill automatic — a row below the
+current version re-resolves itself, at one request per ~1 km cell rather than per workout.
+
+**One MapKit request, with the subdivision parsed from MapKit's own string** *(revised
+2026-10-11)*. MapKit's address representations expose no structured subdivision — `regionCode` is
+documented but absent from the SDK, `regionName` is the country — and the structured sources that do
+(`CLGeocoder`, `MKMapItem.placemark`) are **deprecated in macOS 26**. Issue 9 first used
+`CLGeocoder`, wrongly believing it current; the deprecation warning surfaced only when the file
+recompiled. So the subdivision is now read from `cityWithContext(.full)` — "Vancouver BC Canada"
+minus city and country leaves "BC" — which measured regular across ten places.
+
+The label keeps MapKit's short form ("Vancouver BC", "Geneva, Switzerland"). An empty
+`cityWithContext` is **not** a home-country behaviour, as first written: across ten places it
+happened only at UBC (outside any municipality). New UBC-like places therefore get "Vancouver" and
+no province; places resolved before this change keep their richer stored terms, since the terms
+version was deliberately not bumped.
+
+The subdivision is an abbreviation in Canada, the US and Switzerland but a full name in the UK
+("Scotland"), so expansion uses a bundled ISO 3166-2 table for CA, US and AU, keyed by country
+because "WA" and "NT" collide. Anywhere else the raw value is still stored and searchable.
+
+**Borrowing the province, 2026-10-11** *(user-requested)*. When MapKit gives a city and country but
+no province — UBC — the place borrows the province every other resolved place in that city and
+country agrees on, in a local pass after each round of lookups (`borrowMissingSubdivisions`). It
+declines when places disagree (two Richmonds) rather than guess. Places now store city, province
+and country separately to make this possible (`PlaceTerms.version` 2). Measured on the user's data:
+3 distinct start cells, one of which MapKit returns with no province, and it now reads "Vancouver
+BC" and matches "British Columbia". **To revisit one day:** a city where *no* resolved place has a
+province has nothing to borrow from and stays province-less — judged rare, and accepted.
+
+**10. ~~A visible way to close the detail inspector.~~ — done 2026-10-09.**
+
+A trailing toolbar **Toggle** bound to the same state as ⌃⌘I, so the button and the menu item can't
+disagree. An explicit close now **sticks**: clicking another row leaves it closed, as in Finder and
+Xcode. The old rule reopened it on the next selection, which meant the close button could not be
+obeyed while a row was selected — most of the time.
+
+**The sidebar squeeze turned out not to exist**, which only measuring found. Stating
+`columnVisibility = .all` had fixed the live collapse, not merely its persistence: with the
+inspector open the sidebar keeps its full 217pt. The table is what gives way — see issue 12.
+
+Resizing the window to fit all three was built and then **removed**. It worked, but AppKit's frame
+autosave made the new width stick, so a single selection would have left the window permanently
+wider even with the inspector shut — and Xcode, Finder and Mail all shrink the content instead.
+Worth not rebuilding.
+
+**Related, fixed 2026-10-10 — the sidebar's inset vanished with the inspector open.** Not an
+inset problem: the panes laid out **1,318pt wide in a 1,300pt window**, and SwiftUI centres
+oversized content, clipping 9pt off *both* edges. Cause: the inspector opened at its 560pt ideal and
+never shrank toward its minimum to fit. Now it opens at the minimum, and while it's open the
+window's minimum width rises from 1,040 to 1,200 (measured: the three panes' floor), so even a
+window dragged narrow can't reproduce it. Tested at both widths, and the test fails with the guard
+removed.
+
+**11. ~~Strange pace splits around km 5 on the 2026-09-21 ~1 PM commute ride.~~ — done 2026-10-10.**
+
+A single bad GPS fix jumped **2,516 m out and straight back** in two seconds. It had no speed — the
+known signature of a bad fix — but an accuracy of 27 m, just inside the 30 m limit, so the filter
+kept it. Its phantom 5 km swallowed km 4–5 in two seconds ("3,600 km/h"), and because splits are
+scaled to the ride's real 8.68 km, it also shrank every other kilometre: the whole ride read
+13–17 km/h instead of 19–29.
+
+Measured across all 8 stored routes before fixing: 10 out-and-backs over 100 m, **all speedless**,
+none on a fix with a speed, 9 already caught by accuracy. So `RouteQuality` now also drops a
+speedless fix over 100 m from both neighbours when they sit within half that of each other. It
+found a second, smaller case on the 16:02 ride the same day (161 m out, while stopped); across the
+library the rule adds those two fixes and nothing else. Tests reproduce both shapes, and fail with
+the rule removed. Thumbnails redraw (drawing version 3).
+
+**Follow-up, done 2026-10-11:** the user confirmed both 9/21 rides were bugged on Strava and deleted
+them there. That exposed the next item.
+
+**13. ~~The sync check didn't notice activities deleted on Strava.~~ — done 2026-10-11.** *(reported
+by the user)* The check only ever *added* matches, so the deleted 9/21 rides kept their orange check
+and a link to a dead activity. It now reconciles both ways: a synced workout whose activity is
+missing from the listing is looked up directly, and only a **404** (measured: what Strava returns
+for a deleted activity) resets it to "not uploaded", clearing the link but keeping its tags. Any
+other error stops the check rather than unmarking anything; candidates are limited to the window
+the listing covered; and `activity:read_all` is now required at connect, so a private activity
+can't pass for a deleted one. The banner reports both counts.
+
+**To confirm live:** run Settings → Strava → "Check for Workouts Already on Strava". Expected:
+"2 were deleted on Strava and are marked not uploaded", both 9/21 rides back to not-uploaded, and
+they can then be re-uploaded with the spike fix.
 
 ---
 
@@ -827,6 +920,12 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-11 (late night)** — **Plan housekeeping, prompted by the user** asking whether §7 had
+  been followed. It hadn't, in one respect: fixed issues 9, 10, 11 and 13 had stayed in `PLAN.md`,
+  struck through, instead of moving to `HISTORY.md` §2 — which had grown the plan from ~233 back to
+  337 lines. Moved them verbatim (with the sidebar-inset fix that sat under open issue 12), kept
+  what remains open from them under Known limitations, and rewrote the stale "Where things stand".
 
 - **2026-10-11** — Place reset closed: the user confirmed the re-resolved places, and the pre-reset
   database backup was deleted at their request.

@@ -4,7 +4,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 (HAE), with batch upload to Strava.
 
 **Status:** Phases 0–7 complete and verified live. Next: known issues, then Phase 8.
-**Last updated:** 2026-10-11 (night).
+**Last updated:** 2026-10-11 (late night).
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first: the HAE data
 > contract, the Xcode tooling limits, and the Strava API facts. **`HISTORY.md`** holds how we got
@@ -24,40 +24,29 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ---
 
-## 1. Where things stand — 2026-10-09
+## 1. Where things stand — 2026-10-11
 
 All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 272 in
 `MaxActCore` (`swift test`), 34 app and UI tests (`RunAllTests` — leave the Mac alone for ~4
-minutes, or mouse use breaks them).
+minutes, or mouse use breaks them). A full run makes no Keychain calls.
 
-**Phase 7 is done.** The three remaining live checks all passed against the real account: the sync
-check imports Commute from Strava, editing a Strava-backed tag on a synced workout pushes the
-change, and tagged uploads arrive with the flag set and muted. Together with the earlier run, that
-covers upload, sport correction, duplicate detection, tag import, tag push and mute.
+Phases 0–7 are done and verified live. Since then: issues 9, 10, 11 and 13 fixed; View ▸ Hide
+Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Known issues 10 and 9 are done** (2026-10-09): a toolbar Inspector toggle with a close that
-sticks, and search by region and country.
+**Next:** issue 12 (the table gets cramped with the inspector open), 14 (signing — needs the user),
+6 (chart/map linking), 8 (summary stats), then Phase 8. Issue 7 (TrainingPeaks) starts with
+whether its API is open to us at all.
 
-**On next launch** the app re-resolves every stored place once, to add the region and country
-terms — one geocoder request per distinct place, in the background, with the Place column
-unchanged. Nothing to do; worth knowing if the Place column looks busy for a minute.
-
-**Next:** known issue 12 (the table gets cramped with the inspector open), 14 (signing, needs the user), 6 (chart/map linking), 8 (summary stats), then Phase 8. Issue 7 (TrainingPeaks)
-starts with whether its API is open to us at all.
-
-**2026-10-10:** View ▸ Hide Sidebar (⌃⌘S), and MaxAct is now **one window** — no tabs, no
-File ▸ New Window. Extra windows had shared the model's filter, search and selection, so they only
-looked independent; the user chose removing them over making them independent.
-
-**Place names reset, 2026-10-11 — done.** The user confirmed the re-resolved places look right, and
-the backup taken before the reset has been deleted.
-
-**Still unseen live:** the exact duplicate-error wording — no real duplicate has been rejected yet.
+**Still to confirm live:**
+- Issue 13: "Check for Workouts Already on Strava" (⌥⌘U) should report the two deleted 9/21 rides
+  and mark them not uploaded; they can then be re-uploaded without the GPS spike.
+- The exact duplicate-error wording — no real duplicate has been rejected yet.
 
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Issues 1–5 are fixed; their diagnoses are in `HISTORY.md`.
+Fixed issues — 1–5, 9–11 and 13 — have their diagnoses in `HISTORY.md` §2; what stays open
+from them is under "Known limitations" below.
 
 **6. Link the charts and the map to each other.** *(feature)*
 Clicking a chart point highlights that spot on the map, and clicking the route highlights that time
@@ -91,103 +80,13 @@ Things that will bite:
 - Week start is a locale setting. Use `Calendar.dateInterval(of:for:)` and choose explicitly.
 - Bucket by the current time zone, and say so.
 
-**9. ~~Search by region and country, not just the stored label.~~ — done 2026-10-09.**
-
-Searching "British Columbia", "Canada" or "Switzerland" now finds rides whose visible label only
-says "Greater Vancouver BC" or "Geneva, Switzerland". A hidden `placeSearchTerms` field holds city,
-subdivision as given *and* expanded, and country; it is stored pre-folded for case and diacritics,
-so "geneve" finds Genève. `placeTermsVersion` makes the backfill automatic — a row below the
-current version re-resolves itself, at one request per ~1 km cell rather than per workout.
-
-**One MapKit request, with the subdivision parsed from MapKit's own string** *(revised
-2026-10-11)*. MapKit's address representations expose no structured subdivision — `regionCode` is
-documented but absent from the SDK, `regionName` is the country — and the structured sources that do
-(`CLGeocoder`, `MKMapItem.placemark`) are **deprecated in macOS 26**. Issue 9 first used
-`CLGeocoder`, wrongly believing it current; the deprecation warning surfaced only when the file
-recompiled. So the subdivision is now read from `cityWithContext(.full)` — "Vancouver BC Canada"
-minus city and country leaves "BC" — which measured regular across ten places.
-
-The label keeps MapKit's short form ("Vancouver BC", "Geneva, Switzerland"). An empty
-`cityWithContext` is **not** a home-country behaviour, as first written: across ten places it
-happened only at UBC (outside any municipality). New UBC-like places therefore get "Vancouver" and
-no province; places resolved before this change keep their richer stored terms, since the terms
-version was deliberately not bumped.
-
-The subdivision is an abbreviation in Canada, the US and Switzerland but a full name in the UK
-("Scotland"), so expansion uses a bundled ISO 3166-2 table for CA, US and AU, keyed by country
-because "WA" and "NT" collide. Anywhere else the raw value is still stored and searchable.
-
-**Borrowing the province, 2026-10-11** *(user-requested)*. When MapKit gives a city and country but
-no province — UBC — the place borrows the province every other resolved place in that city and
-country agrees on, in a local pass after each round of lookups (`borrowMissingSubdivisions`). It
-declines when places disagree (two Richmonds) rather than guess. Places now store city, province
-and country separately to make this possible (`PlaceTerms.version` 2). Measured on the user's data:
-3 distinct start cells, one of which MapKit returns with no province, and it now reads "Vancouver
-BC" and matches "British Columbia". **To revisit one day:** a city where *no* resolved place has a
-province has nothing to borrow from and stays province-less — judged rare, and accepted.
-
-**10. ~~A visible way to close the detail inspector.~~ — done 2026-10-09.**
-
-A trailing toolbar **Toggle** bound to the same state as ⌃⌘I, so the button and the menu item can't
-disagree. An explicit close now **sticks**: clicking another row leaves it closed, as in Finder and
-Xcode. The old rule reopened it on the next selection, which meant the close button could not be
-obeyed while a row was selected — most of the time.
-
-**The sidebar squeeze turned out not to exist**, which only measuring found. Stating
-`columnVisibility = .all` had fixed the live collapse, not merely its persistence: with the
-inspector open the sidebar keeps its full 217pt. The table is what gives way — see issue 12.
-
-Resizing the window to fit all three was built and then **removed**. It worked, but AppKit's frame
-autosave made the new width stick, so a single selection would have left the window permanently
-wider even with the inspector shut — and Xcode, Finder and Mail all shrink the content instead.
-Worth not rebuilding.
-
-**11. ~~Strange pace splits around km 5 on the 2026-09-21 ~1 PM commute ride.~~ — done 2026-10-10.**
-
-A single bad GPS fix jumped **2,516 m out and straight back** in two seconds. It had no speed — the
-known signature of a bad fix — but an accuracy of 27 m, just inside the 30 m limit, so the filter
-kept it. Its phantom 5 km swallowed km 4–5 in two seconds ("3,600 km/h"), and because splits are
-scaled to the ride's real 8.68 km, it also shrank every other kilometre: the whole ride read
-13–17 km/h instead of 19–29.
-
-Measured across all 8 stored routes before fixing: 10 out-and-backs over 100 m, **all speedless**,
-none on a fix with a speed, 9 already caught by accuracy. So `RouteQuality` now also drops a
-speedless fix over 100 m from both neighbours when they sit within half that of each other. It
-found a second, smaller case on the 16:02 ride the same day (161 m out, while stopped); across the
-library the rule adds those two fixes and nothing else. Tests reproduce both shapes, and fail with
-the rule removed. Thumbnails redraw (drawing version 3).
-
-**Follow-up, done 2026-10-11:** the user confirmed both 9/21 rides were bugged on Strava and deleted
-them there. That exposed the next item.
-
-**13. ~~The sync check didn't notice activities deleted on Strava.~~ — done 2026-10-11.** *(reported
-by the user)* The check only ever *added* matches, so the deleted 9/21 rides kept their orange check
-and a link to a dead activity. It now reconciles both ways: a synced workout whose activity is
-missing from the listing is looked up directly, and only a **404** (measured: what Strava returns
-for a deleted activity) resets it to "not uploaded", clearing the link but keeping its tags. Any
-other error stops the check rather than unmarking anything; candidates are limited to the window
-the listing covered; and `activity:read_all` is now required at connect, so a private activity
-can't pass for a deleted one. The banner reports both counts.
-
-**To confirm live:** run Settings → Strava → "Check for Workouts Already on Strava". Expected:
-"2 were deleted on Strava and are marked not uploaded", both 9/21 rides back to not-uploaded, and
-they can then be re-uploaded with the spike fix.
-
 **12. The table gets cramped when the inspector is open.** *(eased 2026-10-10)*
 
 At the default 1,300pt window the table now gets **664pt** with the inspector open, up from 562pt,
-because the inspector opens at its 440pt minimum instead of a 560pt ideal (see the fix below).
+because the inspector opens at its 440pt minimum instead of a 560pt ideal (the sidebar-inset fix; see `HISTORY.md` §2, under issue 10).
 Still below the sum of the column minimums, so some columns compress. Remaining options, none
 measured: automatically hiding low-value columns under some width, or accepting it — widening the
 window once is sticky and solves it per-user. Decide with real content in the window.
-
-**Fixed alongside it, 2026-10-10 — the sidebar's inset vanished with the inspector open.** Not an
-inset problem: the panes laid out **1,318pt wide in a 1,300pt window**, and SwiftUI centres
-oversized content, clipping 9pt off *both* edges. Cause: the inspector opened at its 560pt ideal and
-never shrank toward its minimum to fit. Now it opens at the minimum, and while it's open the
-window's minimum width rises from 1,040 to 1,200 (measured: the three panes' floor), so even a
-window dragged narrow can't reproduce it. Tested at both widths, and the test fails with the guard
-removed.
 
 **14. The real app asks for the Keychain password after every rebuild.** *(follow-up, user-requested
 2026-10-11)*
@@ -217,8 +116,15 @@ setting.
 
 ### Known limitations
 
+- **A city with no province anywhere stays province-less** (from issue 9). MapKit gives no province
+  for places outside a municipality (UBC); such a place borrows one from other places in the same
+  city and country. If none of them has one, there's nothing to borrow. Judged rare; revisit if it
+  shows up.
+- **Region search expands abbreviations only for Canada, the US and Australia** (from issue 9).
+  Elsewhere the raw value is stored and searchable.
 - **No `.hae` reader.** It would give HealthKit's own laps, splits and pause events, which MaxAct
-  currently reconstructs from the route. Worth reconsidering if issue 11 traces back to splits.
+  currently reconstructs from the route. (Issue 11's odd splits turned out to be a GPS fault, not
+  this.)
 - **UI tests share the app's window geometry.** AppKit's frame autosave and split-view state live
   in the standard defaults, which `--ui-testing` does not isolate, and the saved frame is **per
   display configuration**. So a test run can change where the real app opens, and a test can't
