@@ -4,7 +4,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 (HAE), with batch upload to Strava.
 
 **Status:** Phases 0–7 complete and verified live. Next: known issues, then Phase 8.
-**Last updated:** 2026-10-11.
+**Last updated:** 2026-10-11 (evening).
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first: the HAE data
 > contract, the Xcode tooling limits, and the Strava API facts. **`HISTORY.md`** holds how we got
@@ -190,9 +190,11 @@ setting.
   accessibility, so they were checked by hand.
 - **Column widths are tuned for this Mac's content.** Longer place or activity names will
   truncate. Retuning means bumping `workoutTableColumns.v5`.
-- **The first UI test of a full run sometimes can't activate the app** ("Running Background") —
-  twice on 2026-10-10/11, both times `testConfirmingDeleteEmptiesTheLibrary`, both passing on an
-  immediate rerun. Not yet diagnosed; rerun it alone before treating it as a real failure.
+- **Ad-hoc signing makes the real app ask for the Keychain password after every rebuild.** Each
+  build has a new signature, so the Keychain treats it as a new app. Needs a stable signing
+  identity — a free Apple ID in Xcode (a personal team), or a self-signed code-signing certificate
+  — which is a step only the user can take. UI tests are no longer affected (see the change log,
+  2026-10-11): they use in-memory secrets and make no Keychain calls.
 - **Performance tests have loose thresholds.** They catch 10× regressions; the printed figures are
   the real measurements.
 - **`Spikes/` stays** as the quickest way to inspect a stored series file. It's excluded from every

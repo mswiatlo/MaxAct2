@@ -2,15 +2,37 @@ import Foundation
 import MaxActCore
 import Security
 
+/// What the app needs from a secret store: the client's needs, plus saving the user's API
+/// application credentials from Settings.
+protocol AppSecretStore: StravaSecretStore {
+    func save(credentials: StravaCredentials?) async throws
+}
+
+/// Secrets held in memory only, for UI tests.
+///
+/// **UI tests must not touch the Keychain at all**, not merely a separate service. The app is
+/// ad-hoc signed, so every build has a new code signature and the Keychain treats it as a new
+/// app: any access can raise a password prompt, which steals focus and left a test unable to bring
+/// the app forward ("Running Background"). Measured: a single UI test made five Keychain lookups.
+/// In memory, there's nothing to prompt for — and nothing a test could do to the real login.
+actor InMemorySecretStore: AppSecretStore {
+    private var storedCredentials: StravaCredentials?
+    private var storedTokens: StravaTokens?
+
+    func credentials() async -> StravaCredentials? { storedCredentials }
+    func tokens() async -> StravaTokens? { storedTokens }
+    func save(tokens: StravaTokens?) async throws { storedTokens = tokens }
+    func save(credentials: StravaCredentials?) async throws { storedCredentials = credentials }
+}
+
 /// Strava credentials and tokens in the login Keychain.
 ///
 /// Two generic-password items under one service: the user's API application (client ID and
 /// secret) and the OAuth tokens. Both are JSON, so adding a field later doesn't mean a migration.
 /// `WhenUnlocked`, because nothing here needs to work while the Mac is locked.
 ///
-/// The service name is injected so UI tests get their own — a UI test once overwrote the real
-/// Health Auto Export token, and the same mistake with Strava tokens would sign the user out.
-actor KeychainSecretStore: StravaSecretStore {
+/// UI tests don't use this at all — see `InMemorySecretStore`.
+actor KeychainSecretStore: AppSecretStore {
     private let service: String
 
     private enum Account: String {

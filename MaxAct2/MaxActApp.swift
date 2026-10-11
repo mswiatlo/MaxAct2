@@ -60,9 +60,10 @@ struct MaxActApp: App {
                 settings: settings,
                 seedCount: Self.uiTestingSeedCount,
                 resolvesPlaces: false,
-                // Its own Keychain service: a UI test must never be able to sign the real Strava
-                // account out, as one once overwrote the real Health Auto Export token.
-                stravaSecrets: KeychainSecretStore(service: "com.swiatlowski.MaxAct.strava.uitests")
+                // Memory, not the Keychain. A UI test must never be able to sign the real Strava
+                // account out, and — since every build is a new ad-hoc signature — any Keychain
+                // access can raise a password prompt that steals focus mid-test.
+                stravaSecrets: InMemorySecretStore()
             ))
             return
         }
@@ -211,7 +212,10 @@ struct MaxActCommands: Commands {
             .disabled(model.stravaUploadCount(model.selectedItems).ready == 0
                       || model.syncStatus.isRunning || !model.isStravaConnected)
 
+            // ⌥⌘U: the Option variant of ⇧⌘U, so the two Strava commands sit together on the
+            // same letter. Free in the app and not a common system shortcut.
             Button("Check Strava for Existing Activities") { model.startStravaCheck() }
+                .keyboardShortcut("u", modifiers: [.command, .option])
                 .disabled(model.syncStatus.isRunning || !model.isStravaConnected || model.items.isEmpty)
         }
 

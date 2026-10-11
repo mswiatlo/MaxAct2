@@ -156,9 +156,9 @@ final class AppModel {
 
     // MARK: Strava
 
-    /// Where the Strava application credentials and tokens live. A separate Keychain service
-    /// under UI testing, so a test can never sign the real account out.
-    let stravaSecrets: KeychainSecretStore
+    /// Where the Strava application credentials and tokens live: the Keychain normally, memory
+    /// under UI testing, so a test can never sign the real account out or raise a password prompt.
+    let stravaSecrets: any AppSecretStore
     let strava: StravaClient
 
     /// Whether a client ID and secret have been entered, and whose account is connected.
@@ -186,7 +186,7 @@ final class AppModel {
         settings: AppSettings,
         seedCount: Int? = nil,
         resolvesPlaces: Bool = true,
-        stravaSecrets: KeychainSecretStore = KeychainSecretStore()
+        stravaSecrets: any AppSecretStore = KeychainSecretStore()
     ) {
         self.stravaSecrets = stravaSecrets
         strava = StravaClient(secrets: stravaSecrets)
@@ -202,7 +202,7 @@ final class AppModel {
     /// Used when the on-disk stores can't be opened. Everything works; nothing persists.
     static func inMemoryFallback(
         settings: AppSettings, seedCount: Int? = nil, resolvesPlaces: Bool = true,
-        stravaSecrets: KeychainSecretStore = KeychainSecretStore()
+        stravaSecrets: any AppSecretStore = KeychainSecretStore()
     ) -> AppModel {
         // Force-unwrapped deliberately: an in-memory container and a temp directory failing
         // would mean the process cannot allocate or write anywhere, and there is no recovery.

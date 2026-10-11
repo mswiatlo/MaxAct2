@@ -113,6 +113,9 @@ final class MaxAct2UITests: XCTestCase {
             "Sync should be in the File menu with a keyboard shortcut."
         )
         XCTAssertTrue(app.menuItems["Download Detail for Selection"].exists)
+        // Both Strava commands, which share the letter U (⇧⌘U upload, ⌥⌘U check).
+        XCTAssertTrue(app.menuItems["Upload Selection to Strava"].exists)
+        XCTAssertTrue(app.menuItems["Check Strava for Existing Activities"].exists)
         app.typeKey(.escape, modifierFlags: [])
 
         let editMenu = app.menuBars.menuBarItems["Edit"]

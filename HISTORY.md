@@ -828,6 +828,14 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-11 (evening)** — **⌥⌘U for "Check Strava for Existing Activities"**, beside ⇧⌘U upload,
+  and **UI tests no longer touch the Keychain.** The user diagnosed the recurring first-test
+  failure: a Keychain password prompt stole focus. Measured with the unified log: one UI test made
+  five `SecItemCopyMatching` calls, each able to prompt because every ad-hoc build is a new
+  signature to the Keychain. Under `--ui-testing` secrets now live in an `InMemorySecretStore`; the
+  log showed zero Keychain calls across the full suite afterwards, and 33/33 passed first time.
+  The real app's prompts remain until there's a stable signing identity.
+
 - **2026-10-11** — **Sync check now notices activities deleted on Strava** (issue 13). The user
   deleted the two spiked 9/21 rides on Strava; MaxAct kept showing them synced, because the check
   only ever added matches. Measured first: a deleted activity's direct lookup returns 404 "Record

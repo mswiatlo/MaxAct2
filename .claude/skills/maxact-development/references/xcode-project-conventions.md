@@ -539,3 +539,19 @@ changing that type resets every user's saved window size and position once.
 into the shared defaults; a failing assertion that skipped an inline restore left a narrow window
 saved for every later test and for the real app on that display. Leave ~1.5 s after the restoring
 drag, or termination can beat the autosave.
+
+## Keychain prompts and UI tests
+
+The app is **ad-hoc signed**, so every build has a new code signature and the Keychain treats it as
+a new app — any access can raise a password prompt. During UI tests that prompt steals focus and
+the test fails with "Failed to activate application (Running Background)", usually the first test
+after a build. Under `--ui-testing` the app therefore uses `InMemorySecretStore` and makes **no**
+Keychain calls. Check with:
+
+```
+/usr/bin/log show --start "<time>" --style compact \
+  --predicate 'process == "MaxAct2" AND eventMessage CONTAINS "SecItem"' | grep -c SecItem
+```
+
+It was 5 per test before, 0 after. The real app still prompts after rebuilds until it has a stable
+signing identity (`security find-identity -v -p codesigning` found none on this Mac).
