@@ -17,7 +17,7 @@ import Testing
     /// Without this the host was the *real* app: it opened the user's database and settings and
     /// read their Strava login from the Keychain — which, ad-hoc signed, raised a password prompt
     /// that then stopped the first UI test from bringing the app forward.
-    @Test func hostRunsIsolatedFromRealData() {
+    @MainActor @Test func hostRunsIsolatedFromRealData() {
         #expect(MaxActApp.isHostingUnitTests)
         #expect(MaxActApp.isIsolatedForTesting)
     }

@@ -26,7 +26,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ## 1. Where things stand — 2026-10-09
 
-All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 261 in
+All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 265 in
 `MaxActCore` (`swift test`), 34 app and UI tests (`RunAllTests` — leave the Mac alone for ~4
 minutes, or mouse use breaks them).
 
@@ -96,19 +96,21 @@ subdivision as given *and* expanded, and country; it is stored pre-folded for ca
 so "geneve" finds Genève. `placeTermsVersion` makes the backfill automatic — a row below the
 current version re-resolves itself, at one request per ~1 km cell rather than per workout.
 
-**Two geocoders, which the measurement forced.** MapKit composes the label well ("Boulder, CO
-United States" but "Geneva, Switzerland") and exposes no subdivision — `regionCode` is documented
-but **absent from the SDK**, and `regionName` is the country. `CLPlacemark` has the structure
-(`locality`, `administrativeArea`, `country`, `isoCountryCode`) and no composer. Each is used for
-what it does well, two requests per new cell, both throttled.
+**One MapKit request, with the subdivision parsed from MapKit's own string** *(revised
+2026-10-11)*. MapKit's address representations expose no structured subdivision — `regionCode` is
+documented but absent from the SDK, `regionName` is the country — and the structured sources that do
+(`CLGeocoder`, `MKMapItem.placemark`) are **deprecated in macOS 26**. Issue 9 first used
+`CLGeocoder`, wrongly believing it current; the deprecation warning surfaced only when the file
+recompiled. So the subdivision is now read from `cityWithContext(.full)` — "Vancouver BC Canada"
+minus city and country leaves "BC" — which measured regular across ten places.
 
-Also measured, and the reason the label didn't regress: `cityWithContext` returns an **empty
-string** for a place in the device's own region, not just over water — Vancouver came back blank on
-a Canadian Mac. Composing `locality + administrativeArea` as the second fallback reproduces
-"Greater Vancouver BC" exactly; falling straight through to `cityName` would have quietly demoted
-every local label to "Vancouver" on the first re-resolve.
+The label keeps MapKit's short form ("Vancouver BC", "Geneva, Switzerland"). An empty
+`cityWithContext` is **not** a home-country behaviour, as first written: across ten places it
+happened only at UBC (outside any municipality). New UBC-like places therefore get "Vancouver" and
+no province; places resolved before this change keep their richer stored terms, since the terms
+version was deliberately not bumped.
 
-`administrativeArea` is an abbreviation in Canada, the US and Switzerland but a full name in the UK
+The subdivision is an abbreviation in Canada, the US and Switzerland but a full name in the UK
 ("Scotland"), so expansion uses a bundled ISO 3166-2 table for CA, US and AU, keyed by country
 because "WA" and "NT" collide. Anywhere else the raw value is still stored and searchable.
 

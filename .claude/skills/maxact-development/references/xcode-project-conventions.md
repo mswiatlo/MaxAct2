@@ -483,30 +483,33 @@ Assert on **relative** geometry (this pane kept its width) rather than absolute 
 been squeezed down by the inspector, so an existence check passed throughout the original bug.
 Assert on `frame.width` when the question is whether something still has room.
 
-## Reverse geocoding: MapKit composes, Core Location structures
+## Reverse geocoding on macOS 26: MapKit only, and the subdivision is a string
 
-Measured 2026-10-09 against four countries, because the two APIs are not interchangeable:
+*(Measured 2026-10-11 across ten places. Supersedes an earlier note that recommended `CLGeocoder`.)*
 
-| | `MKAddressRepresentations` | `CLPlacemark` |
+| | Status | Gives |
 |---|---|---|
-| City | `cityName` | `locality` ("Greater Vancouver" where MapKit says "Vancouver") |
-| Subdivision | **none** — `regionCode` is documented but *absent from the SDK*; `regionName` is the **country** | `administrativeArea` |
-| Country | `regionName` | `country`, `isoCountryCode` |
-| Composed label | `cityWithContext(_:)` — knows to write "Boulder, CO United States" but "Geneva, Switzerland" | none |
+| `MKAddressRepresentations` | current | `cityName`, `cityWithContext(_:)`, `regionName` (**the country**). `regionCode` is documented but **absent from the SDK**. No subdivision field. |
+| `CLGeocoder` | **deprecated in macOS 26** ("Use MapKit") | `locality`, `administrativeArea`, `country`, `isoCountryCode` |
+| `MKMapItem.placemark` | **deprecated in macOS 26** ("Use location, address and addressRepresentations") | the same four fields |
 
-So MaxAct uses MapKit for the displayed label and Core Location for the structured parts that feed
-region search. `CLGeocoder` is not deprecated on macOS 26.
+So the subdivision comes out of `cityWithContext(.full)` by removing the city prefix and the country
+suffix (`PlaceTerms.subdivision(inCityContext:city:country:)`): "Vancouver BC Canada" → "BC",
+"North Vancouver BC, Canada" → "BC", "Seattle, WA United States" → "WA", "Edinburgh, Scotland" →
+"Scotland", "Geneva, Switzerland" → none. The country code comes from matching `regionName` against
+`Locale.localizedString(forRegionCode:)`.
 
-**`cityWithContext` returns an empty string for the device's own region**, not only over water: on
-a Canadian Mac, Vancouver came back blank while Geneva and Boulder resolved. Any fallback chain has
-to treat `""` as absent, and dropping straight to `cityName` loses the province.
+**An empty `cityWithContext` means "no municipality", not "home country".** Of ten places only UBC
+(University Endowment Lands) returned `""` — with `cityName` still "Vancouver". It's also `""` over
+water. Treat `""` as absent.
 
-`administrativeArea` is an abbreviation in CA/US/CH ("BC", "CO", "GE") but a full name in GB
-("Scotland"), so expanding it needs a per-country table — Foundation has no subdivision equivalent
-of `Locale.localizedString(forRegionCode:)`.
+**Deprecation warnings only appear when the file recompiles.** `XcodeListNavigatorIssues` reported
+zero warnings after the `CLGeocoder` code was added, and the warning surfaced days later when
+`PlaceResolver.swift` rebuilt. After adding a new API, grep that build's own log for the file, not
+just the issue list.
 
 **Privacy line, unchanged:** only the snapped ~1 km cell is ever sent, and only city-level fields
-are read back. `fullAddress`, `shortAddress`, `name` and `thoroughfare` all return a street address.
+are read back. `fullAddress`, `shortAddress` and `name` all return a street address.
 
 ## `SidebarCommands()` mislabels a bound split view
 

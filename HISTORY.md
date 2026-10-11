@@ -828,6 +828,15 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-11 (night)** — **Two corrections to issue 9.** A clean rebuild surfaced deprecation
+  warnings: `CLGeocoder` is **deprecated in macOS 26**, contrary to what issue 9 recorded, and so is
+  the obvious alternative, `MKMapItem.placemark`. The earlier warning check had missed it because
+  the file hadn't recompiled. There is no supported structured subdivision now, so the resolver uses
+  one MapKit request and parses the province from `cityWithContext(.full)`, which measured regular
+  across ten places. Measuring those ten also overturned the second claim: an empty
+  `cityWithContext` is not a home-country behaviour but a UBC quirk (no municipality). Terms
+  version not bumped, so stored places — including UBC's richer CLGeocoder-era terms — are kept.
+
 - **2026-10-11 (evening)** — **⌥⌘U for "Check Strava for Existing Activities"**, beside ⇧⌘U upload,
   and **UI tests no longer touch the Keychain.** The user diagnosed the recurring first-test
   failure: a Keychain password prompt stole focus. Measured with the unified log: one UI test made

@@ -139,3 +139,47 @@ import Testing
         #expect(!item(place: nil, terms: nil).matches(searchText: "Canada"))
     }
 }
+
+/// Reading the subdivision out of MapKit's formatted city string — the only non-deprecated source
+/// on macOS 26. Every input here is a string MapKit actually returned, measured 2026-10-11.
+@Suite struct SubdivisionParsingTests {
+    @Test("the province or state is what's left between city and country")
+    func measuredStrings() {
+        #expect(PlaceTerms.subdivision(inCityContext: "Vancouver BC Canada", city: "Vancouver", country: "Canada") == "BC")
+        #expect(PlaceTerms.subdivision(inCityContext: "North Vancouver BC, Canada", city: "North Vancouver", country: "Canada") == "BC")
+        #expect(PlaceTerms.subdivision(inCityContext: "Toronto ON Canada", city: "Toronto", country: "Canada") == "ON")
+        #expect(PlaceTerms.subdivision(inCityContext: "Seattle, WA United States", city: "Seattle", country: "United States") == "WA")
+        // The UK names the nation, and the country isn't repeated at the end.
+        #expect(PlaceTerms.subdivision(inCityContext: "Edinburgh, Scotland", city: "Edinburgh", country: "United Kingdom") == "Scotland")
+    }
+
+    @Test("no subdivision is reported as none, not guessed")
+    func nothingToFind() {
+        // Geneva's string carries the country only.
+        #expect(PlaceTerms.subdivision(inCityContext: "Geneva, Switzerland", city: "Geneva", country: "Switzerland") == nil)
+        // UBC, outside any municipality, comes back empty.
+        #expect(PlaceTerms.subdivision(inCityContext: "", city: "Vancouver", country: "Canada") == nil)
+        #expect(PlaceTerms.subdivision(inCityContext: nil, city: "Vancouver", country: "Canada") == nil)
+        // A string that doesn't start with the city can't be split safely.
+        #expect(PlaceTerms.subdivision(inCityContext: "Somewhere BC Canada", city: "Vancouver", country: "Canada") == nil)
+    }
+
+    @Test("country names map to the codes the subdivision table is keyed by")
+    func countryCodes() {
+        let english = Locale(identifier: "en_US")
+        #expect(PlaceTerms.countryCode(forName: "Canada", locale: english) == "CA")
+        #expect(PlaceTerms.countryCode(forName: "United States", locale: english) == "US")
+        #expect(PlaceTerms.countryCode(forName: "Switzerland", locale: english) == "CH")
+        #expect(PlaceTerms.countryCode(forName: "United Kingdom", locale: english) == "GB")
+        #expect(PlaceTerms.countryCode(forName: "Atlantis", locale: english) == nil)
+    }
+
+    @Test("parsed and mapped, the parts give the same search terms as before")
+    func endToEnd() {
+        let subdivision = PlaceTerms.subdivision(inCityContext: "Vancouver BC Canada", city: "Vancouver", country: "Canada")
+        let terms = PlaceTerms.searchTerms(for: PlaceDescription(
+            city: "Vancouver", subdivision: subdivision, country: "Canada",
+            countryCode: PlaceTerms.countryCode(forName: "Canada", locale: Locale(identifier: "en_US"))))
+        #expect(terms == "vancouver · bc · british columbia · canada")
+    }
+}

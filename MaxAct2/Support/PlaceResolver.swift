@@ -109,82 +109,62 @@ actor PlaceResolver {
         case failed
     }
 
-    /// Resolves one cell: MapKit for the label, Core Location for the parts search needs.
+    /// Resolves one cell from a single MapKit request: the short label, and the parts that let
+    /// search match a region or country.
     ///
-    /// **Two geocoders, on purpose.** MapKit composes the label well — it knows to write
-    /// "Boulder, CO United States" but "Geneva, Switzerland" — yet it exposes no structured
-    /// subdivision: `regionCode` is documented but *absent from the SDK*, and `regionName` is the
-    /// country. `CLPlacemark` has the structure (`locality`, `administrativeArea`, `country`,
-    /// `isoCountryCode`) and no equivalent composer. So each is used for what it does well.
+    /// **MapKit only, and one request.** The subdivision has no supported structured source on
+    /// macOS 26 — `CLGeocoder` (used at first) and `MKMapItem.placemark` both carry
+    /// `administrativeArea` but are **deprecated**, and MapKit's address representations expose
+    /// only formatted strings. So the subdivision is read out of `cityWithContext(.full)`
+    /// (``PlaceTerms/subdivision(inCityContext:city:country:)``), which measured regular across ten
+    /// places, and the country code is looked up from MapKit's country name.
     ///
-    /// Costs two requests per *new cell*, not per workout; both go through the same throttle, and
-    /// the cache means a repeat trailhead costs nothing.
-    ///
-    /// Reads only city-level fields from either. **Never `name`, `shortAddress` or `fullAddress`,
-    /// nor a placemark's `thoroughfare`** — measured, those return the street address
-    /// ("4629 Haggart St, Vancouver"), which is the whole thing the snapping exists to avoid.
+    /// Reads only city-level fields. **Never `name`, `shortAddress` or `fullAddress`** — measured,
+    /// those return the street address ("4629 Haggart St, Vancouver"), which is the whole thing
+    /// the snapping exists to avoid.
     private func lookUp(_ coordinate: Coordinate) async -> Outcome {
-        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-        guard let request = MKReverseGeocodingRequest(location: location) else {
-            return .nothingThere
-        }
+        guard let request = MKReverseGeocodingRequest(
+            location: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        ) else { return .nothingThere }
 
-        let context: String?
-        let cityName: String?
+        let representations: MKAddressRepresentations
         do {
-            let items = try await request.mapItems
-            guard let representations = items.first?.addressRepresentations else {
+            guard let found = try await request.mapItems.first?.addressRepresentations else {
                 return .nothingThere
             }
-            context = representations.cityWithContext(.automatic)?.cleaned
-            cityName = representations.cityName?.cleaned
+            representations = found
         } catch {
             return .failed
         }
 
-        // Core Location's turn. A failure here is survivable — the label is what the column needs,
-        // and a later `PlaceTerms.version` bump will try the terms again.
-        await waitForSlot()
-        let parts = await describe(location)
+        let city = representations.cityName?.cleaned
+        let country = representations.regionName?.cleaned
+        let parts = PlaceDescription(
+            city: city,
+            subdivision: PlaceTerms.subdivision(
+                inCityContext: representations.cityWithContext(.full)?.cleaned, city: city, country: country),
+            country: country,
+            countryCode: PlaceTerms.countryCode(forName: country)
+        )
 
-        guard let label = label(context: context, cityName: cityName, parts: parts) else {
-            return .nothingThere
-        }
-        return .found(Place(label: label, searchTerms: parts.flatMap(PlaceTerms.searchTerms(for:))))
+        guard let label = label(
+            context: representations.cityWithContext(.automatic)?.cleaned, parts: parts
+        ) else { return .nothingThere }
+        return .found(Place(label: label, searchTerms: PlaceTerms.searchTerms(for: parts)))
     }
 
-    /// Picks the most informative short label available.
+    /// MapKit's own short form when it has one — "Vancouver BC", "Geneva, Switzerland" — else the
+    /// city alone.
     ///
-    /// The order matters, and the second entry is why this isn't just MapKit's string. Measured:
-    /// `cityWithContext` returns an **empty string** both for a start over water *and* for a place
-    /// in the device's own region — on a Canadian Mac, Vancouver came back blank. Falling straight
-    /// to `cityName` would then have quietly demoted every local label from "Greater Vancouver BC"
-    /// to "Vancouver" the first time a library was re-resolved.
-    private func label(context: String?, cityName: String?, parts: PlaceDescription?) -> String? {
+    /// Measured: `cityWithContext` comes back as an **empty string** over water and for places
+    /// outside any municipality. The one seen was UBC (the University Endowment Lands), which
+    /// reported a city of "Vancouver" but no context at all. Every other Canadian place tested
+    /// returned "City BC"-style context. (Issue 9 first read that empty string as a "device's own
+    /// region" behaviour, from that single UBC sample; ten places showed otherwise.)
+    private func label(context: String?, parts: PlaceDescription) -> String? {
         if let context { return context }
-        if let city = parts?.city, let subdivision = parts?.subdivision {
-            return "\(city) \(subdivision)"
-        }
-        return cityName ?? parts?.city
-    }
-
-    /// The structured half, via Core Location — the only one of the two that exposes a
-    /// subdivision. Reads four city-level fields and nothing finer.
-    private func describe(_ location: CLLocation) async -> PlaceDescription? {
-        guard let placemark = try? await CLGeocoder().reverseGeocodeLocation(location).first else {
-            return nil
-        }
-        // `CLPlacemark` is `@MainActor`-isolated under this project's default isolation, so its
-        // fields are read in one hop rather than four.
-        let description = await MainActor.run {
-            PlaceDescription(
-                city: placemark.locality?.cleaned,
-                subdivision: placemark.administrativeArea?.cleaned,
-                country: placemark.country?.cleaned,
-                countryCode: placemark.isoCountryCode?.cleaned
-            )
-        }
-        return description.isEmpty ? nil : description
+        if let city = parts.city, let subdivision = parts.subdivision { return "\(city) \(subdivision)" }
+        return parts.city
     }
 
     private func waitForSlot() async {

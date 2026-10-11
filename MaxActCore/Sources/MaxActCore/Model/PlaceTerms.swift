@@ -93,6 +93,48 @@ public enum PlaceTerms {
         folded(text).contains(needle)
     }
 
+    /// The subdivision inside MapKit's formatted `cityWithContext(.full)`: what's left once the
+    /// city is removed from the front and the country from the end.
+    ///
+    /// **Why parse a string.** On macOS 26 there is no supported structured source: MapKit's
+    /// address representations expose no subdivision (`regionCode` is documented but absent from
+    /// the SDK, `regionName` is the country), and both `CLGeocoder` and `MKMapItem.placemark` —
+    /// which do carry `administrativeArea` — are deprecated. The formatted string is the
+    /// replacement Apple points to, and measured across ten places it is regular:
+    /// "Vancouver BC Canada", "North Vancouver BC, Canada", "Seattle, WA United States",
+    /// "Edinburgh, Scotland" (country "United Kingdom", so nothing trails), "Geneva, Switzerland"
+    /// (nothing left: correctly no subdivision).
+    ///
+    /// Returns `nil` when nothing is left, or when the string doesn't start with the city — in
+    /// which case it isn't safe to guess where the city ends.
+    public static func subdivision(inCityContext context: String?, city: String?, country: String?) -> String? {
+        guard var rest = context?.trimmingCharacters(in: .whitespaces), let city, !city.isEmpty,
+              rest.hasPrefix(city) else { return nil }
+        rest = String(rest.dropFirst(city.count))
+        if let country, !country.isEmpty, rest.hasSuffix(country) {
+            rest = String(rest.dropLast(country.count))
+        }
+        let trimmed = rest.trimmingCharacters(in: CharacterSet(charactersIn: " ,"))
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    /// The ISO 3166-1 code for a country name as MapKit spells it in `locale` — "Canada" → "CA".
+    ///
+    /// Needed only to key the subdivision table, since MapKit gives the country by name and the
+    /// structured `isoCountryCode` lives on the deprecated placemark.
+    public static func countryCode(forName name: String?, locale: Locale = .current) -> String? {
+        guard let name, !name.isEmpty else { return nil }
+        for region in Locale.Region.isoRegions {
+            let code = region.identifier
+            guard code.count == 2, code.allSatisfy(\.isLetter) else { continue }
+            if locale.localizedString(forRegionCode: code)?
+                .compare(name, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame {
+                return code
+            }
+        }
+        return nil
+    }
+
     /// ISO 3166-2, keyed by country so the collisions resolve: `NT` is Canada's Northwest
     /// Territories and Australia's Northern Territory, `WA` is Washington and Western Australia.
     static let subdivisions: [String: String] = [
