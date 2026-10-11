@@ -942,6 +942,15 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-11** — **Issue 14: signing with the Personal Team.** The user signed into Xcode and
+  had a certificate, but `security find-identity -v` found no valid identity: the certificate's
+  issuer, Apple's **G3** developer intermediate, was missing, and the keychain held only the G1
+  intermediate that expired in 2023. Downloaded G3 from Apple, verified its fingerprint and that it
+  issued the user's certificate, and installed it with the user's approval; the identity became
+  valid. Set `DEVELOPMENT_TEAM` on all three targets. The build is signed "Apple Development" with a
+  hash-free designated requirement, so Keychain "Always Allow" will persist across rebuilds — to be
+  confirmed live.
+
 - **2026-10-11** — **Issue 12 re-examined with real content and fixed properly.** The earlier
   closing that day skipped the check the plan called for. Added `--ui-testing-real-copy` (a copy of
   the real library in the app's temp folder, isolated as for UI tests) and a self-skipping

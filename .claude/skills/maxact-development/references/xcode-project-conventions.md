@@ -602,3 +602,20 @@ xcrun xcresulttool export attachments --path <xcresult> --output-path /tmp/shots
 
 First use (issue 12) overturned a conclusion drawn from widths alone: with the inspector open the
 table cuts columns off rather than compressing them, and the cut-off one was Strava.
+
+## Signing: Personal Team, and the G3 intermediate
+
+The app is signed with the user's free **Personal Team** (`DEVELOPMENT_TEAM = 89YP9U4PKQ` on all
+three targets, automatic signing). `CODE_SIGN_IDENTITY` resolves to "-" (ad hoc) when the team is
+empty and "Apple Development" when it isn't, so the team is the only setting needed. The result's
+designated requirement is *bundle id + certificate*, with no build hash, so a Keychain "Always
+Allow" survives rebuilds — unlike ad-hoc signing, where every build is a stranger.
+
+If `security find-identity -v -p codesigning` shows an Apple Development certificate but **0 valid
+identities**, check its issuer: modern certificates come from the **"Apple Worldwide Developer
+Relations Certification Authority — G3"** intermediate, and a keychain holding only the old one
+(expired 2023-02-07) can't build the chain locally. `security verify-cert` still passes because it
+fetches intermediates over the network, which is misleading. Fix: install
+`https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer` (SHA-256 `DC:F2:18:78:…:91:60:1F`)
+into the login keychain. OpenSSL's "unhandled critical extension" when verifying an Apple
+code-signing certificate is OpenSSL not knowing Apple's extension, not a chain fault.

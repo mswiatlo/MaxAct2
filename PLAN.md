@@ -33,7 +33,7 @@ minutes, or mouse use breaks them). A full run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 9–13 fixed or closed; View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** issue 14 (signing — needs the user), 6 (chart/map linking), 8 (summary stats), then Phase 8. Issue 7 (TrainingPeaks) starts with
+**Next:** confirm issue 14 live (signing), then 6 (chart/map linking), 8 (summary stats), then Phase 8. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -77,28 +77,25 @@ Things that will bite:
 - Week start is a locale setting. Use `Calendar.dateInterval(of:for:)` and choose explicitly.
 - Bucket by the current time zone, and say so.
 
-**14. The real app asks for the Keychain password after every rebuild.** *(follow-up, user-requested
-2026-10-10)*
+**14. The real app asks for the Keychain password after every rebuild.** *(built 2026-10-11;
+needs one live check)*
 
-The app is **ad-hoc signed** (`Signature=adhoc`, no team), so every build has a new code signature
-and the Keychain treats each one as a new app: the first Strava access after a rebuild raises a
-password prompt, and "Always Allow" only covers that one build. Tests are no longer affected — UI
-tests and the unit-test host run on in-memory secrets — but day-to-day development still is.
+Now signed with the user's free **Personal Team** (`DEVELOPMENT_TEAM` on all three targets; signing
+style stays automatic, which picks "Apple Development" once a team is set). Verified on the build:
+signed by "Apple Development", chaining to Apple Root CA, sandbox and network entitlements
+unchanged, and a designated requirement of *bundle id + certificate* with no per-build hash — which
+is what lets "Always Allow" survive rebuilds. 34/34 app and UI tests.
 
-The fix is a **stable signing identity**, so the Keychain's access rule follows the certificate
-rather than the build. `security find-identity -v -p codesigning` found **none** on this Mac. Options:
+**To confirm live (the user):** launch MaxAct from Xcode; expect one last Keychain prompt — choose
+**Always Allow** — and possibly a one-time macOS prompt about the app's data, since its signer
+changed. Then rebuild (⌘B) and launch again: there should be no prompt. Strava should still show
+as connected, since the Keychain service name is unchanged.
 
-- **Add an Apple ID in Xcode** (Settings ▸ Accounts) for a free *Personal Team*, then select it as
-  the target's team with automatic signing. Simplest; personal-team certificates expire yearly
-  and are renewed by Xcode.
-- **A self-signed code-signing certificate** (Keychain Access ▸ Certificate Assistant ▸ Create a
-  Certificate, type "Code Signing"), set as `CODE_SIGN_IDENTITY`. No Apple account needed, but
-  manual to renew and not trusted beyond this Mac.
-
-Needs the user for the account or certificate step. After it, each item needs "Always Allow" once
-more, then should stop prompting; verify by rebuilding twice and launching. Check that the
-sandbox and Keychain service name (`com.swiatlowski.MaxAct.strava`) carry over unchanged, so the
-existing Strava login survives the switch.
+Getting there needed one fix on this Mac: the Apple Development certificate showed as *not valid*
+because the keychain held only Apple's old developer intermediate (expired February 2023), not the
+**G3** one that issued it. G3 was downloaded from apple.com/certificateauthority, its SHA-256
+fingerprint checked against Apple's, and installed into the login keychain with the user's OK.
+The personal-team certificate expires **2027-10-11**; Xcode renews it.
 
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.
