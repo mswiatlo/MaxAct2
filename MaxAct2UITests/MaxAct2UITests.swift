@@ -660,6 +660,49 @@ final class SeededTableUITests: XCTestCase {
         _ = assertContained("in the narrowest window", inset: inset)
     }
 
+    /// Pointing at a chart highlights the same moment on the map; clicking empty map clears it.
+    ///
+    /// Observed through the map marker, which carries an identifier. The charts' spoken values
+    /// can't be read here: macOS exposes a chart with `accessibilityElement(children: .ignore)` as
+    /// a plain group, and groups carry no AXValue — measured, the value came back empty.
+    @MainActor
+    func testPointingAtAChartHighlightsTheMap() throws {
+        let app = launchSeeded()
+        let table = app.outlines["WorkoutTable"]
+        XCTAssertTrue(table.waitForExistence(timeout: 15))
+        table.cells.element(boundBy: 0).click()
+
+        let heartRate = app.otherElements.matching(NSPredicate(format: "label == 'Heart Rate'")).firstMatch
+        XCTAssertTrue(heartRate.waitForExistence(timeout: 15), "No heart-rate chart.")
+        let marker = app.descendants(matching: .any)["RouteHighlight"]
+        XCTAssertFalse(marker.exists, "Nothing should be highlighted before pointing at anything.")
+
+        heartRate.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
+        XCTAssertTrue(marker.waitForExistence(timeout: 5),
+                      "Pointing at a chart didn't put a marker on the map.")
+        let markerCentre = CGVector(dx: marker.frame.midX, dy: marker.frame.midY)
+
+        // Any element type: the map is exposed as a map element, not a group (measured).
+        let map = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label BEGINSWITH 'Route map with'")).firstMatch
+        XCTAssertTrue(map.exists)
+        let origin = app.windows.firstMatch.coordinate(withNormalizedOffset: .zero)
+        let windowOrigin = app.windows.firstMatch.frame.origin
+
+        // The other direction: click the route — exactly where the marker was, so on the route by
+        // construction — and the highlight must be set by the map, not left over from the hover.
+        let onRoute = origin.withOffset(CGVector(dx: markerCentre.dx - windowOrigin.x,
+                                                 dy: markerCentre.dy - windowOrigin.y))
+        onRoute.click()
+        XCTAssertTrue(marker.waitForExistence(timeout: 5),
+                      "Clicking the route didn't highlight that moment.")
+
+        // Empty map, well away from a route that loops round the middle, clears it.
+        map.coordinate(withNormalizedOffset: CGVector(dx: 0.03, dy: 0.05)).click()
+        XCTAssertTrue(marker.waitForNonExistence(timeout: 5),
+                      "Clicking empty map should clear the highlight, not jump to the nearest point.")
+    }
+
     /// Opening the inspector must not cost the sidebar.
     ///
     /// The regression test for the collapse that broke every other sidebar test: the inspector

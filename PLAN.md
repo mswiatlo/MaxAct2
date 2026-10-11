@@ -45,20 +45,23 @@ Numbered independently of the phases: "known issue 8" (summary stats) is not "Ph
 Fixed or closed issues — 1–5 and 9–14 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
-**6. Link the charts and the map to each other.** *(feature)*
-Clicking a chart point highlights that spot on the map, and clicking the route highlights that time
-in the charts. One `@State var highlighted: Date?` drives both — **timestamp, not array index**,
-since the series differ in length. `.chartXSelection(value:)` for charts → map; `MapReader` to turn a
-click into a coordinate for map → charts. Traps:
-- Look up against the full `series.cleanedRoute`, never the thinned chart data or simplified
-  polyline.
-- A time inside a pause has no position: snap only within a few seconds, else show nothing.
-- A click far from the track should highlight nothing: use a screen-space distance threshold.
-- The pace series drops stopped samples, so it may lack a mark the other charts have.
+**6. Link the charts and the map to each other.** *(built 2026-10-11; to try on real rides)*
 
-Put nearest-by-time (binary search) and nearest-by-coordinate in `MaxActCore` next to
-`WorkoutCharts` so the tolerances are tested. Update the charts' `accessibilityValue` with the
-highlighted values.
+Pointing at any chart highlights that moment in **every** chart — a rule with that chart's value
+— and puts a marker on the map where the athlete was. Clicking the route does the reverse;
+clicking empty map clears it. One `highlighted: Date?` drives everything, looked up against the
+full cleaned route (`RouteLookup` in `MaxActCore`), never the thinned chart points or simplified
+line. A time inside a pause shows no map marker and no chart value; a click counts as "on the
+route" within 20 screen points, so it behaves the same at every zoom. While highlighted, each
+chart's VoiceOver value becomes "<value> at <time>".
+
+Measured: on macOS, `chartXSelection` **follows the pointer** — hovering is enough, no click
+needed — and the highlight clears when the pointer leaves the chart. A UI test covers chart→map,
+map→chart and the clear, and was confirmed to fail with route clicks broken.
+
+**To try (the user), on a real ride:** hover the heart-rate chart and watch the marker move along
+the route; click a point on the route and see the rules land in the charts; check a ride with a
+pause shows no marker inside it. Close the issue if it reads well.
 
 **7. Sync to TrainingPeaks as well as Strava.** *(speculative, unresearched)*
 TrainingPeaks accepts TCX, so the file is free. **First establish whether its API is open** — it is

@@ -20,6 +20,15 @@ struct SeriesChart: View {
     /// expects up to mean quicker.
     var reversed: Bool = false
 
+    /// The moment highlighted across every chart and the map. Shared rather than per chart, so
+    /// pointing at one chart shows the same instant in the others and on the route.
+    @Binding var highlighted: Date?
+
+    /// This chart's value at the highlighted moment, or `nil` in a pause or outside the chart.
+    private var highlightedValue: Double? {
+        highlighted.flatMap { RouteLookup.value(at: $0, in: segments) }
+    }
+
     private var values: [Double] {
         segments.flatMap(\.points).flatMap { point in
             // The band's extremes matter to the scale: a heart-rate axis sized to the averages
@@ -40,7 +49,9 @@ struct SeriesChart: View {
                     // One element with a summary, rather than several hundred unlabelled marks.
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(title)
-                    .accessibilityValue(summary(low: low, high: high))
+                    // While something is highlighted, say *that* — a crosshair drawn silently
+                    // tells a screen-reader user nothing.
+                    .accessibilityValue(highlightDescription ?? summary(low: low, high: high))
             }
         }
     }
@@ -73,7 +84,29 @@ struct SeriesChart: View {
                     .lineStyle(StrokeStyle(lineWidth: 1.5))
                 }
             }
+
+            if let highlighted {
+                RuleMark(x: .value("Highlighted", highlighted))
+                    .foregroundStyle(.secondary)
+                    .lineStyle(StrokeStyle(lineWidth: 1))
+                if let value = highlightedValue {
+                    PointMark(x: .value("Highlighted", highlighted), y: .value(title, value))
+                        .foregroundStyle(tint)
+                        .symbolSize(40)
+                        .annotation(
+                            position: .top, spacing: 4,
+                            overflowResolution: .init(x: .fit(to: .chart), y: .disabled)
+                        ) {
+                            Text(format(value))
+                                .font(.caption.monospacedDigit().weight(.semibold))
+                                .padding(.horizontal, 4)
+                                .background(.background.opacity(0.85), in: .rect(cornerRadius: 3))
+                        }
+                }
+            }
         }
+        // Pointing at a chart sets the shared moment; the map and the other charts follow.
+        .chartXSelection(value: $highlighted)
         // A little headroom, and never a zero baseline: heart rate starting at 0 flattens the
         // whole trace into the top of the chart. An array domain is how Charts takes a reversed
         // scale — a `ClosedRange` can't run downwards.
@@ -101,6 +134,11 @@ struct SeriesChart: View {
         let margin = span > 0 ? span * 0.1 : max(1, abs(high) * 0.1)
         let bounds = [low - margin, high + margin]
         return reversed ? bounds.reversed() : bounds
+    }
+
+    private var highlightDescription: String? {
+        guard let highlighted, let value = highlightedValue else { return nil }
+        return "\(format(value)) at \(highlighted.formatted(date: .omitted, time: .standard))"
     }
 
     private func summary(low: Double, high: Double) -> String {

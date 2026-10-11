@@ -968,6 +968,14 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-11** — **Issue 6 built: charts and map linked.** `RouteLookup` (binary search by time,
+  linear nearest-by-coordinate, chart value within the segment spanning a time) with 5 tests
+  including pauses; a shared highlighted moment drives a rule and value in every chart and a map
+  marker; route clicks judged in screen points. Measured that `chartXSelection` follows hover on
+  macOS. The UI test reads the map marker, since chart groups expose no accessibility value to
+  XCUITest; it was mutation-checked against broken route clicks. Left open for the user to try on
+  real rides. 277 package tests, 35 app and UI tests.
+
 - **2026-10-11** — **Issue 14 confirmed live and closed.** No Keychain prompt after a rebuild that
   genuinely changed the binary — the user's improvement on the first check, which rebuilt with
   nothing changed. The probe change was reverted and its branch deleted.

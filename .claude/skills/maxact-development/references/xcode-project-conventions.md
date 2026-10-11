@@ -625,3 +625,16 @@ can produce a byte-identical binary, so "no prompt after rebuild" proves nothing
 the app actually uses (a comment won't reach the binary), confirm the hash of
 `MaxAct2.app/Contents/MacOS/MaxAct2.debug.dylib` changed — in Debug builds the code lives there, not
 in the main executable — then launch. Revert afterwards.
+
+## Charts and maps under XCUITest *(measured 2026-10-11)*
+
+- `chartXSelection(value:)` on macOS **follows the pointer**: `element.hover()` sets it, and moving
+  off the chart clears it. No click needed.
+- A chart made one element with `accessibilityElement(children: .ignore)` is exposed as a plain
+  group (`otherElements`), and **its `accessibilityValue` reads back empty** — groups have no
+  AXValue. Assert through something else that carries an identifier (MaxAct uses the map marker,
+  `RouteHighlight`).
+- A SwiftUI `Map` is its own element type, not `otherElements`; find it with
+  `descendants(matching: .any)` and its label.
+- When a test passes, check it can fail: the route-click assertion was confirmed by temporarily
+  making every click miss, which a hover-then-click test could otherwise pass by accident.

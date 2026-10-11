@@ -60,6 +60,15 @@ struct WorkoutDetailView: View {
     /// every selection after it.
     @State private var camera: MapCameraPosition = .automatic
 
+    /// The moment linked across the charts and the map — set by pointing at a chart or clicking
+    /// the route, shown by a rule in every chart and a marker on the map. A time rather than an
+    /// index, because the charts, the drawn line and the route all have different points.
+    @State private var highlighted: Date?
+
+    /// How close, on screen, a click must land to the route to count as a click *on* it. Judged
+    /// in points because a fixed distance in metres means something different at every zoom.
+    private static let routeClickTolerance: CGFloat = 20
+
     private var workout: Workout { item.workout }
 
     /// The series plus everything derived from it, computed once per selection instead of on every
@@ -67,6 +76,8 @@ struct WorkoutDetailView: View {
     private struct LoadedSeries {
         let id: String
         let series: WorkoutSeries
+        /// The full cleaned route, for linking: never the simplified drawing below.
+        let route: [RoutePoint]
         let coordinates: [CLLocationCoordinate2D]
         /// Spurious fixes dropped from the drawn track. Reported rather than hidden — the map is
         /// then demonstrably not the raw recording.
@@ -88,7 +99,7 @@ struct WorkoutDetailView: View {
                 let series = loaded.flatMap { $0.id == item.id ? $0 : nil }
 
                 if let series, !series.coordinates.isEmpty {
-                    routeMap(series.coordinates)
+                    routeMap(series)
                 } else if workout.hasRoute && !item.hasDetail {
                     notDownloadedNotice
                 }
@@ -115,6 +126,7 @@ struct WorkoutDetailView: View {
         // screen underneath the new workout's header until the load finishes.
         loaded = nil
         camera = .automatic
+        highlighted = nil
 
         guard let series = await model.seriesStore.loadIfAvailable(item.id) else { return }
 
@@ -127,6 +139,7 @@ struct WorkoutDetailView: View {
         loaded = LoadedSeries(
             id: item.id,
             series: series,
+            route: route,
             coordinates: simplified.map {
                 CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
             },
@@ -192,17 +205,57 @@ struct WorkoutDetailView: View {
         }
     }
 
-    private func routeMap(_ coordinates: [CLLocationCoordinate2D]) -> some View {
-        Map(position: $camera) {
-            MapPolyline(coordinates: coordinates)
-                .stroke(
-                    Color(model.settings.routeColor),
-                    style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round)
-                )
+    private func routeMap(_ series: LoadedSeries) -> some View {
+        // Where the highlighted moment was. Nothing during a pause: there is no honest position.
+        let marker = highlighted.flatMap { RouteLookup.point(at: $0, in: series.route) }
+        return MapReader { proxy in
+            Map(position: $camera) {
+                MapPolyline(coordinates: series.coordinates)
+                    .stroke(
+                        Color(model.settings.routeColor),
+                        style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round)
+                    )
+                if let marker {
+                    Annotation(
+                        "Highlighted position",
+                        coordinate: CLLocationCoordinate2D(
+                            latitude: marker.coordinate.latitude, longitude: marker.coordinate.longitude),
+                        anchor: .center
+                    ) {
+                        Circle()
+                            .fill(.white)
+                            .stroke(Color(model.settings.routeColor), lineWidth: 3)
+                            .frame(width: 14, height: 14)
+                            .shadow(radius: 1)
+                            .accessibilityIdentifier("RouteHighlight")
+                    }
+                    .annotationTitles(.hidden)
+                }
+            }
+            .onTapGesture { location in
+                highlighted = moment(clickedAt: location, on: series.route, proxy: proxy)
+            }
         }
         .frame(height: 280)
         .clipShape(.rect(cornerRadius: 10))
-        .accessibilityLabel("Route map with \(coordinates.count) points")
+        .accessibilityLabel("Route map with \(series.coordinates.count) points")
+    }
+
+    /// The moment the route passed closest to a click, or `nil` if the click wasn't near the route.
+    ///
+    /// Nearest-by-coordinate always finds *something*, so the answer is then checked on screen:
+    /// a click in empty map clears the highlight rather than jumping to the far side of the ride.
+    private func moment(clickedAt location: CGPoint, on route: [RoutePoint], proxy: MapProxy) -> Date? {
+        guard let clicked = proxy.convert(location, from: .local),
+              let nearest = RouteLookup.nearest(
+                  to: Coordinate(latitude: clicked.latitude, longitude: clicked.longitude), in: route),
+              let onScreen = proxy.convert(
+                  CLLocationCoordinate2D(latitude: nearest.point.coordinate.latitude,
+                                         longitude: nearest.point.coordinate.longitude),
+                  to: .local)
+        else { return nil }
+        let distance = hypot(onScreen.x - location.x, onScreen.y - location.y)
+        return distance <= Self.routeClickTolerance ? nearest.point.timestamp : nil
     }
 
     private var notDownloadedNotice: some View {
@@ -226,7 +279,8 @@ struct WorkoutDetailView: View {
             systemImage: "heart",
             segments: series.heartRate,
             tint: .pink,
-            format: { "\(Int($0.rounded()))" }
+            format: { "\(Int($0.rounded()))" },
+            highlighted: $highlighted
         )
 
         // Two different series, not one relabelled: pace is seconds per kilometre on a reversed
@@ -238,7 +292,8 @@ struct WorkoutDetailView: View {
                 segments: series.pace,
                 tint: tint,
                 format: { WorkoutFormatting.paceLabel(secondsPerKilometer: $0) },
-                reversed: true
+                reversed: true,
+                highlighted: $highlighted
             )
         } else {
             SeriesChart(
@@ -246,7 +301,8 @@ struct WorkoutDetailView: View {
                 systemImage: "speedometer",
                 segments: series.speed,
                 tint: tint,
-                format: { WorkoutFormatting.speed(metersPerSecond: $0) }
+                format: { WorkoutFormatting.speed(metersPerSecond: $0) },
+                highlighted: $highlighted
             )
         }
 
@@ -255,7 +311,8 @@ struct WorkoutDetailView: View {
             systemImage: "mountain.2",
             segments: series.elevation,
             tint: .teal,
-            format: { "\(Int($0.rounded())) m" }
+            format: { "\(Int($0.rounded())) m" },
+            highlighted: $highlighted
         )
     }
 
