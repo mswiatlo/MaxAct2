@@ -33,8 +33,9 @@ final class RouteThumbnailRenderer {
         /// Bump when anything about *how* the track is drawn changes, as opposed to what is drawn
         /// from. `2` introduced `RouteQuality` filtering: a single spurious fix can be a 20-pixel
         /// spur on a 96-pixel thumbnail, so images cached before it had to be redrawn rather than
-        /// left showing an artifact the detail map no longer has.
-        static let drawingVersion = 2
+        /// left showing an artifact the detail map no longer has. `3` added the out-and-back rule,
+        /// which removes a 2.5 km spur from at least one real ride.
+        static let drawingVersion = 3
 
         var fileName: String {
             "\(workoutID)-\(width)x\(height)-\(isDark ? "dark" : "light")"

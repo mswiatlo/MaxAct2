@@ -4,7 +4,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 (HAE), with batch upload to Strava.
 
 **Status:** Phases 0–7 complete and verified live. Next: known issues, then Phase 8.
-**Last updated:** 2026-10-10 (afternoon).
+**Last updated:** 2026-10-10 (evening).
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first: the HAE data
 > contract, the Xcode tooling limits, and the Strava API facts. **`HISTORY.md`** holds how we got
@@ -26,8 +26,8 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ## 1. Where things stand — 2026-10-09
 
-All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 233 in
-`MaxActCore` (`swift test`), 30 app and UI tests (`RunAllTests` — leave the Mac alone for ~4
+All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 254 in
+`MaxActCore` (`swift test`), 33 app and UI tests (`RunAllTests` — leave the Mac alone for ~4
 minutes, or mouse use breaks them).
 
 **Phase 7 is done.** The three remaining live checks all passed against the real account: the sync
@@ -42,8 +42,7 @@ sticks, and search by region and country.
 terms — one geocoder request per distinct place, in the background, with the Place column
 unchanged. Nothing to do; worth knowing if the Place column looks busy for a minute.
 
-**Next:** known issue 11 (odd splits on the 9/21 ride), 12 (the table gets cramped with the
-inspector open), 6 (chart/map linking), 8 (summary stats), then Phase 8. Issue 7 (TrainingPeaks)
+**Next:** known issue 12 (the table gets cramped with the inspector open), 6 (chart/map linking), 8 (summary stats), then Phase 8. Issue 7 (TrainingPeaks)
 starts with whether its API is open to us at all.
 
 **2026-10-10:** View ▸ Hide Sidebar (⌃⌘S), and MaxAct is now **one window** — no tabs, no
@@ -129,12 +128,25 @@ autosave made the new width stick, so a single selection would have left the win
 wider even with the inspector shut — and Xcode, Finder and Mail all shrink the content instead.
 Worth not rebuilding.
 
-**11. Strange pace splits around km 5 on the 2026-09-21 ~1 PM commute ride.**
-Not yet investigated. Measure first: print that ride's per-km splits from `WorkoutSplits` next to
-the raw route around 4–6 km (timestamps, gaps, speeds, accuracy), and compare with Strava's own
-splits for the same ride. Suspects: a GPS gap or stop inside the km, a jump the route cleaning
-missed, or route distance disagreeing with HealthKit's total. Fix in `MaxActCore` with a test built
-from the real points.
+**11. ~~Strange pace splits around km 5 on the 2026-09-21 ~1 PM commute ride.~~ — done 2026-10-10.**
+
+A single bad GPS fix jumped **2,516 m out and straight back** in two seconds. It had no speed — the
+known signature of a bad fix — but an accuracy of 27 m, just inside the 30 m limit, so the filter
+kept it. Its phantom 5 km swallowed km 4–5 in two seconds ("3,600 km/h"), and because splits are
+scaled to the ride's real 8.68 km, it also shrank every other kilometre: the whole ride read
+13–17 km/h instead of 19–29.
+
+Measured across all 8 stored routes before fixing: 10 out-and-backs over 100 m, **all speedless**,
+none on a fix with a speed, 9 already caught by accuracy. So `RouteQuality` now also drops a
+speedless fix over 100 m from both neighbours when they sit within half that of each other. It
+found a second, smaller case on the 16:02 ride the same day (161 m out, while stopped); across the
+library the rule adds those two fixes and nothing else. Tests reproduce both shapes, and fail with
+the rule removed. Thumbnails redraw (drawing version 3).
+
+**Follow-up for the user:** both 9/21 rides were uploaded to Strava by MaxAct *before* this fix, so
+Strava has the spikes — likely a 2.5 km spur on the 13:00 ride's map and odd splits there. Not
+verified (the token had expired). The API can't replace an activity's file, so the fix would be to
+delete those two on Strava and re-upload them from MaxAct. Worth a look before deciding.
 
 **12. The table gets cramped when the inspector is open.** *(eased 2026-10-10)*
 

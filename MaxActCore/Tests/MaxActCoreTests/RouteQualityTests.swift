@@ -67,13 +67,109 @@ import Testing
 
     @Test("genuine speed is never mistaken for an artifact")
     func fastIsNotSuspicious() {
-        // The rule deliberately never looks at movement. A 90 km/h descent, and successive fixes
-        // 25 m apart at 1 Hz — which an instantaneous-speed detector would have flagged — stay.
+        // Neither rule judges speed. A 90 km/h descent, and successive fixes 25 m apart at 1 Hz —
+        // which an instantaneous-speed detector would have flagged — stay.
         #expect(RouteQuality.isPlausible(point(at: 0, speed: 25, accuracy: 10)))
         let descent = (0..<10).map {
             point(at: Double($0), latitude: 49.25 + Double($0) * 0.00025, speed: 25)
         }
         #expect(RouteQuality.cleaned(descent) == descent)
+    }
+
+    // MARK: - Out-and-back (issue 11)
+
+    /// A ride at 1 Hz heading north, about 11 m per fix, with a good speed on every point.
+    private func ride(_ count: Int) -> [RoutePoint] {
+        (0..<count).map { point(at: Double($0), latitude: 49.25 + Double($0) * 0.0001) }
+    }
+
+    @Test("the issue 11 teleport is dropped although its accuracy passes")
+    func excursionWithGoodAccuracy() {
+        // The measured shape: no speed, accuracy 27 m — inside the 30 m limit, so the accuracy
+        // rule keeps it — and 2,516 m out from neighbours that are 51 m apart.
+        var route = ride(10)
+        let spike = point(at: 4.5, latitude: 49.25 + 4 * 0.0001 + 0.0226, speed: nil, accuracy: 27)
+        #expect(RouteQuality.isPlausible(spike), "the accuracy rule alone keeps it — the bug")
+        route.insert(spike, at: 5)
+
+        #expect(RouteQuality.discardedCount(route) == 1)
+        #expect(RouteQuality.cleaned(route) == ride(10))
+    }
+
+    @Test("a shorter excursion with looser neighbours is dropped too")
+    func excursionWhileStopped() {
+        // The second real case, from the 16:02 ride the same day: stopped at a light, a speedless
+        // fix 161 m out and 190 m back, with its neighbours 45 m apart — a ratio of 0.28, which a
+        // quarter-of-the-excursion rule narrowly missed.
+        let base = 49.25
+        var route = (0..<5).map { point(at: Double($0), latitude: base, speed: 0.2) }
+        route.append(point(at: 5, latitude: base + 0.00145, longitude: -123.1, speed: nil, accuracy: 22))
+        route.append(point(at: 11, latitude: base + 0.000405, speed: 0))
+        route.append(contentsOf: (1...4).map {
+            point(at: 11 + Double($0), latitude: base + 0.000405 + Double($0) * 0.00004)
+        })
+        #expect(RouteQuality.discardedCount(route) == 1)
+        #expect(!RouteQuality.cleaned(route).contains { $0.horizontalAccuracyMeters == 22 })
+    }
+
+    @Test("a fix that carries a speed is never treated as an excursion")
+    func excursionNeedsNoSpeed() {
+        // All 10 measured out-and-backs were speedless, and no fix with a speed ever made one.
+        var route = ride(10)
+        route.insert(point(at: 4.5, latitude: 49.25 + 4 * 0.0001 + 0.0226, speed: 4), at: 5)
+        #expect(RouteQuality.discardedCount(route) == 0)
+    }
+
+    @Test("a speedless jump that carries on, rather than coming back, is kept")
+    func onwardJumpIsKept() {
+        // A long gap — a tunnel, a dropout — puts the next fix far away *and keeps going*. The
+        // neighbours then disagree with each other too, so it isn't an excursion.
+        var route = ride(5)
+        route.append(point(at: 30, latitude: 49.25 + 4 * 0.0001 + 0.003, speed: nil, accuracy: 12))
+        route.append(contentsOf: (1...5).map {
+            point(at: 30 + Double($0), latitude: 49.25 + 4 * 0.0001 + 0.003 + Double($0) * 0.0001)
+        })
+        #expect(RouteQuality.discardedCount(route) == 0)
+    }
+
+    @Test("small speedless wobbles stay, and the ends of a route are never excursions")
+    func boundaries() {
+        // 50 m out and back is under the 100 m limit: real GPS scatter, not teleportation.
+        var wobble = ride(10)
+        wobble.insert(point(at: 4.5, latitude: 49.25 + 4 * 0.0001 + 0.00045, speed: nil), at: 5)
+        #expect(RouteQuality.discardedCount(wobble) == 0)
+
+        // No second neighbour to come back to, so nothing to judge by.
+        var ends = ride(5)
+        ends.insert(point(at: -1, latitude: 49.30, speed: nil, accuracy: 12), at: 0)
+        ends.append(point(at: 10, latitude: 49.30, speed: nil, accuracy: 12))
+        #expect(RouteQuality.discardedCount(ends) == 0)
+    }
+
+    @Test("splits stay plausible through an out-and-back")
+    func splitsSurviveExcursion() {
+        // The visible symptom: the phantom distance swallowed whole kilometres in a second or two
+        // ("3,600 km/h"), and shrank every other kilometre's share of the route with it.
+        let start = Date(timeIntervalSince1970: 1_760_000_000)
+        var route = (0..<700).map {
+            RoutePoint(coordinate: Coordinate(latitude: 49.25 + Double($0) * 0.00005, longitude: -123.1),
+                       timestamp: start.addingTimeInterval(Double($0)),
+                       speedMetersPerSecond: 5.5, horizontalAccuracyMeters: 8)
+        }
+        route.insert(RoutePoint(coordinate: Coordinate(latitude: 49.25 + 300 * 0.00005 + 0.0226,
+                                                      longitude: -123.1),
+                                timestamp: start.addingTimeInterval(300.5),
+                                speedMetersPerSecond: nil, horizontalAccuracyMeters: 27), at: 301)
+        let distance = 699 * 0.00005 * 111_195   // the route's own length, ~3.9 km
+        let workout = Workout(id: "R", kind: .cycling, start: start, end: start.addingTimeInterval(699),
+                              duration: 699, distanceMeters: distance, hasRoute: true)
+
+        let splits = WorkoutSplits.splits(for: workout, series: WorkoutSeries(workoutID: "R", route: route))
+        #expect(splits.count == 4)
+        for split in splits where !split.isPartial {
+            let kmh = (split.speedMetersPerSecond ?? 0) * 3.6
+            #expect((18...22).contains(kmh), "km \(split.index) at \(kmh) km/h")
+        }
     }
 }
 

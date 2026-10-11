@@ -828,6 +828,14 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-10 (evening)** — **Known issue 11 done.** Printed the 13:00 ride's splits against its raw
+  route: a speedless fix 2,516 m out and back, accuracy 27 m, survived the 30 m accuracy rule, and
+  its phantom distance broke every split on the ride, not only km 5. Rather than lower the
+  threshold to fit one case, measured the whole library: all 10 out-and-backs over 100 m were
+  speedless, so the shape itself is now a rule. A first version (neighbours within a quarter of the
+  excursion) missed a second real case at 0.28, found by checking what survived; loosened to half,
+  which adds exactly two fixes library-wide. Strava's copies of both 9/21 rides predate the fix.
+
 - **2026-10-10 (afternoon)** — **Sidebar inset with the inspector open**, reported by the user, and
   a standing rule to **work on branches**. Measuring the pane frames showed the inset wasn't being
   removed: the content was 1,318pt in a 1,300pt window and SwiftUI centred it, clipping 9pt off each

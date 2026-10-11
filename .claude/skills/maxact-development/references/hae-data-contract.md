@@ -168,6 +168,21 @@ Do **not** try to detect artifacts by implausible instantaneous speed. At 1 Hz t
 several m/s: a walking ceiling of 3 m/s flags 3–5 metre steps, and a ceiling high enough to avoid
 that never fires. See `RouteQuality` for the full write-up.
 
+**Accuracy is a proxy; "no speed" is the real signal** *(re-measured 2026-10-10 over 8 routes,
+16,699 points)*. There were exactly 10 out-and-back jumps over 100 m. **All 10 were speedless and no
+fix carrying a speed ever made one** — but one had an accuracy of 27 m, inside the limit, and its
+phantom 2.5 km wrecked a ride's splits (issue 11). So `RouteQuality` also drops a speedless fix that
+is over 100 m from both neighbours while they sit within half that of each other: the shape of a
+jump that comes straight back, which neither jitter nor real movement makes. Across the library
+that adds two fixes and nothing else. What survives both rules is sub-100 m wobble on fixes *with*
+a speed, worth about 1% of distance, left alone deliberately.
+
+**A spike distorts every split, not just its own.** Splits are scaled to the workout's stated
+distance, so phantom route length shrinks every real kilometre's share: one 2.5 km spike on an
+8.7 km ride turned km 4–5 into "0 s / 3,600 km/h" *and* made km 1–3 and 6–9 read 13–17 km/h instead
+of 19–29. If splits look uniformly slow, check `measured / workout.distanceMeters` — normal is
+1.05–1.13; that ride was 1.62.
+
 ### Don't compute distance from the route
 
 Summing raw 1 Hz steps inflated a 3.73 km walk to **5.55 km** and an 11.66 km ride to **17.39 km**

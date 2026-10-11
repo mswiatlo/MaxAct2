@@ -33,7 +33,10 @@ import Foundation
 public enum RouteQuality {
     /// Above this, a fix that also lacks a speed is treated as spurious. 30 m sits well clear of
     /// the 8–16 m median accuracy of good fixes and just under the 34–39 m median of the bad ones;
-    /// at 35 m one real teleport survived, and at 25 m nothing extra was caught.
+    /// at 35 m one real teleport survived, and at 25 m nothing extra was caught *in the original
+    /// five workouts*. A later ride had a 27 m teleport, which is why ``isExcursion(_:in:)`` exists
+    /// rather than this being lowered: a threshold tuned to the one case that got through would be
+    /// a guess, while the out-and-back shape is the thing actually wrong.
     public static let accuracyLimitMeters: Double = 30
 
     /// A gap longer than this is a pause, not a sampling interval.
@@ -53,17 +56,62 @@ public enum RouteQuality {
         return accuracy <= accuracyLimitMeters
     }
 
+    /// A speedless fix this far from *both* neighbours is an excursion, not a position.
+    public static let excursionLimitMeters: Double = 100
+
     /// The route with spurious fixes removed. What should be drawn, measured and exported.
     public static func cleaned(_ route: [RoutePoint]) -> [RoutePoint] {
+        let discarded = discardedIndices(route)
         // Almost always a no-op in terms of count, so avoid reallocating when nothing is dropped.
-        let discarded = route.lazy.filter { !isPlausible($0) }.count
-        return discarded == 0 ? route : route.filter(isPlausible)
+        guard !discarded.isEmpty else { return route }
+        return route.indices.filter { !discarded.contains($0) }.map { route[$0] }
     }
 
     /// How many fixes ``cleaned(_:)`` would drop, so the detail pane can say so rather than
     /// silently changing the numbers.
     public static func discardedCount(_ route: [RoutePoint]) -> Int {
-        route.lazy.filter { !isPlausible($0) }.count
+        discardedIndices(route).count
+    }
+
+    /// Fixes failing either rule: the accuracy rule in ``isPlausible(_:)``, or the out-and-back
+    /// rule in ``isExcursion(_:in:)``.
+    static func discardedIndices(_ route: [RoutePoint]) -> Set<Int> {
+        Set(route.indices.filter { !isPlausible(route[$0]) || isExcursion($0, in: route) })
+    }
+
+    /// Whether the fix at `index` jumps away and straight back: a speedless point more than
+    /// ``excursionLimitMeters`` from *both* neighbours, while those neighbours are close to each
+    /// other.
+    ///
+    /// **Added for issue 11, by measurement.** A 2,516 m out-and-back on a 2026-09-21 ride had an
+    /// accuracy of **27 m** — just inside ``accuracyLimitMeters`` — so the accuracy rule kept it, and
+    /// its phantom 5 km swallowed two kilometres of splits in two seconds. Across all 8 stored routes
+    /// (16,699 points) there were exactly 10 out-and-backs over 100 m. **All 10 were speedless**, no
+    /// fix carrying a speed ever made one, and 9 already failed the accuracy rule; this was the one
+    /// that didn't. So the speedless condition is the reliable half of the signature, and accuracy
+    /// was a proxy that was right nine times in ten.
+    ///
+    /// Not the implied-speed detector rejected above. That one flagged any fast step, and at 1 Hz
+    /// fired on 3–5 m of jitter. This needs a point to leave by over 100 m *and return* to where
+    /// its neighbours agree it should be — a shape jitter can't make, and a genuine fast section
+    /// can't either, since real movement doesn't come back.
+    ///
+    /// **Neighbours within half the excursion**, not a quarter, which was tried first and missed a
+    /// second real case: on the 16:02 ride the same day, a speedless fix went 161 m out and 190 m
+    /// back while the rider was stopped, with its neighbours 45 m apart — a ratio of 0.28. A fix
+    /// that carries *on* instead puts its neighbours about twice the excursion apart, so half
+    /// still leaves a wide margin; measured across the library, loosening it added that one fix
+    /// and nothing else.
+    static func isExcursion(_ index: Int, in route: [RoutePoint]) -> Bool {
+        guard index > 0, index < route.count - 1,
+              route[index].speedMetersPerSecond == nil else { return false }
+        let before = route[index - 1].coordinate
+        let point = route[index].coordinate
+        let after = route[index + 1].coordinate
+        let excursion = min(WorkoutSplits.distance(from: before, to: point),
+                            WorkoutSplits.distance(from: point, to: after))
+        return excursion > excursionLimitMeters
+            && WorkoutSplits.distance(from: before, to: after) < excursion / 2
     }
 }
 
