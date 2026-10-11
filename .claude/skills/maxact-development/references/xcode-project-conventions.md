@@ -567,3 +567,17 @@ reported as fixed; a full run still had one, from the host. Check with:
 
 It was 5 per UI test before, then 1 per run (the host), then 0. The real app still prompts after rebuilds until it has a stable
 signing identity (`security find-identity -v -p codesigning` found none on this Mac).
+
+## `RunCodeSnippet` on an app file launches the real app, on real data
+
+Running a snippet "in the context of" a file in the `MaxAct2` target **launches the whole app**:
+`MaxActApp.init` runs with no test flags, so it opens the user's real database, settings and
+Keychain, and `AppModel.load` starts its background work. Found 2026-10-11 when a snippet meant to
+resolve places on a *copy* of the database left the real one migrated to a new schema and its places
+re-resolved by unmerged branch code. It is also a likely source of the Keychain prompts the user
+saw, since each such launch is a fresh ad-hoc build reading the real Strava entry.
+
+So for anything that needs live MapKit or real data, prefer a **gated test in `MaxActCore`**
+(`swift test`, enabled by an environment variable): it runs in its own process and touches only
+what it's given. MapKit's `MKReverseGeocodingRequest` works from there. Reserve `RunCodeSnippet` on
+app files for pure code with no side effects, and never assume it is isolated.

@@ -352,21 +352,58 @@ public actor WorkoutStore {
     ///
     /// Stamping the version here is what stops a resolved row coming back round in
     /// ``itemsNeedingPlace(limit:)`` for ever — including when the geocoder knew a name but
-    /// nothing structural, which legitimately leaves `searchTerms` nil.
+    /// nothing structural, which legitimately leaves `parts` nil.
     public func setPlace(
         label: String?,
-        searchTerms: String? = nil,
+        parts: PlaceDescription? = nil,
         for workoutID: String
     ) throws {
         guard let record = try record(id: workoutID) else { return }
         record.placeLabel = label
-        record.placeSearchTerms = searchTerms
+        record.placeSearchTerms = parts.flatMap(PlaceTerms.searchTerms(for:))
+        record.placeCity = parts?.city
+        record.placeSubdivision = parts?.subdivision
+        record.placeCountry = parts?.country
         record.placeTermsVersion = PlaceTerms.version
         try modelContext.save()
     }
 
+    /// Gives places MapKit reported without a subdivision the one their city agrees on.
+    ///
+    /// A pure database pass — no geocoding — run after each round of resolving, so it works
+    /// whatever order places resolved in and across launches: the UBC ride can resolve first and
+    /// pick up "BC" once any other Vancouver ride has. See
+    /// ``PlaceTerms/lendableSubdivisions(from:)`` for when it declines to guess.
+    ///
+    /// The label gains the subdivision only if it was the bare city, which is what MapKit's empty
+    /// context leaves behind; a label MapKit composed itself is kept. Returns how many changed.
+    @discardableResult
+    public func borrowMissingSubdivisions() throws -> Int {
+        let records = try modelContext.fetch(FetchDescriptor<WorkoutRecord>(
+            predicate: #Predicate { $0.placeCity != nil && $0.placeCountry != nil }
+        ))
+        let lendable = PlaceTerms.lendableSubdivisions(from: records.compactMap(\.placeParts))
+        guard !lendable.isEmpty else { return 0 }
+
+        var changed = 0
+        for record in records {
+            guard let parts = record.placeParts,
+                  let filled = PlaceTerms.borrowingSubdivision(for: parts, from: lendable),
+                  let city = filled.city, let subdivision = filled.subdivision
+            else { continue }
+            record.placeSubdivision = subdivision
+            record.placeSearchTerms = PlaceTerms.searchTerms(for: filled)
+            if record.placeLabel == nil || record.placeLabel == city {
+                record.placeLabel = "\(city) \(subdivision)"
+            }
+            changed += 1
+        }
+        if changed > 0 { try modelContext.save() }
+        return changed
+    }
+
     /// Internal, and only so a test can reproduce a library resolved before a given terms version.
-    /// Production code always stamps the current version through ``setPlace(label:searchTerms:for:)``.
+    /// Production code always stamps the current version through ``setPlace(label:parts:for:)``.
     func setPlaceTermsVersion(_ version: Int, for workoutID: String) throws {
         guard let record = try record(id: workoutID) else { return }
         record.placeTermsVersion = version

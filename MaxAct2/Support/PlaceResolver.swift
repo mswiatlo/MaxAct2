@@ -16,11 +16,11 @@ import MaxActCore
 actor PlaceResolver {
     private let store: WorkoutStore
 
-    /// What one cell resolves to: the short label the column shows, and the hidden terms that let
-    /// search match a region or country.
+    /// What one cell resolves to: the short label the column shows, and the parts — city,
+    /// subdivision, country — that search terms are built from and that borrowing compares.
     private struct Place {
         let label: String
-        let searchTerms: String?
+        let parts: PlaceDescription?
     }
 
     /// Snapped-cell key → resolved place. The reason a corpus costs a request per *place*.
@@ -62,7 +62,11 @@ actor PlaceResolver {
             // or the geocoder gave up. Re-querying would return the same rows for ever.
             if batchStored == 0 || exhausted { break }
         }
-        return stored
+        // Then fill in subdivisions MapKit didn't give, from places in the same city that have
+        // one. Every time, not only after new lookups: it's a cheap local pass, and it lets a
+        // place that resolved alone earlier pick up a province once a neighbour has resolved.
+        let borrowed = (try? await store.borrowMissingSubdivisions()) ?? 0
+        return stored + borrowed
     }
 
     /// Returns what it stored, and whether it stopped early because the geocoder kept failing.
@@ -77,7 +81,7 @@ actor PlaceResolver {
             if unresolvable.contains(key) { continue }
 
             if let hit = resolved[key] {
-                if (try? await store.setPlace(label: hit.label, searchTerms: hit.searchTerms,
+                if (try? await store.setPlace(label: hit.label, parts: hit.parts,
                                               for: entry.id)) != nil { stored += 1 }
                 continue
             }
@@ -87,7 +91,7 @@ actor PlaceResolver {
             case .found(let place):
                 resolved[key] = place
                 consecutiveFailures = 0
-                if (try? await store.setPlace(label: place.label, searchTerms: place.searchTerms,
+                if (try? await store.setPlace(label: place.label, parts: place.parts,
                                               for: entry.id)) != nil { stored += 1 }
             case .nothingThere:
                 // Not a failure — the geocoder answered, and the answer was "nowhere named".
@@ -150,7 +154,7 @@ actor PlaceResolver {
         guard let label = label(
             context: representations.cityWithContext(.automatic)?.cleaned, parts: parts
         ) else { return .nothingThere }
-        return .found(Place(label: label, searchTerms: PlaceTerms.searchTerms(for: parts)))
+        return .found(Place(label: label, parts: parts.isEmpty ? nil : parts))
     }
 
     /// MapKit's own short form when it has one — "Vancouver BC", "Geneva, Switzerland" — else the

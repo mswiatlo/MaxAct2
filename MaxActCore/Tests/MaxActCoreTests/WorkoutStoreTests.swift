@@ -123,8 +123,8 @@ import Testing
         #expect(pending.map(\.id) == ["withRoute"])
 
         // Once named, it drops out and is not asked about again.
-        try await store.setPlace(label: "Vancouver BC", searchTerms: "vancouver · bc",
-                                 for: "withRoute")
+        try await store.setPlace(label: "Vancouver BC", parts: PlaceDescription(
+            city: "Vancouver", subdivision: "BC", country: "Canada", countryCode: "CA"), for: "withRoute")
         pending = try await store.itemsNeedingPlace()
         #expect(pending.isEmpty)
     }
@@ -143,9 +143,8 @@ import Testing
         try await store.setPlaceTermsVersion(0, for: "W1")
         #expect(try await store.itemsNeedingPlace().count == 1)
 
-        try await store.setPlace(label: "Greater Vancouver BC",
-                                 searchTerms: "greater vancouver · bc · british columbia · canada",
-                                 for: "W1")
+        try await store.setPlace(label: "Greater Vancouver BC", parts: PlaceDescription(
+            city: "Greater Vancouver", subdivision: "BC", country: "Canada", countryCode: "CA"), for: "W1")
         #expect(try await store.itemsNeedingPlace().isEmpty)
         #expect(try await store.item(id: "W1")?.matches(searchText: "British Columbia") == true)
     }
@@ -160,7 +159,7 @@ import Testing
 
         // Terms are a bonus, so nil is a legitimate outcome — but it must still count as resolved,
         // or the resolver would re-request this cell on every launch.
-        try await store.setPlace(label: "Somewhere", searchTerms: nil, for: "W1")
+        try await store.setPlace(label: "Somewhere", parts: nil, for: "W1")
         #expect(try await store.itemsNeedingPlace().isEmpty)
     }
 

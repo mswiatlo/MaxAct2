@@ -26,7 +26,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ## 1. Where things stand — 2026-10-09
 
-All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 265 in
+All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 272 in
 `MaxActCore` (`swift test`), 34 app and UI tests (`RunAllTests` — leave the Mac alone for ~4
 minutes, or mouse use breaks them).
 
@@ -49,11 +49,10 @@ starts with whether its API is open to us at all.
 File ▸ New Window. Extra windows had shared the model's filter, search and selection, so they only
 looked independent; the user chose removing them over making them independent.
 
-**Place names reset, 2026-10-11:** at the user's request, the 8 stored place labels and search terms
-were cleared directly in the database (backup alongside it, `backup-before-place-reset-2026-10-11`),
-so the next launch re-resolves them with the MapKit-only lookup. To check: labels read as before,
-except UBC starts, which are expected to show "Vancouver" without "BC"; searching "British Columbia"
-finds the rest.
+**Place names reset, 2026-10-11:** at the user's request the 8 stored places were cleared
+(backup alongside the database, `backup-before-place-reset-2026-10-11`) and have since re-resolved
+with province borrowing — all 8 match "British Columbia". The re-resolve was triggered by a
+`RunCodeSnippet` launch rather than the user, which is now a recorded pitfall.
 
 **Still unseen live:** the exact duplicate-error wording — no real duplicate has been rejected yet.
 
@@ -119,6 +118,15 @@ version was deliberately not bumped.
 The subdivision is an abbreviation in Canada, the US and Switzerland but a full name in the UK
 ("Scotland"), so expansion uses a bundled ISO 3166-2 table for CA, US and AU, keyed by country
 because "WA" and "NT" collide. Anywhere else the raw value is still stored and searchable.
+
+**Borrowing the province, 2026-10-11** *(user-requested)*. When MapKit gives a city and country but
+no province — UBC — the place borrows the province every other resolved place in that city and
+country agrees on, in a local pass after each round of lookups (`borrowMissingSubdivisions`). It
+declines when places disagree (two Richmonds) rather than guess. Places now store city, province
+and country separately to make this possible (`PlaceTerms.version` 2). Measured on the user's data:
+3 distinct start cells, one of which MapKit returns with no province, and it now reads "Vancouver
+BC" and matches "British Columbia". **To revisit one day:** a city where *no* resolved place has a
+province has nothing to borrow from and stays province-less — judged rare, and accepted.
 
 **10. ~~A visible way to close the detail inspector.~~ — done 2026-10-09.**
 

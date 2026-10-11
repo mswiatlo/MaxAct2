@@ -2,9 +2,9 @@ import Foundation
 
 /// The structured pieces of a coarse place, as a geocoder gives them.
 ///
-/// Transient: only the derived search string is stored. Deliberately holds nothing finer than a
-/// city — no street, no postal code — so the privacy rule that governs ``PlaceGrid`` survives the
-/// trip through here.
+/// Stored alongside the derived search string (`WorkoutRecord.placeCity` and friends), so that a
+/// place missing its subdivision can borrow one. Deliberately holds nothing finer than a city — no
+/// street, no postal code — so the privacy rule that governs ``PlaceGrid`` survives the trip.
 public struct PlaceDescription: Hashable, Sendable {
     /// "Vancouver", "Greater Vancouver", "Genève".
     public let city: String?
@@ -37,7 +37,11 @@ public enum PlaceTerms {
     /// Bumped when the terms' *content* changes, so stored strings rebuild themselves. Records
     /// below this version are re-resolved by ``WorkoutStore/itemsNeedingPlace(limit:)``, which
     /// costs one geocoder request per distinct place rather than per workout.
-    public static let version = 1
+    ///
+    /// `2` (2026-10-11): places also store their city, subdivision and country, so a place MapKit
+    /// gave no subdivision can borrow one (``lendableSubdivisions(from:)``). Rows from version 1
+    /// have no parts to lend or borrow with, so they re-resolve once.
+    public static let version = 2
 
     /// Case- and diacritic-folded, so "geneve" finds "Genève" and "bc" finds "BC".
     ///
@@ -85,6 +89,47 @@ public enum PlaceTerms {
     public static func subdivisionName(_ subdivision: String, countryCode: String?) -> String? {
         guard let countryCode, subdivision.count <= 3 else { return nil }
         return subdivisions["\(countryCode.uppercased())-\(subdivision.uppercased())"]
+    }
+
+    // MARK: - Borrowing a subdivision
+
+    /// Subdivisions that can be lent to places missing one: for each city-and-country, the single
+    /// subdivision every resolved place there agrees on.
+    ///
+    /// **Why borrow.** MapKit reports no subdivision for places outside any municipality — UBC, in
+    /// the University Endowment Lands, comes back as city "Vancouver", country "Canada", and
+    /// nothing else — so those rides weren't findable as "BC" or "British Columbia". Any other
+    /// Vancouver ride already knows the answer.
+    ///
+    /// **Only when unambiguous.** A city-and-country whose resolved places disagree (two
+    /// Richmonds, or a border town reported both ways) lends nothing: a wrong province is worse
+    /// than a missing one. And there's nothing to lend if no other place in that city has resolved
+    /// fully — rare, and accepted (see PLAN.md, issue 9).
+    public static func lendableSubdivisions(from places: [PlaceDescription]) -> [String: String] {
+        var seen: [String: Set<String>] = [:]
+        for place in places {
+            guard let key = borrowKey(for: place), let subdivision = place.subdivision else { continue }
+            seen[key, default: []].insert(subdivision)
+        }
+        return seen.compactMapValues { $0.count == 1 ? $0.first : nil }
+    }
+
+    /// `place` with its subdivision filled from `lendable`, or `nil` if it has one already or
+    /// there's nothing unambiguous to borrow.
+    public static func borrowingSubdivision(
+        for place: PlaceDescription, from lendable: [String: String]
+    ) -> PlaceDescription? {
+        guard place.subdivision == nil, let key = borrowKey(for: place),
+              let subdivision = lendable[key] else { return nil }
+        return PlaceDescription(city: place.city, subdivision: subdivision,
+                                country: place.country, countryCode: place.countryCode)
+    }
+
+    /// Folded city and country: "Vancouver"/"Canada" and "vancouver"/"canada" are one place.
+    static func borrowKey(for place: PlaceDescription) -> String? {
+        guard let city = place.city, !city.isEmpty, let country = place.country, !country.isEmpty
+        else { return nil }
+        return folded(city) + "|" + folded(country)
     }
 
     /// Whether `text` contains `needle`, both folded. The one comparison search uses, so that

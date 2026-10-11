@@ -183,3 +183,103 @@ import Testing
         #expect(terms == "vancouver · bc · british columbia · canada")
     }
 }
+
+/// Lending a subdivision to places MapKit reported without one — UBC, which comes back as city
+/// "Vancouver", country "Canada", and nothing else.
+@Suite struct SubdivisionBorrowingTests {
+    private func place(_ city: String?, _ subdivision: String?, _ country: String?) -> PlaceDescription {
+        PlaceDescription(city: city, subdivision: subdivision, country: country,
+                         countryCode: PlaceTerms.countryCode(forName: country, locale: Locale(identifier: "en_US")))
+    }
+
+    @Test("a city whose places agree lends its subdivision")
+    func agreeingCityLends() {
+        let lendable = PlaceTerms.lendableSubdivisions(from: [
+            place("Vancouver", "BC", "Canada"), place("Vancouver", "BC", "Canada"),
+            place("Vancouver", nil, "Canada"),
+        ])
+        let ubc = PlaceTerms.borrowingSubdivision(for: place("Vancouver", nil, "Canada"), from: lendable)
+        #expect(ubc?.subdivision == "BC")
+        #expect(ubc.flatMap(PlaceTerms.searchTerms(for:)) == "vancouver · bc · british columbia · canada")
+    }
+
+    @Test("a city whose places disagree lends nothing — no guessing")
+    func ambiguousCityDoesNot() {
+        // Same name, same country, different provinces.
+        let lendable = PlaceTerms.lendableSubdivisions(from: [
+            place("Richmond", "BC", "Canada"), place("Richmond", "ON", "Canada"),
+        ])
+        #expect(PlaceTerms.borrowingSubdivision(for: place("Richmond", nil, "Canada"), from: lendable) == nil)
+    }
+
+    @Test("a different country is a different city")
+    func countryMatters() {
+        let lendable = PlaceTerms.lendableSubdivisions(from: [place("Vancouver", "WA", "United States")])
+        #expect(PlaceTerms.borrowingSubdivision(for: place("Vancouver", nil, "Canada"), from: lendable) == nil)
+    }
+
+    @Test("nothing to lend, nothing borrowed; a place that has one keeps its own")
+    func edges() {
+        #expect(PlaceTerms.borrowingSubdivision(for: place("Vancouver", nil, "Canada"), from: [:]) == nil)
+        let lendable = PlaceTerms.lendableSubdivisions(from: [place("Vancouver", "BC", "Canada")])
+        #expect(PlaceTerms.borrowingSubdivision(for: place("Vancouver", "XX", "Canada"), from: lendable) == nil)
+        #expect(PlaceTerms.borrowingSubdivision(for: place(nil, nil, "Canada"), from: lendable) == nil)
+    }
+
+    @Test("matching ignores case and accents")
+    func folded() {
+        let lendable = PlaceTerms.lendableSubdivisions(from: [place("Montréal", "QC", "Canada")])
+        #expect(PlaceTerms.borrowingSubdivision(for: place("montreal", nil, "canada"), from: lendable)?
+            .subdivision == "QC")
+    }
+}
+
+@Suite struct SubdivisionBorrowingStoreTests {
+    private func store() throws -> WorkoutStore {
+        WorkoutStore(modelContainer: try WorkoutStore.container(inMemory: true))
+    }
+
+    private func ingested(_ id: String) -> IngestedWorkout {
+        let start = Date(timeIntervalSince1970: 1_790_000_000)
+        return IngestedWorkout(
+            workout: Workout(id: id, kind: .cycling, start: start, end: start.addingTimeInterval(1800), duration: 1800),
+            series: WorkoutSeries(workoutID: id))
+    }
+
+    private let canada = "Canada"
+
+    @Test("the UBC ride borrows BC from a Vancouver ride, whichever resolved first")
+    func ubcBorrowsBC() async throws {
+        let store = try store()
+        try await store.upsert([ingested("UBC"), ingested("KITS")])
+        // UBC resolves first, with what MapKit actually gives it: a city and a country.
+        try await store.setPlace(label: "Vancouver", parts: PlaceDescription(
+            city: "Vancouver", subdivision: nil, country: canada, countryCode: "CA"), for: "UBC")
+        #expect(try await store.borrowMissingSubdivisions() == 0, "nothing to borrow from yet")
+
+        try await store.setPlace(label: "Vancouver BC", parts: PlaceDescription(
+            city: "Vancouver", subdivision: "BC", country: canada, countryCode: "CA"), for: "KITS")
+        #expect(try await store.borrowMissingSubdivisions() == 1)
+
+        let ubc = try #require(try await store.item(id: "UBC"))
+        #expect(ubc.placeLabel == "Vancouver BC", "the bare-city label gains the province")
+        for search in ["BC", "British Columbia", "Canada"] {
+            #expect(ubc.matches(searchText: search), "\(search) should find the UBC ride")
+        }
+        #expect(try await store.borrowMissingSubdivisions() == 0, "idempotent")
+    }
+
+    @Test("a label MapKit composed itself is kept when a subdivision is borrowed")
+    func composedLabelKept() async throws {
+        let store = try store()
+        try await store.upsert([ingested("A"), ingested("B")])
+        try await store.setPlace(label: "Somewhere special", parts: PlaceDescription(
+            city: "Vancouver", subdivision: nil, country: canada, countryCode: "CA"), for: "A")
+        try await store.setPlace(label: "Vancouver BC", parts: PlaceDescription(
+            city: "Vancouver", subdivision: "BC", country: canada, countryCode: "CA"), for: "B")
+        try await store.borrowMissingSubdivisions()
+        let a = try #require(try await store.item(id: "A"))
+        #expect(a.placeLabel == "Somewhere special")
+        #expect(a.matches(searchText: "British Columbia"))
+    }
+}

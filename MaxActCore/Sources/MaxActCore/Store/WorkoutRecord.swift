@@ -70,6 +70,14 @@ public final class WorkoutRecord {
     /// is what every row written before this existed reports — and what makes them re-resolve
     /// themselves, one request per place rather than per workout.
     public var placeTermsVersion: Int = 0
+
+    /// The place's parts, as resolved — city, subdivision, country. Kept separately from the
+    /// folded search string because that can't be reliably split back up, and borrowing a
+    /// subdivision for a place MapKit gave none needs to compare cities and countries. Defaulted,
+    /// so the store migrates without a mapping model.
+    public var placeCity: String?
+    public var placeSubdivision: String?
+    public var placeCountry: String?
     public var stravaStateKey: String
     public var stravaFailureReason: String?
     public var stravaActivityID: Int?
@@ -116,6 +124,9 @@ public final class WorkoutRecord {
         placeLabel = nil
         placeSearchTerms = nil
         placeTermsVersion = 0
+        placeCity = nil
+        placeSubdivision = nil
+        placeCountry = nil
         placeLatitude = nil
         placeLongitude = nil
         stravaStateKey = StravaState.notUploaded.storageKey
@@ -193,6 +204,14 @@ public final class WorkoutRecord {
 }
 
 extension WorkoutRecord {
+    /// The stored parts, or `nil` if the place was never broken down.
+    var placeParts: PlaceDescription? {
+        let parts = PlaceDescription(city: placeCity, subdivision: placeSubdivision,
+                                     country: placeCountry,
+                                     countryCode: PlaceTerms.countryCode(forName: placeCountry))
+        return parts.isEmpty ? nil : parts
+    }
+
     /// The snapped start, or `nil` if no route has been stored yet.
     public var placeCoordinate: Coordinate? {
         guard let placeLatitude, let placeLongitude else { return nil }

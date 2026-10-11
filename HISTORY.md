@@ -828,6 +828,17 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-11 (late)** — **Borrowing the province for places MapKit gives none**, requested by the
+  user after the reset showed UBC rides losing "BC". Places now store city, province and country
+  (`PlaceTerms.version` 2), and a local pass after each round of lookups lends a city's agreed
+  province to places in that city missing one, declining when places disagree. Measured on the
+  user's data from a standalone test process: 3 distinct start cells, one of them province-less in
+  MapKit; it now reads "Vancouver BC". **Incident:** a `RunCodeSnippet` run, meant to resolve places
+  on a *copy* of the database, launched the full app instead — migrating the user's real database
+  and re-resolving their places with unmerged branch code. Harmless in outcome (the same result
+  the merged code gives) but not consented to; the pitfall is now in the Xcode conventions
+  reference, and live probes use gated `swift test` runs instead.
+
 - **2026-10-11 (night)** — **Two corrections to issue 9.** A clean rebuild surfaced deprecation
   warnings: `CLGeocoder` is **deprecated in macOS 26**, contrary to what issue 9 recorded, and so is
   the obvious alternative, `MKMapItem.placemark`. The earlier warning check had missed it because
