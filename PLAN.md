@@ -4,7 +4,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 (HAE), with batch upload to Strava.
 
 **Status:** Phases 0–7 complete and verified live. Next: known issues, then Phase 8.
-**Last updated:** 2026-10-11 (evening).
+**Last updated:** 2026-10-11 (night).
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first: the HAE data
 > contract, the Xcode tooling limits, and the Strava API facts. **`HISTORY.md`** holds how we got
@@ -42,12 +42,18 @@ sticks, and search by region and country.
 terms — one geocoder request per distinct place, in the background, with the Place column
 unchanged. Nothing to do; worth knowing if the Place column looks busy for a minute.
 
-**Next:** known issue 12 (the table gets cramped with the inspector open), 6 (chart/map linking), 8 (summary stats), then Phase 8. Issue 7 (TrainingPeaks)
+**Next:** known issue 12 (the table gets cramped with the inspector open), 14 (signing, needs the user), 6 (chart/map linking), 8 (summary stats), then Phase 8. Issue 7 (TrainingPeaks)
 starts with whether its API is open to us at all.
 
 **2026-10-10:** View ▸ Hide Sidebar (⌃⌘S), and MaxAct is now **one window** — no tabs, no
 File ▸ New Window. Extra windows had shared the model's filter, search and selection, so they only
 looked independent; the user chose removing them over making them independent.
+
+**Place names reset, 2026-10-11:** at the user's request, the 8 stored place labels and search terms
+were cleared directly in the database (backup alongside it, `backup-before-place-reset-2026-10-11`),
+so the next launch re-resolves them with the MapKit-only lookup. To check: labels read as before,
+except UBC starts, which are expected to show "Vancouver" without "BC"; searching "British Columbia"
+finds the rest.
 
 **Still unseen live:** the exact duplicate-error wording — no real duplicate has been rejected yet.
 
@@ -177,6 +183,29 @@ window's minimum width rises from 1,040 to 1,200 (measured: the three panes' flo
 window dragged narrow can't reproduce it. Tested at both widths, and the test fails with the guard
 removed.
 
+**14. The real app asks for the Keychain password after every rebuild.** *(follow-up, user-requested
+2026-10-11)*
+
+The app is **ad-hoc signed** (`Signature=adhoc`, no team), so every build has a new code signature
+and the Keychain treats each one as a new app: the first Strava access after a rebuild raises a
+password prompt, and "Always Allow" only covers that one build. Tests are no longer affected — UI
+tests and the unit-test host run on in-memory secrets — but day-to-day development still is.
+
+The fix is a **stable signing identity**, so the Keychain's access rule follows the certificate
+rather than the build. `security find-identity -v -p codesigning` found **none** on this Mac. Options:
+
+- **Add an Apple ID in Xcode** (Settings ▸ Accounts) for a free *Personal Team*, then select it as
+  the target's team with automatic signing. Simplest; personal-team certificates expire yearly
+  and are renewed by Xcode.
+- **A self-signed code-signing certificate** (Keychain Access ▸ Certificate Assistant ▸ Create a
+  Certificate, type "Code Signing"), set as `CODE_SIGN_IDENTITY`. No Apple account needed, but
+  manual to renew and not trusted beyond this Mac.
+
+Needs the user for the account or certificate step. After it, each item needs "Always Allow" once
+more, then should stop prompting; verify by rebuilding twice and launching. Check that the
+sandbox and Keychain service name (`com.swiatlowski.MaxAct.strava`) carry over unchanged, so the
+existing Strava login survives the switch.
+
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.
 
@@ -192,10 +221,8 @@ setting.
   accessibility, so they were checked by hand.
 - **Column widths are tuned for this Mac's content.** Longer place or activity names will
   truncate. Retuning means bumping `workoutTableColumns.v5`.
-- **Ad-hoc signing makes the real app ask for the Keychain password after every rebuild.** Each
-  build has a new signature, so the Keychain treats it as a new app. Needs a stable signing
-  identity — a free Apple ID in Xcode (a personal team), or a self-signed code-signing certificate
-  — which is a step only the user can take. Tests are no longer affected (see the change log,
+- **Ad-hoc signing makes the real app ask for the Keychain password after every rebuild** —
+  tracked as issue 14. Tests are no longer affected (see the change log,
   2026-10-11): UI tests and the unit-test host both run on in-memory stores, and a full run makes
   no Keychain calls.
 - **Performance tests have loose thresholds.** They catch 10× regressions; the printed figures are
