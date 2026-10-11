@@ -362,7 +362,7 @@ private func client(_ transport: ScriptedTransport, _ secrets: MemorySecrets) ->
 
     @Test("only a 404 means deleted; a live activity is kept")
     func onlyNotFoundCounts() async throws {
-        // Measured 2026-10-11: a deleted activity answers 404 "Record Not Found", a live one 200.
+        // Measured 2026-10-10: a deleted activity answers 404 "Record Not Found", a live one 200.
         let transport = ScriptedTransport([notFound, json(200, ["id": 2]), notFound])
         let strava = client(transport, MemorySecrets(tokens: freshTokens))
 

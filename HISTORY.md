@@ -11,7 +11,7 @@ Durable *how-to* facts (API behaviour, Xcode quirks, data contract) are in
 ## Contents
 
 1. Notes from the Phase 6–7 pauses (lessons and bugs found by use)
-2. Fixed known issues (1–5, 9–11, 13)
+2. Fixed known issues (1–5, 9–13)
 3. Seeded UI tests
 4. Original context and research
 5. Original architecture sketch
@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed known issues (1–5, 9–11, 13)
+## 2. Fixed known issues (1–5, 9–13)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -221,7 +221,7 @@ Not built: the opt-in background trickle. The manual action covers the need, and
 that occupies the phone for hours deserves its own design pass rather than being tacked on.
 
 
-**Issues 9, 10, 11 and 13**, moved from `PLAN.md` on 2026-10-11 as written there (issue 12 remains open; the sidebar-inset fix that was recorded under it follows issue 10).
+**Issues 9, 10, 11 and 13**, moved from `PLAN.md` on 2026-10-10 as written there (issue 12 remains open; the sidebar-inset fix that was recorded under it follows issue 10).
 
 **9. ~~Search by region and country, not just the stored label.~~ — done 2026-10-09.**
 
@@ -232,7 +232,7 @@ so "geneve" finds Genève. `placeTermsVersion` makes the backfill automatic — 
 current version re-resolves itself, at one request per ~1 km cell rather than per workout.
 
 **One MapKit request, with the subdivision parsed from MapKit's own string** *(revised
-2026-10-11)*. MapKit's address representations expose no structured subdivision — `regionCode` is
+2026-10-10)*. MapKit's address representations expose no structured subdivision — `regionCode` is
 documented but absent from the SDK, `regionName` is the country — and the structured sources that do
 (`CLGeocoder`, `MKMapItem.placemark`) are **deprecated in macOS 26**. Issue 9 first used
 `CLGeocoder`, wrongly believing it current; the deprecation warning surfaced only when the file
@@ -249,7 +249,7 @@ The subdivision is an abbreviation in Canada, the US and Switzerland but a full 
 ("Scotland"), so expansion uses a bundled ISO 3166-2 table for CA, US and AU, keyed by country
 because "WA" and "NT" collide. Anywhere else the raw value is still stored and searchable.
 
-**Borrowing the province, 2026-10-11** *(user-requested)*. When MapKit gives a city and country but
+**Borrowing the province, 2026-10-10** *(user-requested)*. When MapKit gives a city and country but
 no province — UBC — the place borrows the province every other resolved place in that city and
 country agrees on, in a local pass after each round of lookups (`borrowMissingSubdivisions`). It
 declines when places disagree (two Richmonds) rather than guess. Places now store city, province
@@ -297,10 +297,10 @@ found a second, smaller case on the 16:02 ride the same day (161 m out, while st
 library the rule adds those two fixes and nothing else. Tests reproduce both shapes, and fail with
 the rule removed. Thumbnails redraw (drawing version 3).
 
-**Follow-up, done 2026-10-11:** the user confirmed both 9/21 rides were bugged on Strava and deleted
+**Follow-up, done 2026-10-10:** the user confirmed both 9/21 rides were bugged on Strava and deleted
 them there. That exposed the next item.
 
-**13. ~~The sync check didn't notice activities deleted on Strava.~~ — done 2026-10-11.** *(reported
+**13. ~~The sync check didn't notice activities deleted on Strava.~~ — done 2026-10-10.** *(reported
 by the user)* The check only ever *added* matches, so the deleted 9/21 rides kept their orange check
 and a link to a dead activity. It now reconciles both ways: a synced workout whose activity is
 missing from the listing is looked up directly, and only a **404** (measured: what Strava returns
@@ -313,7 +313,18 @@ can't pass for a deleted one. The banner reports both counts.
 "2 were deleted on Strava and are marked not uploaded", both 9/21 rides back to not-uploaded, and
 they can then be re-uploaded with the spike fix.
 
-**Confirmed live 2026-10-12** by the user: the check marked the two deleted 9/21 rides not uploaded.
+**Confirmed live 2026-10-10** by the user: the check marked the two deleted 9/21 rides not uploaded.
+
+**12. ~~The table gets cramped when the inspector is open.~~ — closed 2026-10-11.** *(eased 2026-10-10)*
+
+At the default 1,300pt window the table now gets **664pt** with the inspector open, up from 562pt,
+because the inspector opens at its 440pt minimum instead of a 560pt ideal (the sidebar-inset fix; see `HISTORY.md` §2, under issue 10).
+Still below the sum of the column minimums, so some columns compress. Remaining options, none
+measured: automatically hiding low-value columns under some width, or accepting it — widening the
+window once is sticky and solves it per-user. Decide with real content in the window.
+
+**Closed 2026-10-11 by the user**, who judged it fixed enough after the inspector change; no further
+change made. What remains is listed in `PLAN.md` under Known limitations.
 
 ---
 
@@ -923,19 +934,24 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
-- **2026-10-12** — Issue 13 confirmed live by the user: the sync check noticed the two rides deleted
+- **2026-10-11** — **Issue 12 closed** by the user as fixed enough after the inspector change, with
+  no further code change; the remaining narrowness is a Known limitation. Also corrected dates: the
+  work of the evening of 2026-10-10 had been recorded as 2026-10-11, and one entry as 2026-10-12,
+  across the plan, history, skill references and four code comments.
+
+- **2026-10-10** — Issue 13 confirmed live by the user: the sync check noticed the two rides deleted
   on Strava and marked them not uploaded. Removed from the plan's live checks.
 
-- **2026-10-11 (late night)** — **Plan housekeeping, prompted by the user** asking whether §7 had
+- **2026-10-10 (late night)** — **Plan housekeeping, prompted by the user** asking whether §7 had
   been followed. It hadn't, in one respect: fixed issues 9, 10, 11 and 13 had stayed in `PLAN.md`,
   struck through, instead of moving to `HISTORY.md` §2 — which had grown the plan from ~233 back to
   337 lines. Moved them verbatim (with the sidebar-inset fix that sat under open issue 12), kept
   what remains open from them under Known limitations, and rewrote the stale "Where things stand".
 
-- **2026-10-11** — Place reset closed: the user confirmed the re-resolved places, and the pre-reset
+- **2026-10-10** — Place reset closed: the user confirmed the re-resolved places, and the pre-reset
   database backup was deleted at their request.
 
-- **2026-10-11 (late)** — **Borrowing the province for places MapKit gives none**, requested by the
+- **2026-10-10 (late)** — **Borrowing the province for places MapKit gives none**, requested by the
   user after the reset showed UBC rides losing "BC". Places now store city, province and country
   (`PlaceTerms.version` 2), and a local pass after each round of lookups lends a city's agreed
   province to places in that city missing one, declining when places disagree. Measured on the
@@ -946,7 +962,7 @@ and remove over a selection; and that a workout with no flag changes issues no `
   the merged code gives) but not consented to; the pitfall is now in the Xcode conventions
   reference, and live probes use gated `swift test` runs instead.
 
-- **2026-10-11 (night)** — **Two corrections to issue 9.** A clean rebuild surfaced deprecation
+- **2026-10-10 (night)** — **Two corrections to issue 9.** A clean rebuild surfaced deprecation
   warnings: `CLGeocoder` is **deprecated in macOS 26**, contrary to what issue 9 recorded, and so is
   the obvious alternative, `MKMapItem.placemark`. The earlier warning check had missed it because
   the file hadn't recompiled. There is no supported structured subdivision now, so the resolver uses
@@ -955,7 +971,7 @@ and remove over a selection; and that a workout with no flag changes issues no `
   `cityWithContext` is not a home-country behaviour but a UBC quirk (no municipality). Terms
   version not bumped, so stored places — including UBC's richer CLGeocoder-era terms — are kept.
 
-- **2026-10-11 (evening)** — **⌥⌘U for "Check Strava for Existing Activities"**, beside ⇧⌘U upload,
+- **2026-10-10 (evening)** — **⌥⌘U for "Check Strava for Existing Activities"**, beside ⇧⌘U upload,
   and **UI tests no longer touch the Keychain.** The user diagnosed the recurring first-test
   failure: a Keychain password prompt stole focus. Measured with the unified log: one UI test made
   five `SecItemCopyMatching` calls, each able to prompt because every ad-hoc build is a new
@@ -968,7 +984,7 @@ and remove over a selection; and that a workout with no flag changes issues no `
   isolates itself the same way; a full run then logged **zero** lookups, 34/34 passing first time.
   The real app's prompts remain until there's a stable signing identity.
 
-- **2026-10-11** — **Sync check now notices activities deleted on Strava** (issue 13). The user
+- **2026-10-10** — **Sync check now notices activities deleted on Strava** (issue 13). The user
   deleted the two spiked 9/21 rides on Strava; MaxAct kept showing them synced, because the check
   only ever added matches. Measured first: a deleted activity's direct lookup returns 404 "Record
   Not Found". The check now nominates synced workouts missing from its listing, confirms each with a

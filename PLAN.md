@@ -4,7 +4,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 (HAE), with batch upload to Strava.
 
 **Status:** Phases 0–7 complete and verified live. Next: known issues, then Phase 8.
-**Last updated:** 2026-10-12.
+**Last updated:** 2026-10-11.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first: the HAE data
 > contract, the Xcode tooling limits, and the Strava API facts. **`HISTORY.md`** holds how we got
@@ -30,11 +30,10 @@ All work is on `main`, pushed; no open branches. Builds clean with **zero warnin
 `MaxActCore` (`swift test`), 34 app and UI tests (`RunAllTests` — leave the Mac alone for ~4
 minutes, or mouse use breaks them). A full run makes no Keychain calls.
 
-Phases 0–7 are done and verified live. Since then: issues 9, 10, 11 and 13 fixed; View ▸ Hide
+Phases 0–7 are done and verified live. Since then: issues 9–13 fixed or closed; View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** issue 12 (the table gets cramped with the inspector open), 14 (signing — needs the user),
-6 (chart/map linking), 8 (summary stats), then Phase 8. Issue 7 (TrainingPeaks) starts with
+**Next:** issue 14 (signing — needs the user), 6 (chart/map linking), 8 (summary stats), then Phase 8. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -43,7 +42,7 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed issues — 1–5, 9–11 and 13 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–5 and 9–13 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
 **6. Link the charts and the map to each other.** *(feature)*
@@ -78,16 +77,8 @@ Things that will bite:
 - Week start is a locale setting. Use `Calendar.dateInterval(of:for:)` and choose explicitly.
 - Bucket by the current time zone, and say so.
 
-**12. The table gets cramped when the inspector is open.** *(eased 2026-10-10)*
-
-At the default 1,300pt window the table now gets **664pt** with the inspector open, up from 562pt,
-because the inspector opens at its 440pt minimum instead of a 560pt ideal (the sidebar-inset fix; see `HISTORY.md` §2, under issue 10).
-Still below the sum of the column minimums, so some columns compress. Remaining options, none
-measured: automatically hiding low-value columns under some width, or accepting it — widening the
-window once is sticky and solves it per-user. Decide with real content in the window.
-
 **14. The real app asks for the Keychain password after every rebuild.** *(follow-up, user-requested
-2026-10-11)*
+2026-10-10)*
 
 The app is **ad-hoc signed** (`Signature=adhoc`, no team), so every build has a new code signature
 and the Keychain treats each one as a new app: the first Strava access after a rebuild raises a
@@ -129,11 +120,14 @@ setting.
   assume a starting width.
 - **Visual details aren't covered by tests.** The map camera and chart contents aren't exposed to
   accessibility, so they were checked by hand.
+- **The table is narrower with the inspector open** (from issue 12): 664pt at the default 1,300pt
+  window, below the sum of the column minimums, so some columns compress. Widening the window once
+  fixes it, and the width sticks.
 - **Column widths are tuned for this Mac's content.** Longer place or activity names will
   truncate. Retuning means bumping `workoutTableColumns.v5`.
 - **Ad-hoc signing makes the real app ask for the Keychain password after every rebuild** —
   tracked as issue 14. Tests are no longer affected (see the change log,
-  2026-10-11): UI tests and the unit-test host both run on in-memory stores, and a full run makes
+  2026-10-10): UI tests and the unit-test host both run on in-memory stores, and a full run makes
   no Keychain calls.
 - **Performance tests have loose thresholds.** They catch 10× regressions; the printed figures are
   the real measurements.

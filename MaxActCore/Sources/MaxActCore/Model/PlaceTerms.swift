@@ -38,7 +38,7 @@ public enum PlaceTerms {
     /// below this version are re-resolved by ``WorkoutStore/itemsNeedingPlace(limit:)``, which
     /// costs one geocoder request per distinct place rather than per workout.
     ///
-    /// `2` (2026-10-11): places also store their city, subdivision and country, so a place MapKit
+    /// `2` (2026-10-10): places also store their city, subdivision and country, so a place MapKit
     /// gave no subdivision can borrow one (``lendableSubdivisions(from:)``). Rows from version 1
     /// have no parts to lend or borrow with, so they re-resolve once.
     public static let version = 2
@@ -104,7 +104,7 @@ public enum PlaceTerms {
     /// **Only when unambiguous.** A city-and-country whose resolved places disagree (two
     /// Richmonds, or a border town reported both ways) lends nothing: a wrong province is worse
     /// than a missing one. And there's nothing to lend if no other place in that city has resolved
-    /// fully — rare, and accepted (see PLAN.md, issue 9).
+    /// fully — rare, and accepted (see PLAN.md, Known limitations).
     public static func lendableSubdivisions(from places: [PlaceDescription]) -> [String: String] {
         var seen: [String: Set<String>] = [:]
         for place in places {

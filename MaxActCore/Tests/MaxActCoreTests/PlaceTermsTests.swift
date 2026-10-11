@@ -141,7 +141,7 @@ import Testing
 }
 
 /// Reading the subdivision out of MapKit's formatted city string — the only non-deprecated source
-/// on macOS 26. Every input here is a string MapKit actually returned, measured 2026-10-11.
+/// on macOS 26. Every input here is a string MapKit actually returned, measured 2026-10-10.
 @Suite struct SubdivisionParsingTests {
     @Test("the province or state is what's left between city and country")
     func measuredStrings() {

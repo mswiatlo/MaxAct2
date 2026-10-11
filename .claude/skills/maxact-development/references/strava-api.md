@@ -116,7 +116,7 @@ from the Keychain (`com.swiatlowski.MaxAct.strava`, accounts `tokens` and `crede
   kid, child, pet or tag (apart from the unrelated `from_accepted_tag`). Don't re-investigate unless
   Strava announces API support.
 
-## Deleted activities *(measured 2026-10-11)*
+## Deleted activities *(measured 2026-10-10)*
 
 `GET /activities/{id}` for an activity deleted on Strava returns **`404 {"message":"Record Not
 Found"}`**; a live one returns 200. An id that never existed also 404s.

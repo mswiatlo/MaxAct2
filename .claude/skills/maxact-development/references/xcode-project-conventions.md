@@ -485,7 +485,7 @@ Assert on `frame.width` when the question is whether something still has room.
 
 ## Reverse geocoding on macOS 26: MapKit only, and the subdivision is a string
 
-*(Measured 2026-10-11 across ten places. Supersedes an earlier note that recommended `CLGeocoder`.)*
+*(Measured 2026-10-10 across ten places. Supersedes an earlier note that recommended `CLGeocoder`.)*
 
 | | Status | Gives |
 |---|---|---|
@@ -572,7 +572,7 @@ signing identity (`security find-identity -v -p codesigning` found none on this 
 
 Running a snippet "in the context of" a file in the `MaxAct2` target **launches the whole app**:
 `MaxActApp.init` runs with no test flags, so it opens the user's real database, settings and
-Keychain, and `AppModel.load` starts its background work. Found 2026-10-11 when a snippet meant to
+Keychain, and `AppModel.load` starts its background work. Found 2026-10-10 when a snippet meant to
 resolve places on a *copy* of the database left the real one migrated to a new schema and its places
 re-resolved by unmerged branch code. It is also a likely source of the Keychain prompts the user
 saw, since each such launch is a fresh ad-hoc build reading the real Strava entry.

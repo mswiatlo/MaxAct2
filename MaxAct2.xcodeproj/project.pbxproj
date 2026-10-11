@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		E40F7DE9305DB72C0002A068 /* MaxActCore in Frameworks */ = {isa = PBXBuildFile; productRef = E40F7DE8305DB72C0002A068 /* MaxActCore */; };
 		E40F7DEB30606B120002A068 /* PLAN.md in Resources */ = {isa = PBXBuildFile; fileRef = E40F7DEA30606B120002A068 /* PLAN.md */; };
+		E4AAD37C307C3AEC00481339 /* HISTORY.md in Resources */ = {isa = PBXBuildFile; fileRef = E4AAD37B307C3AEC00481339 /* HISTORY.md */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -33,6 +34,7 @@
 		E40F7E2430608A510002A068 /* make_fixture.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = make_fixture.py; sourceTree = "<group>"; };
 		E40F7E2530608A510002A068 /* hae_decode.swift.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = hae_decode.swift.txt; sourceTree = "<group>"; };
 		E40F7E2630608B2C0002A068 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		E4AAD37B307C3AEC00481339 /* HISTORY.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = HISTORY.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -76,6 +78,7 @@
 		000000000000000000000001 = {
 			isa = PBXGroup;
 			children = (
+				E4AAD37B307C3AEC00481339 /* HISTORY.md */,
 				E40F7DEA30606B120002A068 /* PLAN.md */,
 				000000000000000000000010 /* MaxAct2 */,
 				E40F7DCC305DB5750002A068 /* MaxAct2Tests */,
@@ -221,6 +224,7 @@
 		000000000000000140000000 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
+				E4AAD37C307C3AEC00481339 /* HISTORY.md in Resources */,
 				E40F7DEB30606B120002A068 /* PLAN.md in Resources */,
 			);
 		};

@@ -170,7 +170,7 @@ public actor StravaClient {
     ///
     /// For activities that were expected in a listing and weren't there. A missing row alone is
     /// not proof: a listing can omit what the token may not see. So each is fetched directly, and
-    /// **only a 404 counts** — measured 2026-10-11, a deleted activity returns
+    /// **only a 404 counts** — measured 2026-10-10, a deleted activity returns
     /// `404 "Record Not Found"` and a live one 200. Anything else (a 5xx, a timeout, a 429) throws,
     /// so an outage can never be mistaken for a deletion. One read request each; normally zero.
     public func deletedActivities(among activityIDs: [Int]) async throws -> Set<Int> {
