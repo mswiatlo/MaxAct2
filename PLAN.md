@@ -26,14 +26,16 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ## 1. Where things stand — 2026-10-11
 
-All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 272 in
-`MaxActCore` (`swift test`), 34 app and UI tests (`RunAllTests` — leave the Mac alone for ~4
-minutes, or mouse use breaks them). A full run makes no Keychain calls.
+All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 277 in
+`MaxActCore` (`swift test`), 36 app and UI tests (`RunAllTests` — leave the Mac alone for ~4
+minutes, or mouse use breaks them; the real-content test skips unless a library copy is in place). A full run makes no Keychain calls.
 
 Phases 0–7 are done and verified live. Since then: issues 9–14 fixed or closed; View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** 6 (chart/map linking), 8 (summary stats), then Phase 8. Issue 7 (TrainingPeaks) starts with
+**Waiting on the user:** try issue 6 (linked charts and map) on real rides — see its entry below.
+
+**Next:** 8 (summary stats), then Phase 8. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected

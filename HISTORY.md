@@ -968,6 +968,8 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-11** — Paused with issue 6 waiting on the user's check on real rides; plan status refreshed.
+
 - **2026-10-11** — **Issue 6 built: charts and map linked.** `RouteLookup` (binary search by time,
   linear nearest-by-coordinate, chart value within the segment spanning a time) with 5 tests
   including pauses; a shared highlighted moment drives a rule and value in every chart and a map
