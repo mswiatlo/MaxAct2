@@ -11,7 +11,7 @@ Durable *how-to* facts (API behaviour, Xcode quirks, data contract) are in
 ## Contents
 
 1. Notes from the Phase 6–7 pauses (lessons and bugs found by use)
-2. Fixed known issues (1–5, 9–13)
+2. Fixed known issues (1–5, 9–14)
 3. Seeded UI tests
 4. Original context and research
 5. Original architecture sketch
@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed known issues (1–5, 9–13)
+## 2. Fixed known issues (1–5, 9–14)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -333,6 +333,32 @@ window and 160pt wider. The Strava column now sits third, after Date (user's cho
 layout key bumped to `v6` so the new order takes effect. Pace, Energy and Avg HR are what's cut off
 now, all shown in the inspector beside them. Long place names ("Greater Vancou…") were left as they
 are, also the user's choice: the full name is in the inspector.
+
+**14. ~~The real app asks for the Keychain password after every rebuild.~~ — done 2026-10-11.**
+
+Now signed with the user's free **Personal Team** (`DEVELOPMENT_TEAM` on all three targets; signing
+style stays automatic, which picks "Apple Development" once a team is set). Verified on the build:
+signed by "Apple Development", chaining to Apple Root CA, sandbox and network entitlements
+unchanged, and a designated requirement of *bundle id + certificate* with no per-build hash — which
+is what lets "Always Allow" survive rebuilds. 34/34 app and UI tests.
+
+**To confirm live (the user):** launch MaxAct from Xcode; expect one last Keychain prompt — choose
+**Always Allow** — and possibly a one-time macOS prompt about the app's data, since its signer
+changed. Then rebuild (⌘B) and launch again: there should be no prompt. Strava should still show
+as connected, since the Keychain service name is unchanged.
+
+Getting there needed one fix on this Mac: the Apple Development certificate showed as *not valid*
+because the keychain held only Apple's old developer intermediate (expired February 2023), not the
+**G3** one that issued it. G3 was downloaded from apple.com/certificateauthority, its SHA-256
+fingerprint checked against Apple's, and installed into the login keychain with the user's OK.
+The personal-team certificate expires **2027-10-11**; Xcode renews it.
+
+**Confirmed live 2026-10-11.** The user ran the signed app, chose Always Allow once, and saw no
+prompt after a rebuild. They pointed out that rebuilding with nothing changed can produce an
+identical binary, which would prove nothing — so a one-line change to a used string was built
+(code hash `6f52…` → `e955…`, signature still the same certificate and team), run with no prompt,
+and then reverted.
+
 
 ---
 
@@ -941,6 +967,10 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-11** — **Issue 14 confirmed live and closed.** No Keychain prompt after a rebuild that
+  genuinely changed the binary — the user's improvement on the first check, which rebuilt with
+  nothing changed. The probe change was reverted and its branch deleted.
 
 - **2026-10-11** — **Issue 14: signing with the Personal Team.** The user signed into Xcode and
   had a certificate, but `security find-identity -v` found no valid identity: the certificate's

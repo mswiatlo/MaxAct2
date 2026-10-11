@@ -30,10 +30,10 @@ All work is on `main`, pushed; no open branches. Builds clean with **zero warnin
 `MaxActCore` (`swift test`), 34 app and UI tests (`RunAllTests` — leave the Mac alone for ~4
 minutes, or mouse use breaks them). A full run makes no Keychain calls.
 
-Phases 0–7 are done and verified live. Since then: issues 9–13 fixed or closed; View ▸ Hide
+Phases 0–7 are done and verified live. Since then: issues 9–14 fixed or closed; View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** confirm issue 14 live (signing), then 6 (chart/map linking), 8 (summary stats), then Phase 8. Issue 7 (TrainingPeaks) starts with
+**Next:** 6 (chart/map linking), 8 (summary stats), then Phase 8. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -42,7 +42,7 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–5 and 9–13 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–5 and 9–14 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
 **6. Link the charts and the map to each other.** *(feature)*
@@ -77,31 +77,14 @@ Things that will bite:
 - Week start is a locale setting. Use `Calendar.dateInterval(of:for:)` and choose explicitly.
 - Bucket by the current time zone, and say so.
 
-**14. The real app asks for the Keychain password after every rebuild.** *(built 2026-10-11;
-needs one live check)*
-
-Now signed with the user's free **Personal Team** (`DEVELOPMENT_TEAM` on all three targets; signing
-style stays automatic, which picks "Apple Development" once a team is set). Verified on the build:
-signed by "Apple Development", chaining to Apple Root CA, sandbox and network entitlements
-unchanged, and a designated requirement of *bundle id + certificate* with no per-build hash — which
-is what lets "Always Allow" survive rebuilds. 34/34 app and UI tests.
-
-**To confirm live (the user):** launch MaxAct from Xcode; expect one last Keychain prompt — choose
-**Always Allow** — and possibly a one-time macOS prompt about the app's data, since its signer
-changed. Then rebuild (⌘B) and launch again: there should be no prompt. Strava should still show
-as connected, since the Keychain service name is unchanged.
-
-Getting there needed one fix on this Mac: the Apple Development certificate showed as *not valid*
-because the keychain held only Apple's old developer intermediate (expired February 2023), not the
-**G3** one that issued it. G3 was downloaded from apple.com/certificateauthority, its SHA-256
-fingerprint checked against Apple's, and installed into the login keychain with the user's OK.
-The personal-team certificate expires **2027-10-11**; Xcode renews it.
-
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.
 
 ### Known limitations
 
+- **Signing depends on a Personal Team certificate that expires 2027-10-11.** Xcode renews it; if
+  Keychain prompts after rebuilds ever return, check `security find-identity -v -p codesigning`
+  first (see the Xcode conventions reference).
 - **A city with no province anywhere stays province-less** (from issue 9). MapKit gives no province
   for places outside a municipality (UBC); such a place borrows one from other places in the same
   city and country. If none of them has one, there's nothing to borrow. Judged rare; revisit if it

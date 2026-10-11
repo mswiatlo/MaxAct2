@@ -619,3 +619,9 @@ fetches intermediates over the network, which is misleading. Fix: install
 `https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer` (SHA-256 `DC:F2:18:78:…:91:60:1F`)
 into the login keychain. OpenSSL's "unhandled critical extension" when verifying an Apple
 code-signing certificate is OpenSSL not knowing Apple's extension, not a chain fault.
+
+**Testing that signing survives a rebuild needs a real change.** Rebuilding with nothing changed
+can produce a byte-identical binary, so "no prompt after rebuild" proves nothing. Change a string
+the app actually uses (a comment won't reach the binary), confirm the hash of
+`MaxAct2.app/Contents/MacOS/MaxAct2.debug.dylib` changed — in Debug builds the code lives there, not
+in the main executable — then launch. Revert afterwards.
