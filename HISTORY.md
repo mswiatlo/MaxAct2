@@ -323,8 +323,16 @@ Still below the sum of the column minimums, so some columns compress. Remaining 
 measured: automatically hiding low-value columns under some width, or accepting it — widening the
 window once is sticky and solves it per-user. Decide with real content in the window.
 
-**Closed 2026-10-11 by the user**, who judged it fixed enough after the inspector change; no further
-change made. What remains is listed in `PLAN.md` under Known limitations.
+**Closed 2026-10-11 — after checking with real content, which the first closing skipped.** It was
+first closed on the numbers alone; the user asked why, since the plan's own note said to decide with
+real content. A test-only launch mode (`--ui-testing-real-copy`) then opened a *copy* of the real
+library, isolated as for every UI test, and photographed the window. Two findings the numbers had
+hidden: with the inspector open the table doesn't *compress* columns, it **cuts off** the ones that
+don't fit — and the cut-off ones included **Strava**, last in the order, at both the default 1,398pt
+window and 160pt wider. The Strava column now sits third, after Date (user's choice), with the
+layout key bumped to `v6` so the new order takes effect. Pace, Energy and Avg HR are what's cut off
+now, all shown in the inspector beside them. Long place names ("Greater Vancou…") were left as they
+are, also the user's choice: the full name is in the inspector.
 
 ---
 
@@ -933,6 +941,13 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-11** — **Issue 12 re-examined with real content and fixed properly.** The earlier
+  closing that day skipped the check the plan called for. Added `--ui-testing-real-copy` (a copy of
+  the real library in the app's temp folder, isolated as for UI tests) and a self-skipping
+  `RealContentUITests` that photographs the window. It showed the Strava column cut off whenever
+  the inspector was open; moved it after Date, layout key now `workoutTableColumns.v6`. The copy and
+  screenshots were deleted afterwards. 35/35 app and UI tests.
 
 - **2026-10-11** — **Issue 12 closed** by the user as fixed enough after the inspector change, with
   no further code change; the remaining narrowness is a Known limitation. Also corrected dates: the

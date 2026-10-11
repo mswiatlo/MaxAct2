@@ -120,11 +120,12 @@ setting.
   assume a starting width.
 - **Visual details aren't covered by tests.** The map camera and chart contents aren't exposed to
   accessibility, so they were checked by hand.
-- **The table is narrower with the inspector open** (from issue 12): 664pt at the default 1,300pt
-  window, below the sum of the column minimums, so some columns compress. Widening the window once
-  fixes it, and the width sticks.
+- **The table is narrower with the inspector open** (from issue 12). Columns that don't fit are cut
+  off at the right rather than compressed: at the default width that's Pace, Energy and Avg HR,
+  all shown in the inspector alongside. Strava sits third so it always stays. Widening the window
+  once brings the rest back, and the width sticks.
 - **Column widths are tuned for this Mac's content.** Longer place or activity names will
-  truncate. Retuning means bumping `workoutTableColumns.v5`.
+  truncate. Retuning means bumping `workoutTableColumns.v6`.
 - **Ad-hoc signing makes the real app ask for the Keychain password after every rebuild** —
   tracked as issue 14. Tests are no longer affected (see the change log,
   2026-10-10): UI tests and the unit-test host both run on in-memory stores, and a full run makes

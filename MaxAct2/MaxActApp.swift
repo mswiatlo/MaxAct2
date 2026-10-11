@@ -73,6 +73,16 @@ struct MaxActApp: App {
             let domain = "com.swiatlowski.MaxAct.uitests"
             UserDefaults.standard.removePersistentDomain(forName: domain)
             let settings = AppSettings(defaults: UserDefaults(suiteName: domain) ?? .standard)
+            // `--ui-testing-real-copy`: a copy of a real library, placed by hand in the app's own
+            // temporary directory, for checking layout against real content. Only honoured inside
+            // this isolated branch, so it can never stand in for the real store.
+            if ProcessInfo.processInfo.arguments.contains("--ui-testing-real-copy"),
+               let model = AppModel.copyOfRealLibrary(
+                   in: URL(fileURLWithPath: NSTemporaryDirectory()).appending(path: "ui-testing-copy"),
+                   settings: settings) {
+                _model = State(initialValue: model)
+                return
+            }
             _model = State(initialValue: AppModel.inMemoryFallback(
                 settings: settings,
                 seedCount: Self.uiTestingSeedCount,

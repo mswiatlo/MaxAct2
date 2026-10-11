@@ -23,7 +23,7 @@ struct WorkoutTable: View {
     ///   column growing, which is why every column below has one.
     /// - The widths the table persists are its own computed ones, not the declared ideals, so
     ///   reading this key back after a launch is the only reliable way to see what it really did.
-    @AppStorage("workoutTableColumns.v5") private var columnCustomizationData = Data()
+    @AppStorage("workoutTableColumns.v6") private var columnCustomizationData = Data()
     @State private var columnCustomization = TableColumnCustomization<WorkoutListItem>()
 
     var body: some View {
@@ -58,9 +58,25 @@ struct WorkoutTable: View {
             .width(min: 96, ideal: 100, max: 110)
             .customizationID("date")
 
-            // Third, beside the date: where a workout happened is part of identifying it, and it
-            // reads better next to when than stranded past the numbers. A saved column
-            // arrangement wins over this, since `customizationID` is what restoration keys on.
+            // Third, right after the date: what this app is for, so it must survive the inspector
+            // opening. Measured against a copy of the real library, at the default 1,398pt window
+            // with the inspector open the table shows only through Pace — when Strava was last,
+            // it was cut off at both that width and 160pt wider. Here it costs ~50pt and stays.
+            TableColumn("Strava") { item in
+                // Centred: a lone glyph pinned to the leading edge of its column reads as
+                // misaligned rather than as a column of status marks.
+                StravaStateBadge(state: item.stravaState, showsLabel: false)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
+            // Symbol alone, so the column is barely wider than its own header. The floor is the
+            // word "Strava", not the content.
+            .width(min: 44, ideal: 50, max: 58)
+            .customizationID("strava")
+
+            // Next to when and whether-it's-synced: where a workout happened is part of
+            // identifying it, and it reads better there than stranded past the numbers. A saved
+            // column arrangement wins over this order, since `customizationID` is what
+            // restoration keys on — hence the storage key's version.
             TableColumn("Place") { item in
                 PlaceCell(item: item)
             }
@@ -125,17 +141,6 @@ struct WorkoutTable: View {
             .width(min: 80, ideal: 120, max: 200)
             .defaultVisibility(.hidden)
             .customizationID("tags")
-
-            TableColumn("Strava") { item in
-                // Centred: a lone glyph pinned to the leading edge of its column reads as
-                // misaligned rather than as a column of status marks.
-                StravaStateBadge(state: item.stravaState, showsLabel: false)
-                    .frame(maxWidth: .infinity, alignment: .center)
-            }
-            // Symbol alone, so the column is barely wider than its own header. The floor is the
-            // word "Strava", not the content.
-            .width(min: 44, ideal: 50, max: 58)
-            .customizationID("strava")
         }
         .tableStyle(.inset)
         // SwiftUI's Table is exposed to accessibility as an *outline*, not a table, and the

@@ -581,3 +581,24 @@ So for anything that needs live MapKit or real data, prefer a **gated test in `M
 (`swift test`, enabled by an environment variable): it runs in its own process and touches only
 what it's given. MapKit's `MKReverseGeocodingRequest` works from there. Reserve `RunCodeSnippet` on
 app files for pure code with no side effects, and never assume it is isolated.
+
+## Checking layout against real content, safely
+
+Seeded data has the wrong shape for layout questions — real place names, real numbers and real
+lengths are what truncate. `--ui-testing-real-copy` (only honoured with `--ui-testing`) opens a
+**copy** of the library at `<container>/Data/tmp/ui-testing-copy/` (`default.store*` plus
+`Series/`), isolated like any UI test: in-memory secrets, no geocoding, throwaway settings.
+`RealContentUITests` skips itself unless that copy exists, then attaches screenshots **of the
+MaxAct window only** — never the screen — with the inspector closed, open, and wider.
+
+```
+C=~/Library/Containers/com.swiatlowski.MaxAct/Data; S="$C/Library/Application Support"
+mkdir -p "$C/tmp/ui-testing-copy" && cp "$S"/default.store* "$C/tmp/ui-testing-copy/" \
+  && cp -R "$S/com.swiatlowski.MaxAct/Series" "$C/tmp/ui-testing-copy/"
+# run RealContentUITests, then:
+xcrun xcresulttool export attachments --path <xcresult> --output-path /tmp/shots
+# afterwards delete both the copy and the exported screenshots
+```
+
+First use (issue 12) overturned a conclusion drawn from widths alone: with the inspector open the
+table cuts columns off rather than compressing them, and the cut-off one was Strava.

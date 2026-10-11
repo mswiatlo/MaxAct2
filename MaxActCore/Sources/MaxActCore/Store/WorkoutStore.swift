@@ -463,6 +463,11 @@ extension WorkoutStore {
     /// The schema, in one place so the app and the tests cannot disagree about it.
     public static var schema: Schema { Schema([WorkoutRecord.self]) }
 
+    /// A container on a specific file — for UI tests run against a *copy* of a real library.
+    public static func container(at url: URL) throws -> ModelContainer {
+        try ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, url: url))
+    }
+
     public static func container(inMemory: Bool = false) throws -> ModelContainer {
         try ModelContainer(
             for: schema,

@@ -200,6 +200,30 @@ final class AppModel {
     }
 
     /// Used when the on-disk stores can't be opened. Everything works; nothing persists.
+    /// A model over a **copy** of a real library, for UI tests that need real content — how long
+    /// real place names are, how wide real numbers run — without touching the real one.
+    ///
+    /// Everything else stays isolated exactly as for seeded UI tests: in-memory secrets, no
+    /// geocoding, throwaway settings. The copy lives in the app's own temporary directory, so the
+    /// sandbox allows it, and a normal launch never looks there. Returns `nil` if no copy exists.
+    static func copyOfRealLibrary(in directory: URL, settings: AppSettings) -> AppModel? {
+        let storeURL = directory.appending(path: "default.store")
+        guard FileManager.default.fileExists(atPath: storeURL.path(percentEncoded: false)),
+              let container = try? WorkoutStore.container(at: storeURL),
+              let seriesStore = try? SeriesStore(directory: directory.appending(path: "Series")),
+              let thumbnails = try? RouteThumbnailRenderer(
+                  seriesStore: seriesStore, directory: directory.appending(path: "Thumbnails"))
+        else { return nil }
+        return AppModel(
+            store: WorkoutStore(modelContainer: container),
+            seriesStore: seriesStore,
+            thumbnails: thumbnails,
+            settings: settings,
+            resolvesPlaces: false,
+            stravaSecrets: InMemorySecretStore()
+        )
+    }
+
     static func inMemoryFallback(
         settings: AppSettings, seedCount: Int? = nil, resolvesPlaces: Bool = true,
         stravaSecrets: any AppSecretStore = KeychainSecretStore()

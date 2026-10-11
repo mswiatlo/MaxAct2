@@ -25,9 +25,9 @@ extension XCTestCase {
     /// in-memory database and separate Keychain service. These tests type into the connection
     /// fields, and without it a test run once overwrote the user's real token.
     @MainActor
-    func launchMaxAct(seed: Int? = nil) -> XCUIApplication {
+    func launchMaxAct(seed: Int? = nil, extraArguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication(bundleIdentifier: "com.swiatlowski.MaxAct")
-        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES", "--ui-testing"]
+        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES", "--ui-testing"] + extraArguments
         // `=` joined, never two tokens — see `MaxActApp.uiTestingSeedCount` for why.
         if let seed { app.launchArguments.append("--ui-testing-seed=\(seed)") }
         app.launch()
@@ -960,5 +960,58 @@ final class DeleteDataUITests: XCTestCase {
             ).firstMatch.waitForExistence(timeout: 15),
             "After deleting everything the library should be back to its empty state."
         )
+    }
+}
+
+
+/// Layout checked against a **copy of a real library** rather than seeded data — real place names,
+/// real numbers, real lengths. Skipped unless a copy has been placed in the app's temporary
+/// directory (`<container>/Data/tmp/ui-testing-copy/`), which is done by hand and removed after.
+///
+/// Isolated like every UI test: in-memory secrets, no geocoding, throwaway settings. Screenshots
+/// are of the MaxAct window only, never the screen, and are kept in the test result for review.
+final class RealContentUITests: XCTestCase {
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+    }
+
+    @MainActor
+    func testInspectorLayoutWithRealContent() throws {
+        let app = launchMaxAct(extraArguments: ["--ui-testing-real-copy"])
+        let window = app.windows.firstMatch
+        let table = app.outlines["WorkoutTable"]
+        guard table.waitForExistence(timeout: 15) else {
+            throw XCTSkip("No real-library copy in place; nothing to measure.")
+        }
+
+        let launchWidth = window.frame.width
+        addTeardownBlock { @MainActor in
+            let excess = window.frame.width - launchWidth
+            guard abs(excess) > 1 else { return }
+            let edge = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5))
+                .withOffset(CGVector(dx: -1, dy: 0))
+            edge.press(forDuration: 0.3, thenDragTo: edge.withOffset(CGVector(dx: -excess, dy: 0)))
+            Thread.sleep(forTimeInterval: 1.5)
+        }
+
+        func capture(_ name: String) {
+            Thread.sleep(forTimeInterval: 1)
+            print("REAL \(name): window \(window.frame.width) table \(table.frame.width)")
+            let attachment = XCTAttachment(screenshot: window.screenshot())
+            attachment.name = name
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+
+        capture("1-inspector-closed")
+        table.cells.element(boundBy: 0).click()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "value CONTAINS[c] 'Duration'"))
+            .firstMatch.waitForExistence(timeout: 10))
+        capture("2-inspector-open-default-width")
+
+        let edge = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5))
+            .withOffset(CGVector(dx: -1, dy: 0))
+        edge.press(forDuration: 0.3, thenDragTo: edge.withOffset(CGVector(dx: 300, dy: 0)))
+        capture("3-inspector-open-300pt-wider")
     }
 }
