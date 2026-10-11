@@ -69,12 +69,28 @@ final class AppModel {
         /// Paused for Strava's rate limit, still running. Distinct from a failure: the batch
         /// resumes on its own at `until`, and the user should see when rather than a spinner.
         case waiting(SyncActivity, until: Date)
+        /// The sync-status check, which reports two counts rather than one.
+        case checkedStrava(StravaCheckResult)
         case failed(String)
+
+        /// "Found 2 workouts already on Strava · 1 was deleted there", or either half alone.
+        static func describe(_ result: StravaCheckResult) -> String {
+            var parts: [String] = []
+            if result.found > 0 {
+                parts.append("Found \(result.found) workout\(result.found == 1 ? "" : "s") already on Strava")
+            }
+            if result.removed > 0 {
+                parts.append(result.removed == 1
+                             ? "1 was deleted on Strava and is marked not uploaded"
+                             : "\(result.removed) were deleted on Strava and are marked not uploaded")
+            }
+            return parts.isEmpty ? "Nothing new found on Strava" : parts.joined(separator: " · ")
+        }
 
         var isRunning: Bool {
             switch self {
             case .running, .waiting: true
-            case .idle, .finished, .failed: false
+            case .idle, .finished, .checkedStrava, .failed: false
             }
         }
 
@@ -99,6 +115,8 @@ final class AppModel {
             case .finished(.checkingStrava, let found):
                 found == 0 ? "Nothing new found on Strava"
                     : "Found \(found) workout\(found == 1 ? "" : "s") already on Strava"
+            case .checkedStrava(let result):
+                Self.describe(result)
             case .waiting(_, let until):
                 "Paused for Strava's rate limit — resumes at "
                     + until.formatted(date: .omitted, time: .shortened)
@@ -409,6 +427,14 @@ final class AppModel {
             throw StravaError.authorizationRejected(
                 "upload permission wasn't granted — leave \"Upload your activities\" ticked")
         }
+        // Required too, since the sync check learned to notice deletions. Without it Strava hides
+        // "Only You" activities from both the listing and a direct lookup, so a private ride would
+        // be indistinguishable from a deleted one and get marked not uploaded.
+        guard query["scope"]?.contains("activity:read_all") == true else {
+            throw StravaError.authorizationRejected(
+                "private-activity access wasn't granted — leave \"View data about your private "
+                + "activities\" ticked, so MaxAct can tell a private activity from a deleted one")
+        }
         guard let code = query["code"] else {
             throw StravaError.invalidResponse("no authorisation code in the callback")
         }
@@ -429,8 +455,8 @@ final class AppModel {
                 // Local edits go first, so the import below sees them as settled rather than
                 // overwriting them with Strava's stale value.
                 _ = await sendPendingStravaFlags()
-                let found = try await markWorkoutsAlreadyOnStrava(workouts)
-                syncStatus = .finished(.checkingStrava, found: found)
+                let result = try await markWorkoutsAlreadyOnStrava(workouts)
+                syncStatus = .checkedStrava(result)
             } catch let error as StravaError {
                 syncStatus = .failed(error.description)
             } catch {
@@ -439,17 +465,34 @@ final class AppModel {
         }
     }
 
-    /// Lists Strava's activities over the workouts' span, marks the matches, and mirrors Strava's
-    /// commute/trainer flags onto every synced workout in that span — the same listing carries
-    /// both, so the flags cost nothing extra. One read request per 200 activities: about a dozen
-    /// for seven years.
+    /// Lists Strava's activities over the workouts' span, and brings the library into line with
+    /// it in both directions: workouts found there are marked synced, and synced workouts whose
+    /// activity was **deleted** on Strava go back to "not on Strava". It also mirrors Strava's
+    /// commute/trainer flags — the same listing carries them, so they cost nothing extra. One read
+    /// request per 200 activities: about a dozen for seven years.
     @discardableResult
-    private func markWorkoutsAlreadyOnStrava(_ workouts: [Workout]) async throws -> Int {
-        guard let earliest = workouts.map(\.start).min(), let latest = workouts.map(\.end).max() else { return 0 }
+    private func markWorkoutsAlreadyOnStrava(_ workouts: [Workout]) async throws -> StravaCheckResult {
+        guard let earliest = workouts.map(\.start).min(), let latest = workouts.map(\.end).max() else {
+            return StravaCheckResult(found: 0, removed: 0)
+        }
         // A day's margin either side: a workout near the edge must still see an activity that
         // started a few minutes before it.
         let span = DateInterval(start: earliest.addingTimeInterval(-86_400), end: latest.addingTimeInterval(86_400))
         let activities = try await strava.activities(in: span)
+
+        // Deletions first, so a workout whose activity is gone is free to match another one —
+        // say, the same ride re-uploaded by the watch — in the pass below. Absence from the
+        // listing only nominates; Strava has to confirm each with a 404 before anything changes.
+        // Only workouts inside the *unpadded* range are candidates: they are the ones the listing
+        // is certain to have covered.
+        let missing = try await store.syncedActivities(
+            missingFrom: Set(activities.map(\.id)),
+            startingWithin: DateInterval(start: earliest, end: latest)
+        )
+        let deleted = missing.isEmpty ? [] : try await strava.deletedActivities(among: Array(missing.keys))
+        let removed = try await store.markRemovedFromStrava(deleted.compactMap { missing[$0] })
+        if removed > 0 { await refreshItems() }
+
         let onStrava = Set(items.filter { $0.stravaState.isOnStrava }.map(\.id))
         let matches = StravaActivityMatcher.match(
             workouts.filter { !onStrava.contains($0.id) }, against: activities
@@ -459,7 +502,12 @@ final class AppModel {
             activities.map { ($0.id, $0.flags) }, uniquingKeysWith: { first, _ in first }
         ))
         await refreshItems()
-        return marked
+        return StravaCheckResult(found: marked, removed: removed)
+    }
+
+    struct StravaCheckResult: Equatable {
+        let found: Int
+        let removed: Int
     }
 
     func disconnectStrava() async {

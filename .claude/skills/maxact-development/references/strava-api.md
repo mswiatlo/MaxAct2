@@ -115,3 +115,20 @@ from the Keychain (`com.swiatlowski.MaxAct.strava`, accounts `tokens` and `crede
   known to be tagged "With Kid" (2026-09-18 16:04 ride): no key or value in its full record mentions
   kid, child, pet or tag (apart from the unrelated `from_accepted_tag`). Don't re-investigate unless
   Strava announces API support.
+
+## Deleted activities *(measured 2026-10-11)*
+
+`GET /activities/{id}` for an activity deleted on Strava returns **`404 {"message":"Record Not
+Found"}`**; a live one returns 200. An id that never existed also 404s.
+
+The sync check uses this to notice deletions: a synced workout whose activity is missing from the
+listing is only *nominated*; it is reset to "not uploaded" after a direct lookup 404s. Any other
+failure (5xx, timeout, 429) throws rather than counting as deleted. Candidates are limited to
+workouts that started inside the listed window — the upload pre-check lists only the selection's
+dates, and everything outside would otherwise look missing.
+
+**`activity:read_all` is now required at connect**, alongside `activity:write`. Strava's approval
+page lets the user untick "View data about your private activities", and without it "Only You"
+activities are hidden from the listing (and presumably from direct lookup), so a private ride
+would be indistinguishable from a deleted one. The existing connection predates this check and is
+assumed to have it — it was made with Strava's defaults.

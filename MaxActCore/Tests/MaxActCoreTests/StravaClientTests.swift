@@ -354,3 +354,40 @@ private func client(_ transport: ScriptedTransport, _ secrets: MemorySecrets) ->
                 == "Evening Indoor Ride")
     }
 }
+
+// MARK: - Deleted activities
+
+@Suite struct DeletedActivityTests {
+    private let notFound = json(404, ["message": "Record Not Found", "errors": []])
+
+    @Test("only a 404 means deleted; a live activity is kept")
+    func onlyNotFoundCounts() async throws {
+        // Measured 2026-10-11: a deleted activity answers 404 "Record Not Found", a live one 200.
+        let transport = ScriptedTransport([notFound, json(200, ["id": 2]), notFound])
+        let strava = client(transport, MemorySecrets(tokens: freshTokens))
+
+        let deleted = try await strava.deletedActivities(among: [1, 2, 3])
+        #expect(deleted == [1, 3])
+        #expect(await transport.paths() == ["GET /api/v3/activities/1", "GET /api/v3/activities/2",
+                                             "GET /api/v3/activities/3"])
+    }
+
+    @Test("an outage is never mistaken for a deletion")
+    func serverErrorThrows() async throws {
+        // A 5xx says nothing about whether the activity exists. It has to stop the check, not
+        // quietly unmark a workout that's still on Strava.
+        let transport = ScriptedTransport([json(503, ["message": "Service Unavailable"])])
+        let strava = client(transport, MemorySecrets(tokens: freshTokens))
+        await #expect(throws: StravaError.self) {
+            _ = try await strava.deletedActivities(among: [1])
+        }
+    }
+
+    @Test("nothing to confirm costs no requests")
+    func emptyIsFree() async throws {
+        let transport = ScriptedTransport([])
+        let strava = client(transport, MemorySecrets(tokens: freshTokens))
+        #expect(try await strava.deletedActivities(among: []).isEmpty)
+        #expect(await transport.paths().isEmpty)
+    }
+}

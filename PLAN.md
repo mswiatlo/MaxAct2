@@ -4,7 +4,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 (HAE), with batch upload to Strava.
 
 **Status:** Phases 0–7 complete and verified live. Next: known issues, then Phase 8.
-**Last updated:** 2026-10-10 (evening).
+**Last updated:** 2026-10-11.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first: the HAE data
 > contract, the Xcode tooling limits, and the Strava API facts. **`HISTORY.md`** holds how we got
@@ -26,7 +26,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ## 1. Where things stand — 2026-10-09
 
-All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 254 in
+All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 261 in
 `MaxActCore` (`swift test`), 33 app and UI tests (`RunAllTests` — leave the Mac alone for ~4
 minutes, or mouse use breaks them).
 
@@ -143,10 +143,21 @@ found a second, smaller case on the 16:02 ride the same day (161 m out, while st
 library the rule adds those two fixes and nothing else. Tests reproduce both shapes, and fail with
 the rule removed. Thumbnails redraw (drawing version 3).
 
-**Follow-up for the user:** both 9/21 rides were uploaded to Strava by MaxAct *before* this fix, so
-Strava has the spikes — likely a 2.5 km spur on the 13:00 ride's map and odd splits there. Not
-verified (the token had expired). The API can't replace an activity's file, so the fix would be to
-delete those two on Strava and re-upload them from MaxAct. Worth a look before deciding.
+**Follow-up, done 2026-10-11:** the user confirmed both 9/21 rides were bugged on Strava and deleted
+them there. That exposed the next item.
+
+**13. ~~The sync check didn't notice activities deleted on Strava.~~ — done 2026-10-11.** *(reported
+by the user)* The check only ever *added* matches, so the deleted 9/21 rides kept their orange check
+and a link to a dead activity. It now reconciles both ways: a synced workout whose activity is
+missing from the listing is looked up directly, and only a **404** (measured: what Strava returns
+for a deleted activity) resets it to "not uploaded", clearing the link but keeping its tags. Any
+other error stops the check rather than unmarking anything; candidates are limited to the window
+the listing covered; and `activity:read_all` is now required at connect, so a private activity
+can't pass for a deleted one. The banner reports both counts.
+
+**To confirm live:** run Settings → Strava → "Check for Workouts Already on Strava". Expected:
+"2 were deleted on Strava and are marked not uploaded", both 9/21 rides back to not-uploaded, and
+they can then be re-uploaded with the spike fix.
 
 **12. The table gets cramped when the inspector is open.** *(eased 2026-10-10)*
 
@@ -179,6 +190,9 @@ setting.
   accessibility, so they were checked by hand.
 - **Column widths are tuned for this Mac's content.** Longer place or activity names will
   truncate. Retuning means bumping `workoutTableColumns.v5`.
+- **The first UI test of a full run sometimes can't activate the app** ("Running Background") —
+  twice on 2026-10-10/11, both times `testConfirmingDeleteEmptiesTheLibrary`, both passing on an
+  immediate rerun. Not yet diagnosed; rerun it alone before treating it as a real failure.
 - **Performance tests have loose thresholds.** They catch 10× regressions; the printed figures are
   the real measurements.
 - **`Spikes/` stays** as the quickest way to inspect a stored series file. It's excluded from every

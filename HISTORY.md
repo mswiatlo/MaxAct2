@@ -828,6 +828,14 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-11** — **Sync check now notices activities deleted on Strava** (issue 13). The user
+  deleted the two spiked 9/21 rides on Strava; MaxAct kept showing them synced, because the check
+  only ever added matches. Measured first: a deleted activity's direct lookup returns 404 "Record
+  Not Found". The check now nominates synced workouts missing from its listing, confirms each with a
+  lookup, and resets only on a 404 — never on an outage. Limited to the listed window, since the
+  upload pre-check lists only the selection's dates. `activity:read_all` is now required at connect
+  so a private activity can't masquerade as a deleted one.
+
 - **2026-10-10 (evening)** — **Known issue 11 done.** Printed the 13:00 ride's splits against its raw
   route: a speedless fix 2,516 m out and back, accuracy 27 m, survived the 30 m accuracy rule, and
   its phantom distance broke every split on the ride, not only km 5. Rather than lower the

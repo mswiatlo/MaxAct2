@@ -166,6 +166,25 @@ public actor StravaClient {
         try await updateActivity(id: id, StravaActivityUpdate(sportType: sportType))
     }
 
+    /// Of `activityIDs`, the ones Strava confirms no longer exist.
+    ///
+    /// For activities that were expected in a listing and weren't there. A missing row alone is
+    /// not proof: a listing can omit what the token may not see. So each is fetched directly, and
+    /// **only a 404 counts** — measured 2026-10-11, a deleted activity returns
+    /// `404 "Record Not Found"` and a live one 200. Anything else (a 5xx, a timeout, a 429) throws,
+    /// so an outage can never be mistaken for a deletion. One read request each; normally zero.
+    public func deletedActivities(among activityIDs: [Int]) async throws -> Set<Int> {
+        var deleted: Set<Int> = []
+        for id in activityIDs {
+            do {
+                _ = try await send(method: "GET", path: "activities/\(id)", kind: .read)
+            } catch StravaError.http(status: 404, _) {
+                deleted.insert(id)
+            }
+        }
+        return deleted
+    }
+
     /// One page of the athlete's activities. `after`/`before` are epoch seconds per the spec.
     func activitiesPage(after: Date, before: Date, page: Int, perPage: Int) async throws -> [StravaActivitySummary] {
         let response = try await send(

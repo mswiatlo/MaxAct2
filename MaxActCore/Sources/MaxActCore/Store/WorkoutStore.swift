@@ -205,6 +205,54 @@ public actor WorkoutStore {
         return changed
     }
 
+    /// Workouts this app believes are on Strava whose activity isn't in `listed`, as
+    /// `activityID → workoutID`. Candidates for ``markRemovedFromStrava(_:)``, **not** proof: the
+    /// caller confirms each one with Strava before acting.
+    ///
+    /// Only rows with an activity id — an upload still processing has none yet, so it can't be
+    /// missing from anything — and only workouts that **started within `span`**, the window the
+    /// listing covered. Outside it, absence means nothing: the upload pre-check lists just the
+    /// selection's dates, and without this every other synced workout would look deleted.
+    public func syncedActivities(
+        missingFrom listed: Set<Int>, startingWithin span: DateInterval
+    ) throws -> [Int: String] {
+        let uploaded = StravaState.uploaded.storageKey
+        let duplicate = StravaState.duplicate.storageKey
+        let (from, to) = (span.start, span.end)
+        let descriptor = FetchDescriptor<WorkoutRecord>(predicate: #Predicate {
+            ($0.stravaStateKey == uploaded || $0.stravaStateKey == duplicate)
+                && $0.stravaActivityID != nil
+                && $0.start >= from && $0.start <= to
+        })
+        var missing: [Int: String] = [:]
+        for record in try modelContext.fetch(descriptor) {
+            guard let activityID = record.stravaActivityID, !listed.contains(activityID) else { continue }
+            missing[activityID] = record.id
+        }
+        return missing
+    }
+
+    /// Returns workouts whose activity was deleted on Strava to "not on Strava".
+    ///
+    /// Clears the activity and upload ids — the link would lead nowhere — and any pending flag
+    /// push, which has nothing left to push to. Tags stay: they're local, and Commute is still
+    /// true of the ride. Returns how many changed.
+    @discardableResult
+    public func markRemovedFromStrava(_ workoutIDs: [String]) throws -> Int {
+        var changed = 0
+        for workoutID in workoutIDs {
+            guard let record = try record(id: workoutID), record.stravaState.isOnStrava else { continue }
+            record.stravaState = .notUploaded
+            record.stravaActivityID = nil
+            record.stravaUploadID = nil
+            record.lastUploadedAt = nil
+            record.stravaFlagsPending = false
+            changed += 1
+        }
+        if changed > 0 { try modelContext.save() }
+        return changed
+    }
+
     /// Uploads a previous run accepted but didn't see finish. Resumed by polling the saved id —
     /// uploading again would only earn a "duplicate" and spend a write.
     public func itemsUploadingToStrava() throws -> [(id: String, uploadID: Int)] {
