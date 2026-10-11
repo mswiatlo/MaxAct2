@@ -11,6 +11,23 @@ struct MaxActApp: App {
     /// deterministic instead of depending on whatever happens to be synced.
     static let isUITesting = ProcessInfo.processInfo.arguments.contains("--ui-testing")
 
+    /// Whether this process is the **host for the unit-test bundle**, which XCTest launches as the
+    /// full app with none of the UI tests' flags.
+    ///
+    /// Found the hard way: after UI tests stopped touching the Keychain, the unified log still
+    /// showed one lookup per full run — from the unit-test host, reading the *real* Strava entry
+    /// with an ad-hoc signature, which is what raised the password prompt that stole focus from
+    /// the first UI test. It was also opening the real database and settings. Detected from the
+    /// environment XCTest gives the host (measured: `XCTestBundlePath` and
+    /// `XCTestSessionIdentifier`), neither of which a normal launch, or Xcode's Run, sets.
+    static let isHostingUnitTests: Bool = {
+        let environment = ProcessInfo.processInfo.environment
+        return environment["XCTestBundlePath"] != nil || environment["XCTestSessionIdentifier"] != nil
+    }()
+
+    /// Either kind of test: run against throwaway stores, in memory, never the user's.
+    static var isIsolatedForTesting: Bool { isUITesting || isHostingUnitTests }
+
     /// `--ui-testing-seed=<n>` plants n synthetic workouts in the in-memory store. Only honoured
     /// alongside `--ui-testing`, so it can never touch the real database.
     ///
@@ -52,7 +69,7 @@ struct MaxActApp: App {
         // differently. Removing the two ways to get a second window is the smaller change.
         NSWindow.allowsAutomaticWindowTabbing = false
 
-        if Self.isUITesting {
+        if Self.isIsolatedForTesting {
             let domain = "com.swiatlowski.MaxAct.uitests"
             UserDefaults.standard.removePersistentDomain(forName: domain)
             let settings = AppSettings(defaults: UserDefaults(suiteName: domain) ?? .standard)

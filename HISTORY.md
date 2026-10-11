@@ -832,8 +832,13 @@ and remove over a selection; and that a workout with no flag changes issues no `
   and **UI tests no longer touch the Keychain.** The user diagnosed the recurring first-test
   failure: a Keychain password prompt stole focus. Measured with the unified log: one UI test made
   five `SecItemCopyMatching` calls, each able to prompt because every ad-hoc build is a new
-  signature to the Keychain. Under `--ui-testing` secrets now live in an `InMemorySecretStore`; the
-  log showed zero Keychain calls across the full suite afterwards, and 33/33 passed first time.
+  signature to the Keychain. Under `--ui-testing` secrets now live in an `InMemorySecretStore`.
+  **Correction, same evening:** the commit claimed zero Keychain calls across the full suite, but
+  that had been measured over two UI tests only. Measured over a full run, one lookup remained —
+  from the **unit-test host**, which XCTest launches as the full app without `--ui-testing`, so it
+  read the *real* Strava entry (the actual source of the prompt) and also opened the real database
+  and settings. The app now detects hosting from `XCTestBundlePath` / `XCTestSessionIdentifier` and
+  isolates itself the same way; a full run then logged **zero** lookups, 34/34 passing first time.
   The real app's prompts remain until there's a stable signing identity.
 
 - **2026-10-11** — **Sync check now notices activities deleted on Strava** (issue 13). The user

@@ -27,7 +27,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 ## 1. Where things stand — 2026-10-09
 
 All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 261 in
-`MaxActCore` (`swift test`), 33 app and UI tests (`RunAllTests` — leave the Mac alone for ~4
+`MaxActCore` (`swift test`), 34 app and UI tests (`RunAllTests` — leave the Mac alone for ~4
 minutes, or mouse use breaks them).
 
 **Phase 7 is done.** The three remaining live checks all passed against the real account: the sync
@@ -193,8 +193,9 @@ setting.
 - **Ad-hoc signing makes the real app ask for the Keychain password after every rebuild.** Each
   build has a new signature, so the Keychain treats it as a new app. Needs a stable signing
   identity — a free Apple ID in Xcode (a personal team), or a self-signed code-signing certificate
-  — which is a step only the user can take. UI tests are no longer affected (see the change log,
-  2026-10-11): they use in-memory secrets and make no Keychain calls.
+  — which is a step only the user can take. Tests are no longer affected (see the change log,
+  2026-10-11): UI tests and the unit-test host both run on in-memory stores, and a full run makes
+  no Keychain calls.
 - **Performance tests have loose thresholds.** They catch 10× regressions; the printed figures are
   the real measurements.
 - **`Spikes/` stays** as the quickest way to inspect a stored series file. It's excluded from every

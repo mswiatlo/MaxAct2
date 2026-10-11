@@ -545,13 +545,22 @@ drag, or termination can beat the autosave.
 The app is **ad-hoc signed**, so every build has a new code signature and the Keychain treats it as
 a new app — any access can raise a password prompt. During UI tests that prompt steals focus and
 the test fails with "Failed to activate application (Running Background)", usually the first test
-after a build. Under `--ui-testing` the app therefore uses `InMemorySecretStore` and makes **no**
-Keychain calls. Check with:
+after a build. Under test the app therefore uses `InMemorySecretStore` and makes **no** Keychain
+calls.
+
+**Two kinds of test launch, and both must be isolated.** UI tests pass `--ui-testing`. The
+**unit-test host** gets no flags at all: XCTest launches the full app and injects the test bundle,
+so without care it opens the real database, settings and Keychain — and it runs *first*, so its
+prompt is what stopped the first UI test. Detect it from the environment XCTest provides
+(`XCTestBundlePath`, `XCTestSessionIdentifier`); `MaxActApp.isIsolatedForTesting` covers both.
+
+**Measure over a full run, not a sample.** Checking two UI tests showed zero lookups and was
+reported as fixed; a full run still had one, from the host. Check with:
 
 ```
 /usr/bin/log show --start "<time>" --style compact \
   --predicate 'process == "MaxAct2" AND eventMessage CONTAINS "SecItem"' | grep -c SecItem
 ```
 
-It was 5 per test before, 0 after. The real app still prompts after rebuilds until it has a stable
+It was 5 per UI test before, then 1 per run (the host), then 0. The real app still prompts after rebuilds until it has a stable
 signing identity (`security find-identity -v -p codesigning` found none on this Mac).

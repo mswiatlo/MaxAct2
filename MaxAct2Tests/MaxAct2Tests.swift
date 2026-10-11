@@ -12,6 +12,16 @@ import Testing
         #expect(identifier == "com.swiatlowski.MaxAct")
     }
 
+    /// The host app recognises it's running tests, and so runs on throwaway in-memory stores.
+    ///
+    /// Without this the host was the *real* app: it opened the user's database and settings and
+    /// read their Strava login from the Keychain — which, ad-hoc signed, raised a password prompt
+    /// that then stopped the first UI test from bringing the app forward.
+    @Test func hostRunsIsolatedFromRealData() {
+        #expect(MaxActApp.isHostingUnitTests)
+        #expect(MaxActApp.isIsolatedForTesting)
+    }
+
     @Test func appTypeIsVisibleToTests() {
         // Referencing an app type is what actually requires the bundle loader.
         #expect(String(describing: MaxActApp.self) == "MaxActApp")
