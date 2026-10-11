@@ -313,6 +313,8 @@ can't pass for a deleted one. The banner reports both counts.
 "2 were deleted on Strava and are marked not uploaded", both 9/21 rides back to not-uploaded, and
 they can then be re-uploaded with the spike fix.
 
+**Confirmed live 2026-10-12** by the user: the check marked the two deleted 9/21 rides not uploaded.
+
 ---
 
 ## 3. Seeded UI tests
@@ -920,6 +922,9 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-12** — Issue 13 confirmed live by the user: the sync check noticed the two rides deleted
+  on Strava and marked them not uploaded. Removed from the plan's live checks.
 
 - **2026-10-11 (late night)** — **Plan housekeeping, prompted by the user** asking whether §7 had
   been followed. It hadn't, in one respect: fixed issues 9, 10, 11 and 13 had stayed in `PLAN.md`,

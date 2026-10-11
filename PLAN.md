@@ -4,7 +4,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 (HAE), with batch upload to Strava.
 
 **Status:** Phases 0–7 complete and verified live. Next: known issues, then Phase 8.
-**Last updated:** 2026-10-11 (late night).
+**Last updated:** 2026-10-12.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first: the HAE data
 > contract, the Xcode tooling limits, and the Strava API facts. **`HISTORY.md`** holds how we got
@@ -37,10 +37,8 @@ Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, 
 6 (chart/map linking), 8 (summary stats), then Phase 8. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
-**Still to confirm live:**
-- Issue 13: "Check for Workouts Already on Strava" (⌥⌘U) should report the two deleted 9/21 rides
-  and mark them not uploaded; they can then be re-uploaded without the GPS spike.
-- The exact duplicate-error wording — no real duplicate has been rejected yet.
+**Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
+yet.
 
 ## 2. Open issues and requests
 
