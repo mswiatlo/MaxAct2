@@ -847,6 +847,52 @@ final class SeededTableUITests: XCTestCase {
             "Choosing Indoor should show fewer than all 40 workouts."
         )
     }
+
+    /// Issue 8: the Statistics row swaps the table for a summary, and a personal best leads back
+    /// to its workout.
+    ///
+    /// The seed is 40 daily workouts ending 9 October 2025, so "this year" is empty and 2025 plays
+    /// "last year" — the summary must cope with a current period that has nothing in it.
+    @MainActor
+    func testStatisticsSummariseTheLibraryAndLeadBackToAWorkout() throws {
+        let app = launchSeeded()
+        let sidebar = app.outlines["Sidebar"]
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 15))
+        let row = sidebar.staticTexts.containing(NSPredicate(format: "value == 'Statistics' OR label == 'Statistics'")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        row.click()
+
+        for heading in ["Totals", "History", "Year by Year", "Consistency", "Personal Bests"] {
+            XCTAssertTrue(
+                app.staticTexts.containing(NSPredicate(format: "value == %@ OR label == %@", heading, heading))
+                    .firstMatch.waitForExistence(timeout: 10),
+                "The statistics view should have a \(heading) section."
+            )
+        }
+        XCTAssertFalse(app.outlines["WorkoutTable"].exists, "Statistics replace the table.")
+
+        // Pointing at an earlier bar moves the caption off the current period.
+        let focus = app.staticTexts["HistoryFocus"]
+        XCTAssertTrue(focus.waitForExistence(timeout: 5))
+        let current = focus.value as? String
+        // The chart is one merged element, which keeps its label but not an identifier.
+        let chart = app.otherElements.matching(NSPredicate(format: "label CONTAINS ' per '")).firstMatch
+        XCTAssertTrue(chart.exists)
+        chart.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)).hover()
+        let moved = NSPredicate { _, _ in (focus.value as? String) != current }
+        XCTAssertEqual(XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: moved, object: nil)], timeout: 5),
+                       .completed, "Hovering the history chart should describe the bar under the pointer.")
+
+        // A personal best opens its workout in the inspector, without leaving the statistics.
+        let best = app.links["PersonalBest"].firstMatch  // `.link` style: a link, not a button
+        best.click()
+        XCTAssertTrue(
+            app.staticTexts.containing(NSPredicate(format: "value CONTAINS[c] 'Duration'"))
+                .firstMatch.waitForExistence(timeout: 10),
+            "Clicking a personal best should show that workout's details."
+        )
+        XCTAssertFalse(app.outlines["WorkoutTable"].exists)
+    }
 }
 
 /// The bulk detail backfill, which only means anything with rows present.
@@ -1069,5 +1115,30 @@ final class RealContentUITests: XCTestCase {
             .withOffset(CGVector(dx: -1, dy: 0))
         edge.press(forDuration: 0.3, thenDragTo: edge.withOffset(CGVector(dx: 300, dy: 0)))
         capture("3-inspector-open-300pt-wider")
+    }
+
+    /// Issue 8: the statistics view over the real library, top to bottom, for checking by eye.
+    @MainActor
+    func testStatisticsWithRealContent() throws {
+        let app = launchMaxAct(extraArguments: ["--ui-testing-real-copy"])
+        let window = app.windows.firstMatch
+        let sidebar = app.outlines["Sidebar"]
+        guard app.outlines["WorkoutTable"].waitForExistence(timeout: 15) else {
+            throw XCTSkip("No real-library copy in place; nothing to measure.")
+        }
+        sidebar.staticTexts.containing(NSPredicate(format: "value == 'Statistics' OR label == 'Statistics'"))
+            .firstMatch.click()
+        XCTAssertTrue(app.staticTexts["HistoryFocus"].waitForExistence(timeout: 10))
+
+        for index in 1...4 {
+            Thread.sleep(forTimeInterval: 1)
+            let attachment = XCTAttachment(screenshot: window.screenshot())
+            attachment.name = "s\(index)-statistics"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+            // Over the empty margin beside the statistics: a chart under the pointer takes the
+            // scroll for itself.
+            window.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5)).scroll(byDeltaX: 0, deltaY: -450)
+        }
     }
 }

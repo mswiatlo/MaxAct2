@@ -111,6 +111,8 @@ struct ContentView: View {
                 }
                 .buttonStyle(.borderedProminent)
             }
+        } else if model.sidebarSelection == .statistics {
+            StatisticsView(model: model)
         } else if model.visibleItems.isEmpty {
             ContentUnavailableView.search(text: model.searchText)
         } else {

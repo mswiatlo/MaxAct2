@@ -24,16 +24,17 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ---
 
-## 1. Where things stand — 2026-10-11
+## 1. Where things stand — 2026-10-12
 
-All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 280 in
-`MaxActCore` (`swift test`), 36 app and UI tests (`RunAllTests` — leave the Mac alone for ~4
-minutes, or mouse use breaks them; the real-content test skips unless a library copy is in place). A full run makes no Keychain calls.
+All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 294 in
+`MaxActCore` (`swift test`), 38 app and UI tests (`RunAllTests` — ask first, then leave the Mac
+alone for ~5 minutes; the two real-content tests skip unless a library copy is in place). A full
+run makes no Keychain calls.
 
 Phases 0–7 are done and verified live. Since then: issues 6 and 9–14 fixed or closed; View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** 8 (summary stats), then Phase 8. Issue 7 (TrainingPeaks) starts with
+**Next:** the user's check of issue 8 (statistics), then Phase 8. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -52,15 +53,16 @@ Garmin, Runalyze and archiving anyway. The uploader sits behind `WorkoutDestinat
 *state* on `WorkoutRecord` is still Strava-shaped; a second destination means per-destination
 state, which is a schema and UI change.
 
-**8. Summary statistics: weekly, monthly, yearly, all-time.** *(speculative)*
-Totals by period and kind, with a distance-per-month chart. `WorkoutAggregate` already does the
-arithmetic; the work is grouping and presentation, in the package so period boundaries are tested.
-Things that will bite:
-- `duration` is moving time for auto-paused activities and elapsed time for others (walks). Label
-  it plainly, or derive moving time from the series.
-- Missing distance/energy must not silently count as zero. Say how many couldn't be counted.
-- Week start is a locale setting. Use `Calendar.dateInterval(of:for:)` and choose explicitly.
-- Bucket by the current time zone, and say so.
+**8. Summary statistics.** *(built 2026-10-12, awaiting the user's check)*
+A **Statistics** row at the top of the sidebar swaps the table for: totals (this week, month, year,
+all time), a history bar chart by week/month/year, this year against last year and the best year
+(HealthFit's comparison), a calendar heat map with day and week streaks, and personal bests per
+activity that open their workout. Its own activity picker; it follows the search field. Choices
+made with the user: summary-based features only, ISO weeks (Monday), the sidebar placement.
+Arithmetic in `WorkoutStatistics` (package, tested); missing values are counted, never summed as
+zero. **To check:** browse it on the real library. The year comparison will stay a single line
+until older history is synced — the library starts 2026-08-23. Deferred, as separate ideas: training
+load (CTL/ATL/TSB), heart-rate zones, a route heat map.
 
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.

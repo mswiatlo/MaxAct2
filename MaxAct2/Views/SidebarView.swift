@@ -6,6 +6,11 @@ struct SidebarView: View {
 
     var body: some View {
         List(selection: $model.sidebarSelection) {
+            // Its own row above the filters, without a count: it isn't a list of workouts.
+            Label("Statistics", systemImage: "chart.bar.xaxis")
+                .tag(SidebarSelection.statistics)
+                .accessibilityIdentifier("StatisticsSidebarRow")
+
             Section("Library") {
                 ForEach(WorkoutFilter.allCases) { filter in
                     row(for: .filter(filter), symbol: filter.symbolName)

@@ -642,3 +642,38 @@ in the main executable — then launch. Revert afterwards.
   with the widest labels (a ride), not whichever row is first.
 - When a test passes, check it can fail: the route-click assertion was confirmed by temporarily
   making every click miss, which a hover-then-click test could otherwise pass by accident.
+- A merged chart element (`accessibilityElement(children: .ignore)`) keeps its **label** but drops
+  an `accessibilityIdentifier`. Query it by label (`label CONTAINS ' per '`).
+- `.buttonStyle(.link)` makes a **Link** in the accessibility tree: query `app.links`, not
+  `app.buttons`.
+- **`LazyVGrid`/`LazyVStack` content below the fold doesn't exist** for XCUITest or VoiceOver until
+  scrolled to. For a handful of items use `Grid`.
+- To scroll a page that contains charts, scroll over an empty margin
+  (`window.coordinate(withNormalizedOffset:).scroll(...)`): a chart under the pointer takes the
+  scroll event.
+
+## Charts that don't render as expected *(measured 2026-10-12)*
+
+- `RectangleMark` with a date x (`unit: .weekOfYear`) and categorical y drew each cell as a hairline.
+  A calendar heat map is a grid of `RoundedRectangle`s instead.
+- `Color.accentColor` inside a `Chart` came out grey. Use an explicit colour (`RouteColor.default`).
+- A centred month label for December needs the x domain to run to 1 January, or it's dropped.
+
+## When the Xcode MCP tools stop responding *(2026-10-12)*
+
+Every `xcode-tools` call can fail with `IDEStatefulActionError error 0` (even `XcodeListSchemes`).
+Fall back to `xcodebuild` with a scratch derived-data folder, which leaves Xcode's own state alone:
+
+```
+xcodebuild build-for-testing -project MaxAct2.xcodeproj -scheme MaxAct2 \
+  -destination 'platform=macOS' -derivedDataPath /tmp/maxact-dd -quiet
+```
+
+**`xcodebuild` records the whole screen when a UI test fails** (`SystemAttachmentLifetime =
+deleteOnSuccess`, `PreferredScreenCaptureFormat = screenRecording` in the generated `.xctestrun`).
+`-collect-test-diagnostics never` does **not** stop it. Before any UI run, set both keys under
+`MaxAct2Tests` and `MaxAct2UITests` in `/tmp/maxact-dd/Build/Products/*.xctestrun` to `keepNever` /
+`screenshots` (`plutil -replace <target>.SystemAttachmentLifetime -string keepNever …`), then run
+`xcodebuild test-without-building -xctestrun <file> -destination 'platform=macOS' -only-testing:…`.
+Window screenshots attached by the tests themselves (`XCTAttachment`, `.keepAlways`) still come
+through. Check the exported attachments for `.mp4` files and delete any on sight.

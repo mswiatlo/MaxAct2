@@ -157,3 +157,64 @@ public struct WorkoutAggregate: Sendable, Equatable {
         totalElevationMeters = elevation
     }
 }
+
+// MARK: - Totals
+
+extension StatisticsMetric {
+    public var title: String {
+        switch self {
+        case .distance: "Distance"
+        case .duration: "Time"
+        case .elevation: "Climb"
+        case .energy: "Energy"
+        case .count: "Workouts"
+        }
+    }
+
+    /// The unit a chart axis is plotted in, so its labels read "120" km rather than "120000" m.
+    public var chartUnit: String {
+        switch self {
+        case .distance: "km"
+        case .duration: "h"
+        case .elevation: "m"
+        case .energy: "kcal"
+        case .count: "workouts"
+        }
+    }
+
+    /// A stored total — metres, seconds, kilocalories or a count — in ``chartUnit``.
+    public func chartValue(_ total: Double) -> Double {
+        switch self {
+        case .distance: total / 1000
+        case .duration: total / 3600
+        case .elevation, .energy, .count: total
+        }
+    }
+}
+
+extension WorkoutFormatting {
+    /// A total over many workouts. **Zero prints as zero**: a week with no rides covered 0 km,
+    /// which is a fact, unlike one workout's missing distance.
+    ///
+    /// Durations read `12 h 05 min` rather than as a clock: `112:05:00` is hard to take in at a
+    /// glance, and seconds mean nothing over a month.
+    public static func total(_ value: Double, _ metric: StatisticsMetric, locale: Locale = .current) -> String {
+        guard value.isFinite else { return missing }
+        switch metric {
+        case .distance:
+            let km = value / 1000
+            return "\(km.formatted(.number.precision(.fractionLength(km < 100 ? 1 : 0)).locale(locale))) km"
+        case .duration:
+            let minutes = Int((value / 60).rounded())
+            return minutes < 60
+                ? "\(minutes) min"
+                : "\((minutes / 60).formatted(.number.locale(locale))) h \(String(format: "%02d", minutes % 60)) min"
+        case .elevation:
+            return "\(Int(value.rounded()).formatted(.number.locale(locale))) m"
+        case .energy:
+            return "\(Int(value.rounded()).formatted(.number.locale(locale))) kcal"
+        case .count:
+            return Int(value.rounded()).formatted(.number.locale(locale))
+        }
+    }
+}

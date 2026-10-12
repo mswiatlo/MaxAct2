@@ -45,17 +45,21 @@ enum WorkoutFilter: Hashable, Identifiable, CaseIterable {
     }
 }
 
-/// What the sidebar can select: a saved filter, or one activity kind.
+/// What the sidebar can select: a saved filter, one activity kind, a tag — or the statistics view.
 enum SidebarSelection: Hashable {
     case filter(WorkoutFilter)
     case kind(String)   // ActivityKind.storageKey
     case tag(String)
+    /// Every workout, summarised rather than listed. It narrows nothing itself: the statistics
+    /// view has its own activity picker, since choosing this row deselects any activity row.
+    case statistics
 
     func matches(_ item: WorkoutListItem) -> Bool {
         switch self {
         case .filter(let filter): filter.matches(item)
         case .kind(let key): item.workout.kind.storageKey == key
         case .tag(let name): item.tags.contains(name)
+        case .statistics: true
         }
     }
 
@@ -64,6 +68,7 @@ enum SidebarSelection: Hashable {
         case .filter(let filter): filter.title
         case .kind(let key): ActivityKind(storageKey: key).displayName
         case .tag(let name): name
+        case .statistics: "Statistics"
         }
     }
 }

@@ -1002,6 +1002,21 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-12** — **Issue 8 built: statistics.** Researched HealthFit's statistics; the user chose
+  the summary-based set (period totals and history, year comparison, calendar heat map, personal
+  bests), ISO weeks, and a sidebar row. `WorkoutStatistics` + 14 package tests, mutation-checked
+  (missing-as-zero, streak through today, best year drawn twice, UTC instead of local day). Measured
+  first: the real library is 49 workouts since 2026-08-23; 5 lack climb; rides auto-pause (26 of
+  38 have span > duration) while walks don't, so "Time" is labelled as recorded duration. Streaks
+  took 154 ms per pass with `Calendar` stepping, even in release; integer day numbers made it 9 ms.
+  Checked on a copy of the real library — totals match SQLite to the kilometre — which caught a heat
+  map drawn as hairlines (`RectangleMark` on a date axis; now a grid of shapes), grey bars
+  (`accentColor` in a chart), a "best year" claimed with one year of data, and personal bests
+  missing from accessibility (`LazyVGrid` below the fold). Xcode's MCP tools stopped responding
+  mid-session, so builds and tests ran through `xcodebuild`; its default records the screen on a
+  failure, which captured two recordings (deleted unviewed) before recording was turned off in the
+  generated `.xctestrun`. 294 package tests.
+
 - **2026-10-12** — **Added `CLAUDE.md`** with the standing working rules, at the user's suggestion.
   It loads every session, unlike `PLAN.md`, whose §7 rules had been missed (fixed issues weren't
   moved to §2). `PLAN.md` §7 now points to it. New rule from the user: ask, and wait, before any
