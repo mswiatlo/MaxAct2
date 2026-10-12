@@ -91,10 +91,6 @@ setting.
   once brings the rest back, and the width sticks.
 - **Column widths are tuned for this Mac's content.** Longer place or activity names will
   truncate. Retuning means bumping `workoutTableColumns.v6`.
-- **Ad-hoc signing makes the real app ask for the Keychain password after every rebuild** —
-  tracked as issue 14. Tests are no longer affected (see the change log,
-  2026-10-10): UI tests and the unit-test host both run on in-memory stores, and a full run makes
-  no Keychain calls.
 - **Performance tests have loose thresholds.** They catch 10× regressions; the printed figures are
   the real measurements.
 - **`Spikes/` stays** as the quickest way to inspect a stored series file. It's excluded from every

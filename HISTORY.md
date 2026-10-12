@@ -1002,6 +1002,9 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-11** — Paused before issue 8. Dropped a stale PLAN.md limitation (ad-hoc signing
+  prompts), fixed by issue 14.
+
 - **2026-10-11** — **Issue 6: charts aligned for real.** The user showed a ride whose plots were
   still offset: y-axis labels of different widths ("km/h" vs bpm) shrank each plot differently.
   Fixed-width y-label column on every chart; "0.0 km/h" instead of "—". The earlier check had only
