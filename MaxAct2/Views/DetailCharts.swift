@@ -24,6 +24,11 @@ struct SeriesChart: View {
     /// pointing at one chart shows the same instant in the others and on the route.
     @Binding var highlighted: Date?
 
+    /// Width reserved for the y-axis labels in every chart, wide enough for the longest one —
+    /// "33:20 /km" or "36.0 km/h" — so every plot area is the same width and the shared time axis
+    /// lines up across charts.
+    static let axisLabelWidth: CGFloat = 64
+
     /// The time range shared by every chart of the workout, so they line up — see
     /// `WorkoutCharts.timeDomain(for:charts:)`.
     let timeDomain: ClosedRange<Date>
@@ -120,7 +125,16 @@ struct SeriesChart: View {
             AxisMarks { value in
                 AxisGridLine()
                 AxisValueLabel {
-                    if let number = value.as(Double.self) { Text(format(number)) }
+                    // A fixed-width column, the same in every chart. Charts give their axis labels
+                    // whatever width they need and shrink the plot to suit, so "175" beside heart
+                    // rate and "36.0 km/h" beside speed left the plots different widths — and the
+                    // same moment at different horizontal positions despite a shared time range.
+                    if let number = value.as(Double.self) {
+                        Text(format(number))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .frame(width: Self.axisLabelWidth, alignment: .leading)
+                    }
                 }
             }
         }

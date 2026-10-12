@@ -383,8 +383,15 @@ match the others. Measured on 22 stored workouts: heart rate starts **1–55 s a
 (the watch locking on) and ends a few seconds early, while route-derived series run the full span —
 and each chart was fitting its axis to its own data. All charts now share one range,
 `WorkoutCharts.timeDomain(for:charts:)`: the workout's start to end, widened only for a stray
-sample. Verified on a copy of the real library: tick labels and the highlight rule now align
-across all three charts.
+sample. Checked on a copy of the real library and judged aligned — but **only on a walk**.
+
+**Reopened the same day:** the user's screenshot of a ride showed the lines still off. A shared
+domain isn't enough; the *plot areas* must be the same width too, and Swift Charts shrinks each
+plot by its y-axis label width — "175" for heart rate, "36.0 km/h" for speed. A walk's pace labels
+("18:00 /km") happen to be close to heart rate's width, which hid it. Every chart's y labels now sit
+in a fixed 64 pt column (`SeriesChart.axisLabelWidth`), and the speed axis prints "0.0 km/h" rather
+than "—" at zero. Verified on a real ride: ticks and highlight rule at the same x in all three, the
+widest label ("14.4 km/h") untruncated.
 
 
 ---
@@ -994,6 +1001,13 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-11** — **Issue 6: charts aligned for real.** The user showed a ride whose plots were
+  still offset: y-axis labels of different widths ("km/h" vs bpm) shrank each plot differently.
+  Fixed-width y-label column on every chart; "0.0 km/h" instead of "—". The earlier check had only
+  looked at a walk, whose pace labels match heart rate's width; the real-content test now selects a
+  ride. Verified on a copy of the real library (copy and screenshots deleted). 280 package tests,
+  35 app and UI tests (1 skipped without a copy), zero warnings.
 
 - **2026-10-11** — **Issue 6 closed; charts share one time axis.** The user confirmed the linking and
   spotted misaligned axes. The measurement contradicted the hypothesis that heart rate ran longer:

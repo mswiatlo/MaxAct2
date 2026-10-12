@@ -636,5 +636,9 @@ in the main executable — then launch. Revert afterwards.
   `RouteHighlight`).
 - A SwiftUI `Map` is its own element type, not `otherElements`; find it with
   `descendants(matching: .any)` and its label.
+- **Stacked charts align only if both the x domain *and* the plot width match.** Swift Charts
+  shrinks the plot by the y-axis label width, so "36.0 km/h" and "175" offset the plots. Give the
+  y labels a fixed-width frame (`SeriesChart.axisLabelWidth`) and check alignment on the workout
+  with the widest labels (a ride), not whichever row is first.
 - When a test passes, check it can fail: the route-click assertion was confirmed by temporarily
   making every click miss, which a hover-then-click test could otherwise pass by accident.

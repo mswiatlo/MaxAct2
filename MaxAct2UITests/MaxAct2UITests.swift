@@ -1053,6 +1053,10 @@ final class RealContentUITests: XCTestCase {
         capture("2-inspector-open-default-width")
 
         // The charts sit below the map: scroll the detail pane to them, to check they line up.
+        // On a ride, whose speed axis has the widest labels ("36.0 km/h") — a walk's pace labels
+        // happened to match heart rate's width closely enough to hide a misalignment once.
+        let ride = table.staticTexts["Cycling"].firstMatch
+        if ride.exists { ride.click() }
         let heartRate = app.otherElements.matching(NSPredicate(format: "label == 'Heart Rate'")).firstMatch
         if heartRate.waitForExistence(timeout: 5) {
             // Scrolling over the chart scrolls the detail pane that contains it.

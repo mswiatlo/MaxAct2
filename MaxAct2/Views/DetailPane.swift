@@ -311,7 +311,9 @@ struct WorkoutDetailView: View {
                 systemImage: "speedometer",
                 segments: series.speed,
                 tint: tint,
-                format: { WorkoutFormatting.speed(metersPerSecond: $0) },
+                // Zero is a real speed on this axis — stopped — not a missing value, so it reads
+                // "0.0 km/h" rather than the formatter's "—".
+                format: { $0 > 0 ? WorkoutFormatting.speed(metersPerSecond: $0) : "0.0 km/h" },
                 highlighted: $highlighted,
                 timeDomain: series.timeDomain
             )
