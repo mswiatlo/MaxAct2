@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 9–14 fixed or closed; View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** the user's check of issue 8 (statistics), then Phase 8. Issue 7 (TrainingPeaks) starts with
+**Next:** issue 8's two layout problems (8a, 8b), then Phase 8. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -53,16 +53,26 @@ Garmin, Runalyze and archiving anyway. The uploader sits behind `WorkoutDestinat
 *state* on `WorkoutRecord` is still Strava-shaped; a second destination means per-destination
 state, which is a schema and UI change.
 
-**8. Summary statistics.** *(built 2026-10-12, awaiting the user's check)*
+**8. Summary statistics.** *(built 2026-10-12; checked by the user — works, two layout problems open)*
 A **Statistics** row at the top of the sidebar swaps the table for: totals (this week, month, year,
 all time), a history bar chart by week/month/year, this year against last year and the best year
 (HealthFit's comparison), a calendar heat map with day and week streaks, and personal bests per
-activity that open their workout. Its own activity picker; it follows the search field. Choices
-made with the user: summary-based features only, ISO weeks (Monday), the sidebar placement.
-Arithmetic in `WorkoutStatistics` (package, tested); missing values are counted, never summed as
-zero. **To check:** browse it on the real library. The year comparison will stay a single line
-until older history is synced — the library starts 2026-08-23. Deferred, as separate ideas: training
-load (CTL/ATL/TSB), heart-rate zones, a route heat map.
+activity that open their workout. Its own activity picker; it follows the search field. Arithmetic
+in `WorkoutStatistics` (package, tested); missing values are counted, never summed as zero. The
+year comparison stays a single line until older history is synced (the library starts
+2026-08-23). Deferred, as separate ideas: training load (CTL/ATL/TSB), heart-rate zones, a route
+heat map.
+
+Open, from the user's check (2026-10-12):
+- **a. A personal best opens a cramped inspector.** Clicking a best shows the workout in the
+  inspector, but from the statistics view it comes up very narrow and effectively fixed in size, so
+  the detail isn't really readable, and it competes with the sidebar for width. Needs a better way
+  to show the workout — e.g. switch to the table with it selected, or give the inspector a usable
+  width here.
+- **b. The statistics view doesn't adapt to a narrow window.** Reducing the window width neither
+  reflows the content nor lets you scroll to what's cut off. Either enforce a minimum width for the
+  view or let the sections reformat (the totals grid, the two-up best cards, the 53-week heat map
+  and the segmented pickers are the fixed-width parts).
 
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.

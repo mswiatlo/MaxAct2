@@ -1002,6 +1002,10 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-12** — The user checked issue 8: the statistics work. Two problems recorded in
+  `PLAN.md` as 8a (a personal best opens a narrow, fixed-size inspector that fights the sidebar
+  for space) and 8b (a narrow window neither reflows nor scrolls the statistics). Paused there.
+
 - **2026-10-12** — **Issue 8 built: statistics.** Researched HealthFit's statistics; the user chose
   the summary-based set (period totals and history, year comparison, calendar heat map, personal
   bests), ISO weeks, and a sidebar row. `WorkoutStatistics` + 14 package tests, mutation-checked
