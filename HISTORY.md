@@ -1002,6 +1002,11 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-12** — **Added `CLAUDE.md`** with the standing working rules, at the user's suggestion.
+  It loads every session, unlike `PLAN.md`, whose §7 rules had been missed (fixed issues weren't
+  moved to §2). `PLAN.md` §7 now points to it. New rule from the user: ask, and wait, before any
+  UI test run, since it takes over the Mac.
+
 - **2026-10-11** — Paused before issue 8. Dropped a stale PLAN.md limitation (ad-hoc signing
   prompts), fixed by issue 14.
 

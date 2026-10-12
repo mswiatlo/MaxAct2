@@ -4,7 +4,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 (HAE), with batch upload to Strava.
 
 **Status:** Phases 0–7 complete and verified live. Next: known issues, then Phase 8.
-**Last updated:** 2026-10-11.
+**Last updated:** 2026-10-12.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first: the HAE data
 > contract, the Xcode tooling limits, and the Strava API facts. **`HISTORY.md`** holds how we got
@@ -163,7 +163,7 @@ permissions problem — say so, and point at Health → Sharing → Apps).
 
 - **Compile fast:** `XcodeRefreshCodeIssuesInFile` after each edit; `BuildProject` before committing.
 - **Package logic:** `swift test` in `MaxActCore/` — the fast inner loop.
-- **App and UI tests:** `RunAllTests`, with the Mac left alone.
+- **App and UI tests:** `RunAllTests`, with the Mac left alone — ask first.
 - **Data questions:** decode the stored series files (see `Spikes/`) rather than reasoning from
   formulas. **Measure, don't derive:** in this project, measurement has repeatedly contradicted
   plausible calculations, for both data and layout. Examples are in `HISTORY.md` §1.
@@ -174,15 +174,10 @@ permissions problem — say so, and point at Health → Sharing → Apps).
 
 ## 7. Keeping this plan current
 
-**Work on a branch.** Before starting any feature, fix or batch of changes, create a branch from
-`main` (`git switch -c <short-name>`). Commit there, verify (build, `swift test`, `RunAllTests`),
-then merge to `main` and push once the work is verified or the user approves. Don't commit
-directly to `main`. *(Requested by the user, 2026-10-10.)*
+**The working rules — branching, verification, keeping this file and `HISTORY.md` current,
+asking before UI tests — are in `CLAUDE.md`**, which every session loads automatically.
 
 This file is for **what's current**: status, next steps, open issues, decisions. Keep it short.
-- Edit sections in place, bump **Last updated**, and update the phase table.
-- Add a dated entry to the change log in **`HISTORY.md`**.
-- When an issue is fixed, move its diagnosis to `HISTORY.md` §2 and drop it here.
 
 Durable *how-to* knowledge goes in `.claude/skills/maxact-development/`:
 
