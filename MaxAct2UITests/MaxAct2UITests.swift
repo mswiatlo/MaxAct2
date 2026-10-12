@@ -1052,6 +1052,15 @@ final class RealContentUITests: XCTestCase {
             .firstMatch.waitForExistence(timeout: 10))
         capture("2-inspector-open-default-width")
 
+        // The charts sit below the map: scroll the detail pane to them, to check they line up.
+        let heartRate = app.otherElements.matching(NSPredicate(format: "label == 'Heart Rate'")).firstMatch
+        if heartRate.waitForExistence(timeout: 5) {
+            // Scrolling over the chart scrolls the detail pane that contains it.
+            heartRate.scroll(byDeltaX: 0, deltaY: -600)
+            heartRate.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
+            capture("2b-charts-aligned")
+        }
+
         let edge = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5))
             .withOffset(CGVector(dx: -1, dy: 0))
         edge.press(forDuration: 0.3, thenDragTo: edge.withOffset(CGVector(dx: 300, dy: 0)))

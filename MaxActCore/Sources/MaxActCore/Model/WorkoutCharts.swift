@@ -124,6 +124,24 @@ public enum WorkoutCharts {
         return segmented(points, limit: limit)
     }
 
+    /// One time range for every chart of a workout, so they line up and a highlighted moment sits
+    /// at the same horizontal position in each.
+    ///
+    /// Left to themselves, each chart fits its axis to its own data, and the series don't start
+    /// together. Measured across 22 stored workouts: heart rate begins **1–55 s after** the
+    /// workout starts (the watch locks on) and ends a few seconds early, while route-derived series
+    /// run within a second or two of start and end. So the heart-rate chart was stretched over a
+    /// shorter span and nothing aligned.
+    ///
+    /// The workout's own start and end are the reference — they're what the athlete recorded —
+    /// widened only to include any sample that falls a moment outside them, so nothing is clipped.
+    public static func timeDomain(for workout: Workout, charts: [[ChartSegment]]) -> ClosedRange<Date> {
+        let dates = charts.flatMap { $0.flatMap(\.points).map(\.date) }
+        let lower = min(workout.start, dates.min() ?? workout.start)
+        let upper = max(workout.end, dates.max() ?? workout.end)
+        return lower...max(upper, lower.addingTimeInterval(1))
+    }
+
     /// Splits at pauses, then thins each segment so the whole chart stays within `limit` marks.
     static func segmented(_ points: [ChartPoint], limit: Int) -> [ChartSegment] {
         guard !points.isEmpty else { return [] }

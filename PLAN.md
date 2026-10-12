@@ -26,14 +26,12 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ## 1. Where things stand — 2026-10-11
 
-All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 277 in
+All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 280 in
 `MaxActCore` (`swift test`), 36 app and UI tests (`RunAllTests` — leave the Mac alone for ~4
 minutes, or mouse use breaks them; the real-content test skips unless a library copy is in place). A full run makes no Keychain calls.
 
-Phases 0–7 are done and verified live. Since then: issues 9–14 fixed or closed; View ▸ Hide
+Phases 0–7 are done and verified live. Since then: issues 6 and 9–14 fixed or closed; View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
-
-**Waiting on the user:** try issue 6 (linked charts and map) on real rides — see its entry below.
 
 **Next:** 8 (summary stats), then Phase 8. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
@@ -44,26 +42,8 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–5 and 9–14 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–6 and 9–14 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
-
-**6. Link the charts and the map to each other.** *(built 2026-10-11; to try on real rides)*
-
-Pointing at any chart highlights that moment in **every** chart — a rule with that chart's value
-— and puts a marker on the map where the athlete was. Clicking the route does the reverse;
-clicking empty map clears it. One `highlighted: Date?` drives everything, looked up against the
-full cleaned route (`RouteLookup` in `MaxActCore`), never the thinned chart points or simplified
-line. A time inside a pause shows no map marker and no chart value; a click counts as "on the
-route" within 20 screen points, so it behaves the same at every zoom. While highlighted, each
-chart's VoiceOver value becomes "<value> at <time>".
-
-Measured: on macOS, `chartXSelection` **follows the pointer** — hovering is enough, no click
-needed — and the highlight clears when the pointer leaves the chart. A UI test covers chart→map,
-map→chart and the clear, and was confirmed to fail with route clicks broken.
-
-**To try (the user), on a real ride:** hover the heart-rate chart and watch the marker move along
-the route; click a point on the route and see the rules land in the charts; check a ride with a
-pause shows no marker inside it. Close the issue if it reads well.
 
 **7. Sync to TrainingPeaks as well as Strava.** *(speculative, unresearched)*
 TrainingPeaks accepts TCX, so the file is free. **First establish whether its API is open** — it is

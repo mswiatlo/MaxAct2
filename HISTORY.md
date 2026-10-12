@@ -11,7 +11,7 @@ Durable *how-to* facts (API behaviour, Xcode quirks, data contract) are in
 ## Contents
 
 1. Notes from the Phase 6–7 pauses (lessons and bugs found by use)
-2. Fixed known issues (1–5, 9–14)
+2. Fixed known issues (1–6, 9–14)
 3. Seeded UI tests
 4. Original context and research
 5. Original architecture sketch
@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed known issues (1–5, 9–14)
+## 2. Fixed known issues (1–6, 9–14)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -358,6 +358,33 @@ prompt after a rebuild. They pointed out that rebuilding with nothing changed ca
 identical binary, which would prove nothing — so a one-line change to a used string was built
 (code hash `6f52…` → `e955…`, signature still the same certificate and team), run with no prompt,
 and then reverted.
+
+
+**6. ~~Link the charts and the map to each other.~~ — done 2026-10-11.**
+
+Pointing at any chart highlights that moment in **every** chart — a rule with that chart's value
+— and puts a marker on the map where the athlete was. Clicking the route does the reverse;
+clicking empty map clears it. One `highlighted: Date?` drives everything, looked up against the
+full cleaned route (`RouteLookup` in `MaxActCore`), never the thinned chart points or simplified
+line. A time inside a pause shows no map marker and no chart value; a click counts as "on the
+route" within 20 screen points, so it behaves the same at every zoom. While highlighted, each
+chart's VoiceOver value becomes "<value> at <time>".
+
+Measured: on macOS, `chartXSelection` **follows the pointer** — hovering is enough, no click
+needed — and the highlight clears when the pointer leaves the chart. A UI test covers chart→map,
+map→chart and the clear, and was confirmed to fail with route clicks broken.
+
+**To try (the user), on a real ride:** hover the heart-rate chart and watch the marker move along
+the route; click a point on the route and see the rules land in the charts; check a ride with a
+pause shows no marker inside it. Close the issue if it reads well.
+
+**Confirmed by the user 2026-10-11**, who then noticed the heart-rate chart's time axis didn't
+match the others. Measured on 22 stored workouts: heart rate starts **1–55 s after** the workout
+(the watch locking on) and ends a few seconds early, while route-derived series run the full span —
+and each chart was fitting its axis to its own data. All charts now share one range,
+`WorkoutCharts.timeDomain(for:charts:)`: the workout's start to end, widened only for a stray
+sample. Verified on a copy of the real library: tick labels and the highlight rule now align
+across all three charts.
 
 
 ---
@@ -967,6 +994,12 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-11** — **Issue 6 closed; charts share one time axis.** The user confirmed the linking and
+  spotted misaligned axes. The measurement contradicted the hypothesis that heart rate ran longer:
+  it's the *shortest* series, starting up to 55 s late, and each chart fitted its own axis. Added
+  `WorkoutCharts.timeDomain(for:charts:)` (3 tests) and applied it to every chart; checked on a copy
+  of the real library, then deleted the copy and screenshots. 280 package tests, 35 app and UI tests.
 
 - **2026-10-11** — Paused with issue 6 waiting on the user's check on real rides; plan status refreshed.
 

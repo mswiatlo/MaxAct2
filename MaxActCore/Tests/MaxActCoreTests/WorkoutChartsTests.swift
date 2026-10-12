@@ -154,3 +154,39 @@ import Testing
         #expect(!WorkoutCharts.speed(noAltitude).isEmpty)
     }
 }
+
+@Suite struct ChartTimeDomainTests {
+    private let start = Date(timeIntervalSince1970: 1_790_000_000)
+
+    private func segment(_ from: TimeInterval, _ to: TimeInterval) -> [ChartSegment] {
+        [ChartSegment(id: 0, points: [ChartPoint(date: start.addingTimeInterval(from), value: 1),
+                                      ChartPoint(date: start.addingTimeInterval(to), value: 2)])]
+    }
+
+    private func workout(_ duration: TimeInterval) -> Workout {
+        Workout(id: "W", kind: .cycling, start: start, end: start.addingTimeInterval(duration), duration: duration)
+    }
+
+    @Test("every chart gets the workout's span, not its own data's")
+    func sharedSpan() {
+        // The measured shape: heart rate starts late and ends early, the route runs the full span.
+        let heartRate = segment(55, 549), elevation = segment(0, 551)
+        let domain = WorkoutCharts.timeDomain(for: workout(551), charts: [heartRate, elevation])
+        #expect(domain == start...start.addingTimeInterval(551))
+    }
+
+    @Test("a sample a moment outside the workout widens the span rather than being clipped")
+    func widensForStragglers() {
+        let route = segment(-1, 1_588)   // seen in real data: a fix a second before the start
+        let domain = WorkoutCharts.timeDomain(for: workout(1_587), charts: [route])
+        #expect(domain.lowerBound == start.addingTimeInterval(-1))
+        #expect(domain.upperBound == start.addingTimeInterval(1_588))
+    }
+
+    @Test("no chart data still gives the workout's span, and never an empty range")
+    func degenerate() {
+        #expect(WorkoutCharts.timeDomain(for: workout(600), charts: []) == start...start.addingTimeInterval(600))
+        let instant = WorkoutCharts.timeDomain(for: workout(0), charts: [])
+        #expect(instant.upperBound > instant.lowerBound)
+    }
+}

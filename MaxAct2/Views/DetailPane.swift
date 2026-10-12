@@ -88,6 +88,8 @@ struct WorkoutDetailView: View {
         let elevation: [ChartSegment]
         let speed: [ChartSegment]
         let pace: [ChartSegment]
+        /// One time axis for all of the charts above, so they align.
+        let timeDomain: ClosedRange<Date>
     }
 
     var body: some View {
@@ -136,6 +138,10 @@ struct WorkoutDetailView: View {
         // Simplified for display too: drawing 12,645 points into a few hundred on-screen pixels
         // costs a great deal and shows nothing extra.
         let simplified = RouteSimplifier.simplify(route.map(\.coordinate), fittingPixels: 900)
+        let heartRate = WorkoutCharts.heartRate(series)
+        let elevation = WorkoutCharts.elevation(series)
+        let speed = WorkoutCharts.speed(series)
+        let pace = WorkoutCharts.pace(series, for: workout.kind)
         loaded = LoadedSeries(
             id: item.id,
             series: series,
@@ -148,10 +154,12 @@ struct WorkoutDetailView: View {
             // Splits and chart series are derived once here rather than in `body`. Each walks
             // thousands of points, and body runs on every hover, resize and scroll.
             splits: WorkoutSplits.splits(for: workout, series: series),
-            heartRate: WorkoutCharts.heartRate(series),
-            elevation: WorkoutCharts.elevation(series),
-            speed: WorkoutCharts.speed(series),
-            pace: WorkoutCharts.pace(series, for: workout.kind)
+            heartRate: heartRate,
+            elevation: elevation,
+            speed: speed,
+            pace: pace,
+            timeDomain: WorkoutCharts.timeDomain(
+                for: workout, charts: [heartRate, elevation, workout.kind.isPaceBased ? pace : speed])
         )
 
         // 30% headroom so the track isn't flush against the edges. Set last, once the route is
@@ -280,7 +288,8 @@ struct WorkoutDetailView: View {
             segments: series.heartRate,
             tint: .pink,
             format: { "\(Int($0.rounded()))" },
-            highlighted: $highlighted
+            highlighted: $highlighted,
+            timeDomain: series.timeDomain
         )
 
         // Two different series, not one relabelled: pace is seconds per kilometre on a reversed
@@ -293,7 +302,8 @@ struct WorkoutDetailView: View {
                 tint: tint,
                 format: { WorkoutFormatting.paceLabel(secondsPerKilometer: $0) },
                 reversed: true,
-                highlighted: $highlighted
+                highlighted: $highlighted,
+                timeDomain: series.timeDomain
             )
         } else {
             SeriesChart(
@@ -302,7 +312,8 @@ struct WorkoutDetailView: View {
                 segments: series.speed,
                 tint: tint,
                 format: { WorkoutFormatting.speed(metersPerSecond: $0) },
-                highlighted: $highlighted
+                highlighted: $highlighted,
+                timeDomain: series.timeDomain
             )
         }
 
@@ -312,7 +323,8 @@ struct WorkoutDetailView: View {
             segments: series.elevation,
             tint: .teal,
             format: { "\(Int($0.rounded())) m" },
-            highlighted: $highlighted
+            highlighted: $highlighted,
+            timeDomain: series.timeDomain
         )
     }
 

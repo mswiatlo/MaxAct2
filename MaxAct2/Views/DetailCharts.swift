@@ -24,6 +24,10 @@ struct SeriesChart: View {
     /// pointing at one chart shows the same instant in the others and on the route.
     @Binding var highlighted: Date?
 
+    /// The time range shared by every chart of the workout, so they line up — see
+    /// `WorkoutCharts.timeDomain(for:charts:)`.
+    let timeDomain: ClosedRange<Date>
+
     /// This chart's value at the highlighted moment, or `nil` in a pause or outside the chart.
     private var highlightedValue: Double? {
         highlighted.flatMap { RouteLookup.value(at: $0, in: segments) }
@@ -111,6 +115,7 @@ struct SeriesChart: View {
         // whole trace into the top of the chart. An array domain is how Charts takes a reversed
         // scale — a `ClosedRange` can't run downwards.
         .chartYScale(domain: domain(low: low, high: high))
+        .chartXScale(domain: timeDomain)
         .chartYAxis {
             AxisMarks { value in
                 AxisGridLine()
