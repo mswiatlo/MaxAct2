@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 9–14 fixed or closed; View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** the user's check of issue 8's layout fixes, then Phase 8. Issue 7 (TrainingPeaks) starts with
+**Next:** issue 8c (the personal-best sheet's header), then Phase 8. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -63,14 +63,18 @@ year comparison stays a single line until older history is synced (the library s
 2026-08-23). Deferred, as separate ideas: training load (CTL/ATL/TSB), heart-rate zones, a route
 heat map.
 
-The user's check (2026-10-12) found two layout problems; both fixed 2026-10-12, awaiting the user's
-check:
+The user's check (2026-10-12) found two layout problems, both fixed 2026-10-12 and checked by the
+user; their check of the fix raised 8c, still open:
 - **8a. A personal best opened a cramped inspector and cut the sidebar off.** Root cause, from a
   layout dump: when the inspector opens beside pure-SwiftUI content, SwiftUI pins that column's
   minimum to its current width, so the panes overflow (a plain colour does it; the AppKit table
   doesn't). An AppKit scroll-view host didn't help. Fix, the user's choice: **a best opens its
   workout in a sheet** (the same detail view), and the **inspector stays shut while Statistics is
   showing** — toolbar toggle, ⌃⌘I and the menu included — returning as it was with the list.
+- **8c. The personal-best sheet's header repeats the workout.** *(open, from the user's check)*
+  It shows the activity and date, which the detail view repeats just below. It should name the
+  **personal best** instead — e.g. "Longest ride · 11.66 km" — so the sheet says why it opened.
+  Needs the best's category passed through from `BestsSection` to `WorkoutSheet`.
 - **8b. The statistics didn't adapt to a narrow window.** Every section now reflows to a 480pt
   minimum (controls stack, totals tighten, the heat map shows as many weeks as fit, best cards go
   to one column).

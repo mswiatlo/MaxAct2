@@ -1002,6 +1002,10 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-12** — The user checked the issue 8 layout fixes and asked for one change, recorded as
+  8c: the personal-best sheet should name the best at the top rather than repeat the workout's
+  activity and date.
+
 - **2026-10-12** — **Issue 8a/8b fixed** (awaiting the user's check). The user chose a sheet for a
   personal best's workout; the inspector is now kept shut while Statistics is showing. Reverted the
   partial workarounds the sheet made unnecessary (inspector inside the column, a raised window
