@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 9–14 fixed or closed; View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** issue 8c (the personal-best sheet's header), then Phase 8. Issue 7 (TrainingPeaks) starts with
+**Next:** issue 8c (the personal-best sheet's header) and 8d (try to restore the inspector over the statistics), then Phase 8. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -75,6 +75,21 @@ user; their check of the fix raised 8c, still open:
   It shows the activity and date, which the detail view repeats just below. It should name the
   **personal best** instead — e.g. "Longest ride · 11.66 km" — so the sheet says why it opened.
   Needs the best's category passed through from `BestsSection` to `WorkoutSheet`.
+- **8d. Bring back the inspector over the statistics, if possible.** *(open, exploratory — the
+  user's request)* Instead of the sheet, the inspector should sit beside or on top of the
+  statistics, with the statistics scrolling left–right if they don't fit. Keep the sheet (it works)
+  and abandon this if it truly can't be done. What's known: the real `.inspector` can't do it —
+  SwiftUI pins any SwiftUI column's width when it opens, even a plain colour, so horizontal
+  scrolling inside the statistics wouldn't help. Ideas to try, cheapest first:
+  - **An overlay, not a split pane:** draw the detail view as a trailing panel *over* the
+    statistics (`.overlay(alignment: .trailing)` with a material background, a drag handle for
+    width, the same toggle/⌃⌘I), with the statistics given trailing room or scrolling. It never
+    enters the split view, so nothing gets pinned. Costs: hand-rolled resizing and no system
+    inspector behaviour (state restoration, standard divider).
+  - **A second `NavigationSplitView` column** for the detail in statistics mode, instead of
+    `.inspector` — unmeasured; may pin the same way.
+  - The UI test `testStatisticsKeepTheirLayoutAndOpenABestInASheet` and the layout-dump technique
+    in the Xcode conventions reference are the tools for judging any attempt.
 - **8b. The statistics didn't adapt to a narrow window.** Every section now reflows to a 480pt
   minimum (controls stack, totals tighten, the heat map shows as many weeks as fit, best cards go
   to one column).

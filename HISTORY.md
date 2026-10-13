@@ -1002,6 +1002,10 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-12** — The user confirmed the issue 8 layout fixes work, and asked for 8d: explore
+  putting the inspector back over the statistics (scrolling sideways if needed), keeping the sheet
+  if that proves impossible. Recorded with first ideas; paused.
+
 - **2026-10-12** — The user checked the issue 8 layout fixes and asked for one change, recorded as
   8c: the personal-best sheet should name the best at the top rather than repeat the workout's
   activity and date.
