@@ -51,10 +51,15 @@ struct ContentView: View {
         NavigationSplitView(columnVisibility: $columns) {
             SidebarView(model: model)
         } detail: {
+            // Inside the detail column, as Apple's examples attach it: the column then has to make
+            // room for the inspector. Attached to the whole split view instead, the inspector was a
+            // sibling the split view sized independently — fine beside the table, which AppKit
+            // shrinks, but beside the statistics the column held ~920pt and the panes overflowed
+            // the window (issue 8a, measured).
             workoutList
-        }
-        .inspector(isPresented: $model.showsDetail) {
-            DetailPane(model: model)
+                .inspector(isPresented: $model.showsDetail) {
+                    DetailPane(model: model)
+                }
         }
         // Lets View ▸ Hide Sidebar read and write the same state the split view uses.
         .focusedSceneValue(\.sidebarVisibility, $columns)
@@ -190,3 +195,4 @@ struct ContentView: View {
         }
     }
 }
+

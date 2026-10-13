@@ -49,6 +49,22 @@ final class AppModel {
     static let minimumWidthWithInspector: CGFloat = 1200
     static let minimumWidth: CGFloat = 1040
 
+    /// The same, with the statistics rather than the table beside the inspector (issue 8a).
+    ///
+    /// Measured, and not yet explained: with the inspector open, the statistics column won't go
+    /// below ~678pt, whatever it contains. A plain colour behaves the same, and so does removing
+    /// the toolbar, the search field or the subtitle, or declaring a narrower column width. The
+    /// table's floor is 562pt. Sidebar 192 + 678 + inspector 440 = 1,310; below that the panes
+    /// overflow and SwiftUI cuts the sidebar off.
+    static let minimumWidthWithInspectorOverStatistics: CGFloat = 1320
+
+    /// The window's minimum for what's on screen now.
+    var minimumWindowWidth: CGFloat {
+        guard showsDetail else { return Self.minimumWidth }
+        return sidebarSelection == .statistics
+            ? Self.minimumWidthWithInspectorOverStatistics : Self.minimumWidthWithInspector
+    }
+
     // MARK: Sync
 
     private(set) var syncStatus: SyncStatus = .idle

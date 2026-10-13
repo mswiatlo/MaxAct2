@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 
 extension XCTestCase {
@@ -714,6 +715,12 @@ final class SeededTableUITests: XCTestCase {
             XCTAssertGreaterThanOrEqual(sidebar.frame.width, 189, "The sidebar was squeezed \(when).")
             XCTAssertGreaterThanOrEqual(sidebar.frame.minX, window.frame.minX,
                                         "The sidebar is cut off by the window's left edge \(when).")
+            // Growing to fit must not push the window off the screen — measured, it once ended
+            // 112pt past the right edge.
+            if let screen = NSScreen.screens.map(\.frame.maxX).max() {
+                XCTAssertLessThanOrEqual(window.frame.maxX, screen + 0.5,
+                                         "The window runs off the right of the screen \(when).")
+            }
         }
         assertFits("with the inspector closed")
 

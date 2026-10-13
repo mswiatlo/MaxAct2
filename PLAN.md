@@ -65,17 +65,17 @@ heat map.
 
 Open, from the user's check (2026-10-12). Work in progress on branch `issue-8-layout` (not merged):
 - **a. A personal best opens a cramped inspector, and the sidebar is cut off.** Decision (user):
-  keep the statistics in view with the inspector beside them, fixed. **Measured cause:** with the
-  inspector open in statistics mode, the detail *column* stays ~920pt wide whatever it contains, so
-  sidebar + statistics + inspector overflow the window and SwiftUI shifts the panes left (sidebar
-  cut by ~172pt, inspector by ~179pt). The same window in table mode is fine (table 564pt,
-  inspector 440pt). Ruled out, each by experiment: the statistics content (a plain box behaves the
-  same), the scroll view, the subtitle, how the inspector is opened (⌃⌘I does the same), and
-  capping the content's width (it just centres inside the 920pt column). Hosting the statistics in
-  a `List` made the app quit when the inspector opened. **Next to try:** the difference is the
-  AppKit-backed `Table` versus pure SwiftUI content — e.g. moving `.inspector` inside the detail
-  column, or hosting the statistics in an AppKit scroll view; Xcode's view debugger would help, once
-  Xcode's MCP tools respond again.
+  keep the statistics in view with the inspector beside them. **Root cause, measured with a layout
+  dump:** when the inspector opens beside *pure SwiftUI* content, SwiftUI pins that column's
+  minimum to its current width (`NSHostingView.minWidth >= <current>`, priority 999.9), so nothing
+  can shrink and the panes overflow the window. Content-independent — a plain colour does it, with
+  or without a scroll view, opened by click or ⌃⌘I — while the AppKit-backed table shrinks
+  normally. On the branch, each measured to help: the inspector attached inside the detail column
+  (inspector 261 → 382pt), a raised window minimum over the statistics (1,320pt), and pulling the
+  window back on screen when it grows (it had ended 112pt off the right edge). Still fails when the
+  sidebar is wider than 192pt (217pt left a 40pt overflow), because the pinned width moves with
+  it. **Options:** keep chasing the SwiftUI behaviour (e.g. host the statistics in an AppKit
+  container like the table), or show a best's workout another way.
 - **b. The statistics don't adapt to a narrow window.** Done on the branch: every section now
   reflows (controls stack, totals tighten, the heat map shows as many weeks as fit, best cards go to
   one column) and the view has a 480pt minimum and ideal; a hosted unit test

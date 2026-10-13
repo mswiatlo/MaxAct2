@@ -1002,6 +1002,14 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-12** — Issue 8a: root cause found. A temporary layout dump showed SwiftUI pinning the
+  detail column's minimum to its current width when the inspector opens beside SwiftUI content
+  (a plain colour does it; the table doesn't). Ruled out by experiment: content, scroll view,
+  `ViewThatFits`, toolbar, search field, subtitle, `navigationSplitViewColumnWidth`, how the
+  inspector opens. Also found and removed two stale `xcodebuild` copies of the app registered with
+  the same bundle id, which UI tests launch by identifier. Scheme now never records the screen.
+  Partial fixes on `issue-8-layout`; not merged.
+
 - **2026-10-12** — Issue 8a/8b in progress on `issue-8-layout`. The user chose to keep the
   inspector beside the statistics. Wrote the UI test first; it measured the inspector opening at
   40pt. Made every section reflow (8b), which brought it to ~260pt, then traced the rest by

@@ -137,10 +137,10 @@ struct MaxActApp: App {
                 // the window's saved frame is keyed by this view's type, and moving it would reset
                 // everyone's window position once.
                 .frame(
-                    minWidth: model.showsDetail
-                        ? AppModel.minimumWidthWithInspector : AppModel.minimumWidth,
+                    minWidth: model.minimumWindowWidth,
                     idealWidth: 1300, minHeight: 480, idealHeight: 780
                 )
+                .background(WindowOnScreenKeeper(minimumWidth: model.minimumWindowWidth))
                 .alert(
                     "MaxAct couldn't open its database",
                     isPresented: .constant(startupError != nil)
