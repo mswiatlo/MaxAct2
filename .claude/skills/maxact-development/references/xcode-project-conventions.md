@@ -674,7 +674,11 @@ xcodebuild build-for-testing -project MaxAct2.xcodeproj -scheme MaxAct2 \
 
 **`xcodebuild` records the whole screen when a UI test fails** (`SystemAttachmentLifetime =
 deleteOnSuccess`, `PreferredScreenCaptureFormat = screenRecording` in the generated `.xctestrun`).
-`-collect-test-diagnostics never` does **not** stop it. Before any UI run, set both keys under
+`-collect-test-diagnostics never` does **not** stop it. **Fixed at the source since 2026-10-12:** the
+shared scheme's `<TestAction>` now carries `systemAttachmentLifetime = "keepNever"` and
+`preferredScreenCaptureFormat = "screenshots"`, which flow into every generated `.xctestrun` and into
+Xcode's own test runs (verified in the `.xctestrun`). The manual patch below is only a fallback for
+an older checkout. Before any UI run, set both keys under
 `MaxAct2Tests` and `MaxAct2UITests` in `/tmp/maxact-dd/Build/Products/*.xctestrun` to `keepNever` /
 `screenshots` (`plutil -replace <target>.SystemAttachmentLifetime -string keepNever …`), then run
 `xcodebuild test-without-building -xctestrun <file> -destination 'platform=macOS' -only-testing:…`.
