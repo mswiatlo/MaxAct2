@@ -27,14 +27,14 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 ## 1. Where things stand — 2026-10-12
 
 All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 294 in
-`MaxActCore` (`swift test`), 38 app and UI tests (`RunAllTests` — ask first, then leave the Mac
+`MaxActCore` (`swift test`), 41 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~5 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
 
 Phases 0–7 are done and verified live. Since then: issues 6 and 9–14 fixed or closed; View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** finish 8a on branch `issue-8-layout` (8b done there), then Phase 8. Issue 7 (TrainingPeaks) starts with
+**Next:** the user's check of issue 8's layout fixes, then Phase 8. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -63,27 +63,17 @@ year comparison stays a single line until older history is synced (the library s
 2026-08-23). Deferred, as separate ideas: training load (CTL/ATL/TSB), heart-rate zones, a route
 heat map.
 
-Open, from the user's check (2026-10-12). Work in progress on branch `issue-8-layout` (not merged):
-- **a. A personal best opens a cramped inspector, and the sidebar is cut off.** Decision (user):
-  keep the statistics in view with the inspector beside them. **Root cause, measured with a layout
-  dump:** when the inspector opens beside *pure SwiftUI* content, SwiftUI pins that column's
-  minimum to its current width (`NSHostingView.minWidth >= <current>`, priority 999.9), so nothing
-  can shrink and the panes overflow the window. Content-independent — a plain colour does it, with
-  or without a scroll view, opened by click or ⌃⌘I — while the AppKit-backed table shrinks
-  normally. On the branch, each measured to help: the inspector attached inside the detail column
-  (inspector 261 → 382pt), a raised window minimum over the statistics (1,320pt), and pulling the
-  window back on screen when it grows (it had ended 112pt off the right edge). Still fails when the
-  sidebar is wider than 192pt (217pt left a 40pt overflow), because the pinned width moves with
-  it. Tried and reverted (2026-10-12): hosting the statistics in an AppKit `NSScrollView`
-  (`NSHostingView` document sized to it) — the column still froze at the same width, and XCUITest
-  could no longer scroll links into view. **Remaining options:** hide the sidebar while the
-  inspector is open over the statistics, show a best's workout in a sheet, or jump to the list.
-- **b. The statistics don't adapt to a narrow window.** Done on the branch: every section now
-  reflows (controls stack, totals tighten, the heat map shows as many weeks as fit, best cards go to
-  one column) and the view has a 480pt minimum and ideal; a hosted unit test
-  (`StatisticsLayoutTests`) checks each section's narrowest width. Not yet verified in a narrow
-  window with the inspector *closed*; the UI test
-  `testStatisticsMakeRoomForTheInspectorAndANarrowWindow` covers both and fails on 8a until fixed.
+The user's check (2026-10-12) found two layout problems; both fixed 2026-10-12, awaiting the user's
+check:
+- **8a. A personal best opened a cramped inspector and cut the sidebar off.** Root cause, from a
+  layout dump: when the inspector opens beside pure-SwiftUI content, SwiftUI pins that column's
+  minimum to its current width, so the panes overflow (a plain colour does it; the AppKit table
+  doesn't). An AppKit scroll-view host didn't help. Fix, the user's choice: **a best opens its
+  workout in a sheet** (the same detail view), and the **inspector stays shut while Statistics is
+  showing** — toolbar toggle, ⌃⌘I and the menu included — returning as it was with the list.
+- **8b. The statistics didn't adapt to a narrow window.** Every section now reflows to a 480pt
+  minimum (controls stack, totals tighten, the heat map shows as many weeks as fit, best cards go
+  to one column).
 
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.
@@ -114,6 +104,9 @@ setting.
   once brings the rest back, and the width sticks.
 - **Column widths are tuned for this Mac's content.** Longer place or activity names will
   truncate. Retuning means bumping `workoutTableColumns.v6`.
+- **No inspector over the statistics** (from issue 8a). SwiftUI pins a SwiftUI column's width when
+  the inspector opens beside it, so the inspector is kept shut there and a personal best opens in a
+  sheet instead.
 - **Performance tests have loose thresholds.** They catch 10× regressions; the printed figures are
   the real measurements.
 - **`Spikes/` stays** as the quickest way to inspect a stored series file. It's excluded from every

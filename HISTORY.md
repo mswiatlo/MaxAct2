@@ -1002,6 +1002,14 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-12** — **Issue 8a/8b fixed** (awaiting the user's check). The user chose a sheet for a
+  personal best's workout; the inspector is now kept shut while Statistics is showing. Reverted the
+  partial workarounds the sheet made unnecessary (inspector inside the column, a raised window
+  minimum); kept pulling the window back on screen when its minimum grows. UI test
+  `testStatisticsKeepTheirLayoutAndOpenABestInASheet` mutation-checked (letting the inspector show
+  over the statistics brings back the cut-off sidebar). Hosted unit tests check every section's
+  narrowest width.
+
 - **2026-10-12** — Issue 8a: the time-boxed AppKit-host attempt (statistics in an `NSScrollView`)
   failed — same frozen width — and was reverted. Back to the user for the fallback.
 

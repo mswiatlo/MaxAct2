@@ -51,15 +51,10 @@ struct ContentView: View {
         NavigationSplitView(columnVisibility: $columns) {
             SidebarView(model: model)
         } detail: {
-            // Inside the detail column, as Apple's examples attach it: the column then has to make
-            // room for the inspector. Attached to the whole split view instead, the inspector was a
-            // sibling the split view sized independently — fine beside the table, which AppKit
-            // shrinks, but beside the statistics the column held ~920pt and the panes overflowed
-            // the window (issue 8a, measured).
             workoutList
-                .inspector(isPresented: $model.showsDetail) {
-                    DetailPane(model: model)
-                }
+        }
+        .inspector(isPresented: inspectorPresented) {
+            DetailPane(model: model)
         }
         // Lets View ▸ Hide Sidebar read and write the same state the split view uses.
         .focusedSceneValue(\.sidebarVisibility, $columns)
@@ -97,6 +92,20 @@ struct ContentView: View {
         .toolbar { toolbarContent }
         .safeAreaInset(edge: .bottom) { syncBanner }
         .task { await model.load() }
+    }
+
+    /// The inspector, **kept shut while Statistics is showing** (issue 8a). Beside statistics it
+    /// can't be laid out: SwiftUI pins a pure-SwiftUI column's minimum to its current width when
+    /// the inspector opens (measured with a layout dump; even a plain colour does it), so the panes
+    /// overflowed and the sidebar was cut off. A personal best opens its workout in a sheet
+    /// instead. The toolbar toggle, ⌃⌘I and View ▸ Show Inspector all go through this, so none
+    /// of them can bring it back there; `showsDetail` is untouched, so the inspector returns as it
+    /// was when the list does.
+    private var inspectorPresented: Binding<Bool> {
+        Binding(
+            get: { model.showsDetail && model.sidebarSelection != .statistics },
+            set: { if model.sidebarSelection != .statistics { model.showsDetail = $0 } }
+        )
     }
 
     @ViewBuilder
@@ -157,10 +166,11 @@ struct ContentView: View {
         // Finder and Xcode put theirs. A close button inside the pane would be a fair addition but
         // no substitute — it vanishes with the pane, so it can't bring it back.
         ToolbarItem {
-            Toggle(isOn: $model.showsDetail) {
+            Toggle(isOn: inspectorPresented) {
                 Label("Inspector", systemImage: "sidebar.trailing")
             }
             .help(model.showsDetail ? "Hide the workout details" : "Show the workout details")
+            .disabled(model.sidebarSelection == .statistics)
         }
     }
 

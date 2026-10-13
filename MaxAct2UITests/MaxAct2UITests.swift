@@ -661,14 +661,15 @@ final class SeededTableUITests: XCTestCase {
         _ = assertContained("in the narrowest window", inset: inset)
     }
 
-    /// Issue 8a/8b: the statistics give way to the inspector and to a narrow window.
+    /// Issue 8a/8b: a personal best opens in a sheet, the inspector stays shut over the
+    /// statistics, and the statistics reflow in a narrow window.
     ///
-    /// Before the fix the statistics had a rigid width of their own — a 53-week heat map, two
-    /// cards side by side and a row of fixed-size pickers — so with the inspector open there was
-    /// nowhere to put it: the inspector came up narrow and pinned, and narrowing the window clipped
-    /// the statistics instead of reflowing them.
+    /// Before: a best opened the inspector beside the statistics, where SwiftUI pinned the
+    /// statistics column at its current width — the inspector came up 40pt wide and the panes ran
+    /// off both edges of the window, cutting the sidebar off. Narrowing the window clipped the
+    /// statistics rather than reflowing them.
     @MainActor
-    func testStatisticsMakeRoomForTheInspectorAndANarrowWindow() throws {
+    func testStatisticsKeepTheirLayoutAndOpenABestInASheet() throws {
         let app = launchSeeded()
         let window = app.windows.firstMatch
         let sidebar = app.outlines["Sidebar"]
@@ -684,64 +685,72 @@ final class SeededTableUITests: XCTestCase {
             Thread.sleep(forTimeInterval: 1.5)
         }
 
+        // Open the inspector on the list first, so there's one to keep shut.
+        let table = app.outlines["WorkoutTable"]
+        XCTAssertTrue(table.waitForExistence(timeout: 10))
+        table.cells.element(boundBy: 0).click()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "value CONTAINS[c] 'Duration'"))
+            .firstMatch.waitForExistence(timeout: 10))
+
         sidebar.staticTexts.containing(NSPredicate(format: "value == 'Statistics' OR label == 'Statistics'"))
             .firstMatch.click()
         let scroll = app.scrollViews["StatisticsScroll"]
         XCTAssertTrue(scroll.waitForExistence(timeout: 10))
 
-        /// Everything wide in the statistics must sit inside the visible scroll area.
-        func assertFits(_ when: String) {
+        /// The statistics fill the window beside the sidebar, nothing is cut off, and everything
+        /// wide sits inside them.
+        func assertLaidOut(_ when: String) {
             continueAfterFailure = true
             defer { continueAfterFailure = false }
             let area = scroll.frame
+            print("STATS \(when): window \(window.frame.minX)…\(window.frame.maxX) "
+                  + "sidebar \(sidebar.frame.minX)…\(sidebar.frame.maxX) statistics \(area.minX)…\(area.maxX)")
+            XCTAssertGreaterThanOrEqual(sidebar.frame.minX, window.frame.minX,
+                                        "The sidebar is cut off by the window's left edge \(when).")
+            XCTAssertEqual(area.maxX, window.frame.maxX, accuracy: 1,
+                           "Something sits beside the statistics — the inspector? — \(when).")
             let wide: [(String, XCUIElement)] = [
-                ("chart picker", app.radioGroups["Chart"]),
                 ("period picker", app.radioGroups["Period"]),
                 ("heat map", app.otherElements["Training calendar, past year"]),
             ] + app.groups.matching(NSPredicate(format: "label ENDSWITH 'personal bests'"))
                 .allElementsBoundByIndex.map { ("best card", $0) }
-            let duration = app.staticTexts.containing(NSPredicate(format: "value CONTAINS[c] 'Duration'")).firstMatch
-            print("STATS \(when): window \(window.frame.minX)…\(window.frame.maxX) "
-                  + "sidebar \(sidebar.frame.minX)…\(sidebar.frame.maxX) "
-                  + "statistics \(area.minX)…\(area.maxX) "
-                  + "inspector text from \(duration.exists ? duration.frame.minX : -1)")
             for (name, element) in wide where element.exists {
-                print("  \(name): \(element.frame.minX - area.minX)…\(element.frame.maxX - area.minX)")
                 XCTAssertLessThanOrEqual(element.frame.maxX, area.maxX + 0.5,
                                          "The \(name) runs past the statistics' right edge \(when).")
                 XCTAssertGreaterThanOrEqual(element.frame.minX, area.minX - 0.5,
                                             "The \(name) starts left of the statistics \(when).")
             }
-            XCTAssertGreaterThanOrEqual(sidebar.frame.width, 189, "The sidebar was squeezed \(when).")
-            XCTAssertGreaterThanOrEqual(sidebar.frame.minX, window.frame.minX,
-                                        "The sidebar is cut off by the window's left edge \(when).")
-            // Growing to fit must not push the window off the screen — measured, it once ended
-            // 112pt past the right edge.
-            if let screen = NSScreen.screens.map(\.frame.maxX).max() {
-                XCTAssertLessThanOrEqual(window.frame.maxX, screen + 0.5,
-                                         "The window runs off the right of the screen \(when).")
-            }
         }
-        assertFits("with the inspector closed")
+        assertLaidOut("on arrival, with the inspector open on the list")
 
-        // A personal best opens the inspector at its own minimum width, at least.
-        let best = app.links["PersonalBest"].firstMatch
-        best.click()
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "value CONTAINS[c] 'Duration'"))
-            .firstMatch.waitForExistence(timeout: 10))
+        // The inspector's shortcut does nothing here.
+        app.typeKey("i", modifierFlags: [.control, .command])
         Thread.sleep(forTimeInterval: 1)
-        assertFits("with the inspector open")
-        XCTAssertGreaterThanOrEqual(window.frame.maxX - scroll.frame.maxX, 439,
-                                    "The inspector opened narrower than its 440pt minimum.")
+        assertLaidOut("after ⌃⌘I")
 
-        // As narrow as the window goes, inspector still open.
+        // A personal best opens its workout in a sheet; Done returns to the statistics as they were.
+        app.links["PersonalBest"].firstMatch.click()
+        let sheet = app.sheets.firstMatch
+        XCTAssertTrue(sheet.waitForExistence(timeout: 10), "A personal best should open a sheet.")
+        XCTAssertTrue(sheet.staticTexts.containing(NSPredicate(format: "value CONTAINS[c] 'Duration'"))
+            .firstMatch.waitForExistence(timeout: 10), "The sheet should show the workout's detail.")
+        sheet.buttons["Done"].click()
+        XCTAssertTrue(sheet.waitForNonExistence(timeout: 5))
+        assertLaidOut("after closing the sheet")
+
+        // As narrow as the window goes: everything reflows to fit.
         let edge = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5))
             .withOffset(CGVector(dx: -1, dy: 0))
+        let widthBefore = window.frame.width
         edge.press(forDuration: 0.3, thenDragTo: edge.withOffset(CGVector(dx: -800, dy: 0)))
         Thread.sleep(forTimeInterval: 1)
-        assertFits("in the narrowest window")
-        XCTAssertGreaterThanOrEqual(window.frame.maxX - scroll.frame.maxX, 439,
-                                    "The inspector was squeezed below its minimum in a narrow window.")
+        XCTAssertLessThan(window.frame.width, widthBefore, "The window didn't narrow, so the narrow case went untested.")
+        assertLaidOut("in the narrowest window")
+
+        // Back on the list, the inspector is as it was.
+        sidebar.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'All Workouts'")).firstMatch.click()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "value CONTAINS[c] 'Duration'"))
+            .firstMatch.waitForExistence(timeout: 10), "The inspector should return with the list.")
     }
 
     /// Pointing at a chart highlights the same moment on the map; clicking empty map clears it.

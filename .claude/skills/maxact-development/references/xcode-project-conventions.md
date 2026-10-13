@@ -685,13 +685,18 @@ an older checkout. Before any UI run, set both keys under
 Window screenshots attached by the tests themselves (`XCTAttachment`, `.keepAlways`) still come
 through. Check the exported attachments for `.mp4` files and delete any on sight.
 
-## Inspector beside pure-SwiftUI detail content *(measured 2026-10-12, unresolved)*
+## Inspector beside pure-SwiftUI detail content *(measured 2026-10-12; designed around)*
 
 **Cause, from a layout dump** (walk `NSSplitView.arrangedSubviews`, print
 `constraintsAffectingLayout(for: .horizontal)`): when the inspector opens, the column's hosting
 view gets `NSHostingView.minWidth >= <its current width>` at priority 999.9. Even a plain `Color`
 does it; an AppKit-backed `Table` doesn't. Attaching `.inspector` inside the detail column helped
 but didn't cure it.
+
+Also tried, and no help: hosting the content in an AppKit `NSScrollView` with an `NSHostingView`
+document sized to it — same pinned width, and XCUITest could no longer scroll links into view.
+**What MaxAct does:** keeps the inspector shut while Statistics is showing (one `Binding` that the
+toolbar toggle, ⌃⌘I and View ▸ Inspector all go through) and shows a workout from there in a sheet.
 
 **UI tests launch the app by bundle identifier**, so every extra build of the app LaunchServices
 knows about (e.g. an `xcodebuild -derivedDataPath /tmp/...` copy) is a candidate to be launched

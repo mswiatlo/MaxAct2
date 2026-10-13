@@ -28,8 +28,6 @@ import Testing
         let narrowest = narrowest(view)
         print("STATISTICS VIEW (\(model.items.count) items): narrowest \(narrowest), "
               + "ideal \(NSHostingView(rootView: view).fittingSize.width)")
-        let content = ContentView(model: model)
-        print("CONTENT VIEW: narrowest \(self.narrowest(content)), ideal \(NSHostingView(rootView: content).fittingSize.width)")
         #expect(narrowest <= StatisticsView.minimumWidth)
     }
 
@@ -37,10 +35,6 @@ import Testing
         let workouts = SampleData.workouts(count: 400)
         let calendar = WorkoutStatistics.trainingCalendar()
         let now = workouts.map(\.start).max() ?? .now
-        let model = AppModel.inMemoryFallback(
-            settings: AppSettings(defaults: UserDefaults(suiteName: "StatisticsLayoutTests") ?? .standard),
-            resolvesPlaces: false, stravaSecrets: InMemorySecretStore()
-        )
         let kinds = Array(Set(workouts.map(\.kind))).sorted { $0.displayName < $1.displayName }
 
         let sections: [(String, AnyView)] = [
@@ -53,7 +47,7 @@ import Testing
                 years: WorkoutStatistics.yearProgression(workouts, metric: .distance, now: now, calendar: calendar),
                 metric: .distance, today: WorkoutStatistics.referenceDate(for: now, calendar: calendar)))),
             ("consistency", AnyView(ConsistencySection(workouts: workouts, now: now, calendar: calendar))),
-            ("bests", AnyView(BestsSection(model: model, workouts: workouts, kinds: kinds))),
+            ("bests", AnyView(BestsSection(workouts: workouts, kinds: kinds) { _ in })),
         ]
         for (name, view) in sections {
             let width = narrowest(view)

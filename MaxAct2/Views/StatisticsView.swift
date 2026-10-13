@@ -20,6 +20,9 @@ struct StatisticsView: View {
     @AppStorage("statistics.period") private var period: StatisticsPeriod = .week
     @AppStorage("statistics.metric") private var metric: StatisticsMetric = .distance
 
+    /// A personal best's workout, shown in a sheet over the statistics (issue 8a).
+    @State private var shownWorkout: WorkoutListItem?
+
     private var workouts: [Workout] {
         model.visibleItems.map(\.workout).filter { kindKey == nil || $0.kind.storageKey == kindKey }
     }
@@ -52,7 +55,9 @@ struct StatisticsView: View {
                         today: WorkoutStatistics.referenceDate(for: now, calendar: calendar)
                     )
                     ConsistencySection(workouts: workouts, now: now, calendar: calendar)
-                    BestsSection(model: model, workouts: workouts, kinds: model.presentKinds.map(\.kind))
+                    BestsSection(workouts: workouts, kinds: model.presentKinds.map(\.kind)) { id in
+                        shownWorkout = model.items.first { $0.id == id }
+                    }
                 }
             }
             .padding(24)
@@ -67,6 +72,9 @@ struct StatisticsView: View {
         // SwiftUI shifted them left and cut the sidebar off.
         .frame(minWidth: Self.minimumWidth, idealWidth: Self.minimumWidth, maxWidth: .infinity)
         .accessibilityIdentifier("StatisticsScroll")
+        .sheet(item: $shownWorkout) { item in
+            WorkoutSheet(model: model, item: item)
+        }
         .navigationTitle("Statistics")
         .navigationSubtitle(subtitle(count: workouts.count))
     }
@@ -576,10 +584,11 @@ struct ConsistencySection: View {
 // MARK: - Personal bests
 
 struct BestsSection: View {
-    let model: AppModel
     let workouts: [Workout]
     /// In sidebar order: most frequent first.
     let kinds: [ActivityKind]
+    /// Shows the workout with this id.
+    let open: (String) -> Void
 
     var body: some View {
         let byKind = Dictionary(grouping: workouts, by: \.kind)
@@ -596,7 +605,7 @@ struct BestsSection: View {
                 cards(shown, byKind: byKind, perRow: 1)
             }
 
-            Footnote(text: "Click a best to show that workout. Fastest is average speed over 1 km or more.")
+            Footnote(text: "Click a best to see that workout. Fastest is average speed over 1 km or more.")
         }
     }
 
@@ -621,10 +630,7 @@ struct BestsSection: View {
                     GridRow {
                         Text(title(best.category))
                             .foregroundStyle(.secondary)
-                        Button(value(best, kind: kind)) {
-                            model.selection = [best.workoutID]
-                            model.showsDetail = true
-                        }
+                        Button(value(best, kind: kind)) { open(best.workoutID) }
                         .buttonStyle(.link)
                         .monospacedDigit()
                         .help("Show this workout")
@@ -662,5 +668,33 @@ struct BestsSection: View {
         case .fastest: WorkoutFormatting.paceOrSpeed(metersPerSecond: best.value, for: kind)
         case .mostEnergy: WorkoutFormatting.energy(kilocalories: best.value)
         }
+    }
+}
+
+// MARK: - A workout from the statistics
+
+/// The workout detail — the same view as the inspector's — in a sheet over the statistics, so a
+/// personal best can be looked at without leaving them. Escape or Done closes it.
+private struct WorkoutSheet: View {
+    let model: AppModel
+    let item: WorkoutListItem
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Label(item.workout.kind.displayName, systemImage: item.workout.kind.symbolName)
+                    .font(.headline)
+                Text(item.workout.start.formatted(date: .abbreviated, time: .shortened))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Done") { dismiss() }
+                    .keyboardShortcut(.defaultAction)
+            }
+            .padding(12)
+            Divider()
+            WorkoutDetailView(model: model, item: item)
+        }
+        .frame(minWidth: 560, idealWidth: 720, minHeight: 560, idealHeight: 820)
     }
 }
