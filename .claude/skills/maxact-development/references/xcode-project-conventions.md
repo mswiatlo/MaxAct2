@@ -662,6 +662,9 @@ in the main executable — then launch. Revert afterwards.
 ## When the Xcode MCP tools stop responding *(2026-10-12)*
 
 Every `xcode-tools` call can fail with `IDEStatefulActionError error 0` (even `XcodeListSchemes`).
+**Restarting Xcode fixed it** (2026-10-12, after it had failed for the rest of a session; an
+earlier restart in the same day hadn't prevented it recurring, so the trigger is unknown). Check
+with `XcodeListSchemes`, which is instant, before falling back.
 Fall back to `xcodebuild` with a scratch derived-data folder, which leaves Xcode's own state alone:
 
 ```
