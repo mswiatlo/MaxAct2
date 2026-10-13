@@ -12,6 +12,9 @@ import SwiftUI
 struct StatisticsView: View {
     @Bindable var model: AppModel
 
+    /// The narrowest the statistics get. Every section reflows down to this.
+    static let minimumWidth: CGFloat = 480
+
     /// `nil` for every activity.
     @State private var kindKey: String?
     @AppStorage("statistics.period") private var period: StatisticsPeriod = .week
@@ -56,6 +59,14 @@ struct StatisticsView: View {
             .frame(maxWidth: 960, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
+        // An explicit *ideal* width, so the split view sizes this pane from the space it's given
+        // rather than from what the content would like. The content's ideal is its widest
+        // single-line layout — the totals footnote alone wants 1,114pt, measured — and the split
+        // view handed the statistics that (~920pt, capped by the 960 above) and the inspector
+        // whatever was left: 40pt at first, and the three panes then overflowed the window, so
+        // SwiftUI shifted them left and cut the sidebar off.
+        .frame(minWidth: Self.minimumWidth, idealWidth: Self.minimumWidth, maxWidth: .infinity)
+        .accessibilityIdentifier("StatisticsScroll")
         .navigationTitle("Statistics")
         .navigationSubtitle(subtitle(count: workouts.count))
     }
@@ -66,25 +77,28 @@ struct StatisticsView: View {
         return "\(scope) · \(count) workouts\(matching)"
     }
 
+    /// Side by side when there's room, stacked when there isn't — the segmented picker alone is
+    /// about 460pt, and a rigid row was part of what held the statistics at ~940pt wide.
     private func controls(metrics: [StatisticsMetric], shownMetric: StatisticsMetric) -> some View {
-        HStack(spacing: 16) {
-            Picker("Activity", selection: $kindKey) {
-                Text("All Activities").tag(String?.none)
-                Divider()
-                ForEach(model.presentKinds, id: \.key) { entry in
-                    Label(entry.kind.displayName, systemImage: entry.kind.symbolName).tag(Optional(entry.key))
-                }
+        let activity = Picker("Activity", selection: $kindKey) {
+            Text("All Activities").tag(String?.none)
+            Divider()
+            ForEach(model.presentKinds, id: \.key) { entry in
+                Label(entry.kind.displayName, systemImage: entry.kind.symbolName).tag(Optional(entry.key))
             }
-            .fixedSize()
+        }
+        .fixedSize()
 
-            Spacer()
+        // Drives the history and year charts; the totals table shows every metric at once.
+        let chart = Picker("Chart", selection: Binding(get: { shownMetric }, set: { metric = $0 })) {
+            ForEach(metrics) { Text($0.title).tag($0) }
+        }
+        .pickerStyle(.segmented)
+        .fixedSize()
 
-            // Drives the history and year charts; the totals table shows every metric at once.
-            Picker("Chart", selection: Binding(get: { shownMetric }, set: { metric = $0 })) {
-                ForEach(metrics) { Text($0.title).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .fixedSize()
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: 16) { activity; Spacer(); chart }
+            VStack(alignment: .leading, spacing: 10) { activity; chart }
         }
     }
 }
@@ -150,30 +164,14 @@ extension StatisticsPeriod {
 
 // MARK: - Totals
 
-private struct TotalsSection: View {
+struct TotalsSection: View {
     let workouts: [Workout]
     let metrics: [StatisticsMetric]
     let now: Date
     let calendar: Calendar
 
-    /// Workouts first, then the rest, matching how a training log reads.
-    private var columns: [StatisticsMetric] {
-        [.count] + metrics.filter { $0 != .count }
-    }
-
-    var body: some View {
-        let rows: [(String, PeriodTotals)] = [
-            ("This week", WorkoutStatistics.current(.week, of: workouts, now: now, calendar: calendar)),
-            ("This month", WorkoutStatistics.current(.month, of: workouts, now: now, calendar: calendar)),
-            ("This year", WorkoutStatistics.current(.year, of: workouts, now: now, calendar: calendar)),
-            ("All time", WorkoutStatistics.overall(workouts)),
-        ]
-        let allTime = rows[3].1
-
-        VStack(alignment: .leading, spacing: 10) {
-            SectionHeader(title: "Totals", systemImage: "sum")
-
-            Grid(alignment: .trailing, horizontalSpacing: 28, verticalSpacing: 8) {
+    private func grid(_ rows: [(String, PeriodTotals)], spacing: CGFloat) -> some View {
+        Grid(alignment: .trailing, horizontalSpacing: spacing, verticalSpacing: 8) {
                 GridRow {
                     Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
                     ForEach(columns) { metric in
@@ -193,6 +191,31 @@ private struct TotalsSection: View {
                     .accessibilityElement(children: .combine)
                 }
             }
+    }
+
+    /// Workouts first, then the rest, matching how a training log reads.
+    private var columns: [StatisticsMetric] {
+        [.count] + metrics.filter { $0 != .count }
+    }
+
+    var body: some View {
+        let rows: [(String, PeriodTotals)] = [
+            ("This week", WorkoutStatistics.current(.week, of: workouts, now: now, calendar: calendar)),
+            ("This month", WorkoutStatistics.current(.month, of: workouts, now: now, calendar: calendar)),
+            ("This year", WorkoutStatistics.current(.year, of: workouts, now: now, calendar: calendar)),
+            ("All time", WorkoutStatistics.overall(workouts)),
+        ]
+        let allTime = rows[3].1
+
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeader(title: "Totals", systemImage: "sum")
+
+            // Generous spacing when there's room, tight when there isn't.
+            ViewThatFits(in: .horizontal) {
+                grid(rows, spacing: 28)
+                grid(rows, spacing: 12)
+            }
+
 
             // Missing values are left out, not counted as zero — and saying so is the point.
             ForEach(metrics.filter { allTime.missingCount($0) > 0 }) { metric in
@@ -209,7 +232,7 @@ private struct TotalsSection: View {
 
 // MARK: - History
 
-private struct HistorySection: View {
+struct HistorySection: View {
     let buckets: [PeriodTotals]
     @Binding var period: StatisticsPeriod
     let metric: StatisticsMetric
@@ -291,7 +314,7 @@ private struct HistorySection: View {
 
 // MARK: - Year by year
 
-private struct YearSection: View {
+struct YearSection: View {
     let years: [YearProgress]
     let metric: StatisticsMetric
     /// Today, in the reference year.
@@ -375,7 +398,7 @@ private struct YearSection: View {
 
 // MARK: - Consistency
 
-private struct ConsistencySection: View {
+struct ConsistencySection: View {
     let workouts: [Workout]
     let now: Date
     let calendar: Calendar
@@ -432,11 +455,23 @@ private struct ConsistencySection: View {
                 .accessibilityLabel("Training calendar, past year")
                 .accessibilityValue("Active on \(active) of \(days.count) days")
 
-            HStack(spacing: 32) {
-                stat("Current streak", days: streaks.currentDays)
-                stat("Longest streak", days: streaks.longestDays)
-                stat("Weeks in a row", weeks: streaks.currentWeeks)
-                stat("Most weeks in a row", weeks: streaks.longestWeeks)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 32) {
+                    stat("Current streak", days: streaks.currentDays)
+                    stat("Longest streak", days: streaks.longestDays)
+                    stat("Weeks in a row", weeks: streaks.currentWeeks)
+                    stat("Most weeks in a row", weeks: streaks.longestWeeks)
+                }
+                Grid(alignment: .leading, horizontalSpacing: 32, verticalSpacing: 10) {
+                    GridRow {
+                        stat("Current streak", days: streaks.currentDays)
+                        stat("Weeks in a row", weeks: streaks.currentWeeks)
+                    }
+                    GridRow {
+                        stat("Longest streak", days: streaks.longestDays)
+                        stat("Most weeks in a row", weeks: streaks.longestWeeks)
+                    }
+                }
             }
 
             Footnote(text: "Active on \(active) of the last \(days.count) days. A streak isn't broken by "
@@ -447,41 +482,25 @@ private struct ConsistencySection: View {
     private static let cell: CGFloat = 13
     private static let gap: CGFloat = 3
 
+    /// Room for the weekday labels to the left of the grid.
+    private static let labelColumn: CGFloat = 40
+
     /// GitHub's layout: a column per week, Monday at the top. Plain shapes rather than a Chart:
     /// `RectangleMark` on a date axis drew each day as a hairline, and a fixed grid of squares
     /// is all this is.
+    ///
+    /// Shows **as many recent weeks as fit**, up to a year. A full year is ~890pt of squares, and
+    /// holding that width was most of what kept the statistics from giving way to the inspector.
     private func heatMap(_ days: [DayTotal]) -> some View {
         // `days` starts on a Monday, so every seven is a week; the last may be partial.
-        let weeks = stride(from: 0, to: days.count, by: 7).map { Array(days[$0..<min($0 + 7, days.count)]) }
+        let allWeeks = stride(from: 0, to: days.count, by: 7).map { Array(days[$0..<min($0 + 7, days.count)]) }
 
         return VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .top, spacing: Self.gap) {
-                // Weekday labels, every other row, as GitHub does.
-                VStack(alignment: .trailing, spacing: Self.gap) {
-                    Color.clear.frame(height: 14)
-                    ForEach(0..<7, id: \.self) { row in
-                        Text(row.isMultiple(of: 2) ? weekdayNames[row] : "")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .frame(height: Self.cell)
-                    }
-                }
-                .padding(.trailing, 4)
-
-                ForEach(weeks.indices, id: \.self) { index in
-                    VStack(spacing: Self.gap) {
-                        monthLabel(weeks, index)
-                        ForEach(weeks[index]) { day in
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(Level(day.duration).color)
-                                .frame(width: Self.cell, height: Self.cell)
-                                .help(describe(day))
-                        }
-                    }
-                    .frame(maxHeight: .infinity, alignment: .top)
-                }
+            GeometryReader { geometry in
+                let fit = Int((geometry.size.width - Self.labelColumn) / (Self.cell + Self.gap))
+                grid(Array(allWeeks.suffix(max(4, fit))))
             }
-            .fixedSize()
+            .frame(height: 14 + Self.gap + 7 * (Self.cell + Self.gap))
 
             HStack(spacing: 10) {
                 ForEach(Level.allCases, id: \.self) { level in
@@ -491,6 +510,36 @@ private struct ConsistencySection: View {
                         Text(level.rawValue).font(.caption).foregroundStyle(.secondary)
                     }
                 }
+            }
+        }
+    }
+
+    private func grid(_ weeks: [[DayTotal]]) -> some View {
+        HStack(alignment: .top, spacing: Self.gap) {
+            // Weekday labels, every other row, as GitHub does.
+            VStack(alignment: .trailing, spacing: Self.gap) {
+                Color.clear.frame(height: 14)
+                ForEach(0..<7, id: \.self) { row in
+                    Text(row.isMultiple(of: 2) ? weekdayNames[row] : "")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .frame(height: Self.cell)
+                }
+            }
+            .frame(width: Self.labelColumn - Self.gap - 4, alignment: .trailing)
+            .padding(.trailing, 4)
+
+            ForEach(weeks.indices, id: \.self) { index in
+                VStack(spacing: Self.gap) {
+                    monthLabel(weeks, index)
+                    ForEach(weeks[index]) { day in
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Level(day.duration).color)
+                            .frame(width: Self.cell, height: Self.cell)
+                            .help(describe(day))
+                    }
+                }
+                .frame(maxHeight: .infinity, alignment: .top)
             }
         }
     }
@@ -526,7 +575,7 @@ private struct ConsistencySection: View {
 
 // MARK: - Personal bests
 
-private struct BestsSection: View {
+struct BestsSection: View {
     let model: AppModel
     let workouts: [Workout]
     /// In sidebar order: most frequent first.
@@ -539,20 +588,27 @@ private struct BestsSection: View {
         VStack(alignment: .leading, spacing: 12) {
             SectionHeader(title: "Personal Bests", systemImage: "trophy")
 
-            // A plain grid, two to a row, not a `LazyVGrid`: lazy cards below the fold don't exist
-            // until scrolled to, so VoiceOver and UI tests couldn't reach them. There are only
-            // ever a handful of activity kinds.
-            Grid(alignment: .topLeading, horizontalSpacing: 16, verticalSpacing: 16) {
-                ForEach(Array(stride(from: 0, to: shown.count, by: 2)), id: \.self) { index in
-                    GridRow {
-                        ForEach(shown[index..<min(index + 2, shown.count)], id: \.self) { kind in
-                            card(kind: kind, bests: WorkoutStatistics.personalBests(byKind[kind] ?? []))
-                        }
-                    }
-                }
+            // A plain grid, not a `LazyVGrid`: lazy cards below the fold don't exist until scrolled
+            // to, so VoiceOver and UI tests couldn't reach them. Two to a row when they fit, one
+            // when they don't — e.g. beside the inspector.
+            ViewThatFits(in: .horizontal) {
+                cards(shown, byKind: byKind, perRow: 2)
+                cards(shown, byKind: byKind, perRow: 1)
             }
 
             Footnote(text: "Click a best to show that workout. Fastest is average speed over 1 km or more.")
+        }
+    }
+
+    private func cards(_ kinds: [ActivityKind], byKind: [ActivityKind: [Workout]], perRow: Int) -> some View {
+        Grid(alignment: .topLeading, horizontalSpacing: 16, verticalSpacing: 16) {
+            ForEach(Array(stride(from: 0, to: kinds.count, by: perRow)), id: \.self) { index in
+                GridRow {
+                    ForEach(kinds[index..<min(index + perRow, kinds.count)], id: \.self) { kind in
+                        card(kind: kind, bests: WorkoutStatistics.personalBests(byKind[kind] ?? []))
+                    }
+                }
+            }
         }
     }
 

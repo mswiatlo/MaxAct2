@@ -1002,6 +1002,14 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-12** — Issue 8a/8b in progress on `issue-8-layout`. The user chose to keep the
+  inspector beside the statistics. Wrote the UI test first; it measured the inspector opening at
+  40pt. Made every section reflow (8b), which brought it to ~260pt, then traced the rest by
+  experiment: in statistics mode the detail column holds ~920pt with the inspector open regardless
+  of content, scroll view, subtitle or how the inspector opens, while table mode shrinks correctly.
+  A `List` host quit the app. Also measured: the totals footnote's *ideal* width is 1,114pt (one
+  line). Paused with 8a open; branch not merged, its layout test failing as expected.
+
 - **2026-10-12** — The user checked issue 8: the statistics work. Two problems recorded in
   `PLAN.md` as 8a (a personal best opens a narrow, fixed-size inspector that fights the sidebar
   for space) and 8b (a narrow window neither reflows nor scrolls the statistics). Paused there.

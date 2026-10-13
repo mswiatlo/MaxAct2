@@ -660,6 +660,83 @@ final class SeededTableUITests: XCTestCase {
         _ = assertContained("in the narrowest window", inset: inset)
     }
 
+    /// Issue 8a/8b: the statistics give way to the inspector and to a narrow window.
+    ///
+    /// Before the fix the statistics had a rigid width of their own — a 53-week heat map, two
+    /// cards side by side and a row of fixed-size pickers — so with the inspector open there was
+    /// nowhere to put it: the inspector came up narrow and pinned, and narrowing the window clipped
+    /// the statistics instead of reflowing them.
+    @MainActor
+    func testStatisticsMakeRoomForTheInspectorAndANarrowWindow() throws {
+        let app = launchSeeded()
+        let window = app.windows.firstMatch
+        let sidebar = app.outlines["Sidebar"]
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 15))
+
+        let launchWidth = window.frame.width
+        addTeardownBlock { @MainActor in
+            let shortfall = launchWidth - window.frame.width
+            guard abs(shortfall) > 1 else { return }
+            let edge = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5))
+                .withOffset(CGVector(dx: -1, dy: 0))
+            edge.press(forDuration: 0.3, thenDragTo: edge.withOffset(CGVector(dx: shortfall, dy: 0)))
+            Thread.sleep(forTimeInterval: 1.5)
+        }
+
+        sidebar.staticTexts.containing(NSPredicate(format: "value == 'Statistics' OR label == 'Statistics'"))
+            .firstMatch.click()
+        let scroll = app.scrollViews["StatisticsScroll"]
+        XCTAssertTrue(scroll.waitForExistence(timeout: 10))
+
+        /// Everything wide in the statistics must sit inside the visible scroll area.
+        func assertFits(_ when: String) {
+            continueAfterFailure = true
+            defer { continueAfterFailure = false }
+            let area = scroll.frame
+            let wide: [(String, XCUIElement)] = [
+                ("chart picker", app.radioGroups["Chart"]),
+                ("period picker", app.radioGroups["Period"]),
+                ("heat map", app.otherElements["Training calendar, past year"]),
+            ] + app.groups.matching(NSPredicate(format: "label ENDSWITH 'personal bests'"))
+                .allElementsBoundByIndex.map { ("best card", $0) }
+            let duration = app.staticTexts.containing(NSPredicate(format: "value CONTAINS[c] 'Duration'")).firstMatch
+            print("STATS \(when): window \(window.frame.minX)…\(window.frame.maxX) "
+                  + "sidebar \(sidebar.frame.minX)…\(sidebar.frame.maxX) "
+                  + "statistics \(area.minX)…\(area.maxX) "
+                  + "inspector text from \(duration.exists ? duration.frame.minX : -1)")
+            for (name, element) in wide where element.exists {
+                print("  \(name): \(element.frame.minX - area.minX)…\(element.frame.maxX - area.minX)")
+                XCTAssertLessThanOrEqual(element.frame.maxX, area.maxX + 0.5,
+                                         "The \(name) runs past the statistics' right edge \(when).")
+                XCTAssertGreaterThanOrEqual(element.frame.minX, area.minX - 0.5,
+                                            "The \(name) starts left of the statistics \(when).")
+            }
+            XCTAssertGreaterThanOrEqual(sidebar.frame.width, 189, "The sidebar was squeezed \(when).")
+            XCTAssertGreaterThanOrEqual(sidebar.frame.minX, window.frame.minX,
+                                        "The sidebar is cut off by the window's left edge \(when).")
+        }
+        assertFits("with the inspector closed")
+
+        // A personal best opens the inspector at its own minimum width, at least.
+        let best = app.links["PersonalBest"].firstMatch
+        best.click()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "value CONTAINS[c] 'Duration'"))
+            .firstMatch.waitForExistence(timeout: 10))
+        Thread.sleep(forTimeInterval: 1)
+        assertFits("with the inspector open")
+        XCTAssertGreaterThanOrEqual(window.frame.maxX - scroll.frame.maxX, 439,
+                                    "The inspector opened narrower than its 440pt minimum.")
+
+        // As narrow as the window goes, inspector still open.
+        let edge = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5))
+            .withOffset(CGVector(dx: -1, dy: 0))
+        edge.press(forDuration: 0.3, thenDragTo: edge.withOffset(CGVector(dx: -800, dy: 0)))
+        Thread.sleep(forTimeInterval: 1)
+        assertFits("in the narrowest window")
+        XCTAssertGreaterThanOrEqual(window.frame.maxX - scroll.frame.maxX, 439,
+                                    "The inspector was squeezed below its minimum in a narrow window.")
+    }
+
     /// Pointing at a chart highlights the same moment on the map; clicking empty map clears it.
     ///
     /// Observed through the map marker, which carries an identifier. The charts' spoken values

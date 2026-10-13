@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 9–14 fixed or closed; View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** issue 8's two layout problems (8a, 8b), then Phase 8. Issue 7 (TrainingPeaks) starts with
+**Next:** finish 8a on branch `issue-8-layout` (8b done there), then Phase 8. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -63,16 +63,25 @@ year comparison stays a single line until older history is synced (the library s
 2026-08-23). Deferred, as separate ideas: training load (CTL/ATL/TSB), heart-rate zones, a route
 heat map.
 
-Open, from the user's check (2026-10-12):
-- **a. A personal best opens a cramped inspector.** Clicking a best shows the workout in the
-  inspector, but from the statistics view it comes up very narrow and effectively fixed in size, so
-  the detail isn't really readable, and it competes with the sidebar for width. Needs a better way
-  to show the workout — e.g. switch to the table with it selected, or give the inspector a usable
-  width here.
-- **b. The statistics view doesn't adapt to a narrow window.** Reducing the window width neither
-  reflows the content nor lets you scroll to what's cut off. Either enforce a minimum width for the
-  view or let the sections reformat (the totals grid, the two-up best cards, the 53-week heat map
-  and the segmented pickers are the fixed-width parts).
+Open, from the user's check (2026-10-12). Work in progress on branch `issue-8-layout` (not merged):
+- **a. A personal best opens a cramped inspector, and the sidebar is cut off.** Decision (user):
+  keep the statistics in view with the inspector beside them, fixed. **Measured cause:** with the
+  inspector open in statistics mode, the detail *column* stays ~920pt wide whatever it contains, so
+  sidebar + statistics + inspector overflow the window and SwiftUI shifts the panes left (sidebar
+  cut by ~172pt, inspector by ~179pt). The same window in table mode is fine (table 564pt,
+  inspector 440pt). Ruled out, each by experiment: the statistics content (a plain box behaves the
+  same), the scroll view, the subtitle, how the inspector is opened (⌃⌘I does the same), and
+  capping the content's width (it just centres inside the 920pt column). Hosting the statistics in
+  a `List` made the app quit when the inspector opened. **Next to try:** the difference is the
+  AppKit-backed `Table` versus pure SwiftUI content — e.g. moving `.inspector` inside the detail
+  column, or hosting the statistics in an AppKit scroll view; Xcode's view debugger would help, once
+  Xcode's MCP tools respond again.
+- **b. The statistics don't adapt to a narrow window.** Done on the branch: every section now
+  reflows (controls stack, totals tighten, the heat map shows as many weeks as fit, best cards go to
+  one column) and the view has a 480pt minimum and ideal; a hosted unit test
+  (`StatisticsLayoutTests`) checks each section's narrowest width. Not yet verified in a narrow
+  window with the inspector *closed*; the UI test
+  `testStatisticsMakeRoomForTheInspectorAndANarrowWindow` covers both and fails on 8a until fixed.
 
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.

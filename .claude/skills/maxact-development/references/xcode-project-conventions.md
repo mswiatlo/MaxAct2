@@ -677,3 +677,17 @@ deleteOnSuccess`, `PreferredScreenCaptureFormat = screenRecording` in the genera
 `xcodebuild test-without-building -xctestrun <file> -destination 'platform=macOS' -only-testing:…`.
 Window screenshots attached by the tests themselves (`XCTAttachment`, `.keepAlways`) still come
 through. Check the exported attachments for `.mp4` files and delete any on sight.
+
+## Inspector beside pure-SwiftUI detail content *(measured 2026-10-12, unresolved)*
+
+With `.inspector` on the `NavigationSplitView` and a 1,200pt window, opening the inspector shrinks
+an AppKit-backed `Table` in the detail column (to 564pt) but **not** pure SwiftUI content: the
+column stayed ~920pt whatever it held — a full statistics view, a plain colour, content capped at
+560pt (which was centred in the column). The panes then overflowed and SwiftUI shifted them,
+cutting the sidebar off on the left. Not the cause: the scroll view, the subtitle, opening via ⌃⌘I.
+`List` as the host made the app quit on opening the inspector.
+
+Measuring tools that worked: `NSHostingController(rootView:).sizeThatFits(in: 1×∞)` for a view's
+narrowest width and `NSHostingView(rootView:).fittingSize` for its ideal, in a hosted unit test (no
+window, no mouse); a UI test printing absolute pane frames (`window`, `app.outlines["Sidebar"]`,
+the content's identifier) — relative widths alone hid the overflow.
