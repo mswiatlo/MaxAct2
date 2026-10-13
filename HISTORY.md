@@ -1002,6 +1002,9 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-12** — Issue 8a: the time-boxed AppKit-host attempt (statistics in an `NSScrollView`)
+  failed — same frozen width — and was reverted. Back to the user for the fallback.
+
 - **2026-10-12** — Issue 8a: root cause found. A temporary layout dump showed SwiftUI pinning the
   detail column's minimum to its current width when the inspector opens beside SwiftUI content
   (a plain colour does it; the table doesn't). Ruled out by experiment: content, scroll view,

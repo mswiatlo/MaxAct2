@@ -74,8 +74,10 @@ Open, from the user's check (2026-10-12). Work in progress on branch `issue-8-la
   (inspector 261 → 382pt), a raised window minimum over the statistics (1,320pt), and pulling the
   window back on screen when it grows (it had ended 112pt off the right edge). Still fails when the
   sidebar is wider than 192pt (217pt left a 40pt overflow), because the pinned width moves with
-  it. **Options:** keep chasing the SwiftUI behaviour (e.g. host the statistics in an AppKit
-  container like the table), or show a best's workout another way.
+  it. Tried and reverted (2026-10-12): hosting the statistics in an AppKit `NSScrollView`
+  (`NSHostingView` document sized to it) — the column still froze at the same width, and XCUITest
+  could no longer scroll links into view. **Remaining options:** hide the sidebar while the
+  inspector is open over the statistics, show a best's workout in a sheet, or jump to the list.
 - **b. The statistics don't adapt to a narrow window.** Done on the branch: every section now
   reflows (controls stack, totals tighten, the heat map shows as many weeks as fit, best cards go to
   one column) and the view has a 480pt minimum and ideal; a hosted unit test
