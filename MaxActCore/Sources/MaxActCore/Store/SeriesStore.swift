@@ -23,7 +23,9 @@ public actor SeriesStore {
         }
     }
 
-    private let directory: URL
+    /// Public so caches derived from the series can live beside them — and so stay in a test's
+    /// throwaway folder when the series do.
+    public nonisolated let directory: URL
     private let fileManager = FileManager.default
 
     /// - Parameter directory: defaults to

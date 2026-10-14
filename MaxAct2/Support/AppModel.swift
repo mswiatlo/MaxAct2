@@ -205,6 +205,13 @@ final class AppModel {
 
     let store: WorkoutStore
     let seriesStore: SeriesStore
+
+    /// The heat map's route sketches (issue 15), cached beside the series they come from.
+    let routeSketchCache: RouteSketchCache?
+    /// Built sketches by workout id, once `loadRouteSketches` has run.
+    private(set) var routeSketches: [String: RouteSketch] = [:]
+    /// (done, total) while sketches are being built for the first time.
+    private(set) var routeSketchProgress: (done: Int, total: Int)?
     let thumbnails: RouteThumbnailRenderer
     let settings: AppSettings
 
@@ -257,6 +264,7 @@ final class AppModel {
         strava = StravaClient(secrets: stravaSecrets)
         self.store = store
         self.seriesStore = seriesStore
+        routeSketchCache = try? RouteSketchCache(directory: seriesStore.directory.deletingLastPathComponent())
         self.thumbnails = thumbnails
         self.settings = settings
         sidebarSelection = SidebarSelection(storageKey: settings.sidebarSelectionKey) ?? .filter(.all)
@@ -881,6 +889,20 @@ final class AppModel {
         }
     }
 
+    /// Sketches for every workout with detail, newest first, building only the ones not yet cached.
+    /// The first run over a full library takes a while (measured 9 s for 418 routes, debug), so
+    /// it reports progress; afterwards it's a single file read.
+    func loadRouteSketches() async {
+        guard let cache = routeSketchCache, routeSketchProgress == nil else { return }
+        let ids = items.filter(\.hasDetail).sorted { $0.workout.start > $1.workout.start }.map(\.id)
+        routeSketchProgress = (0, 0)
+        let built = await cache.sketches(for: ids, seriesStore: seriesStore) { done, total in
+            await MainActor.run { self.routeSketchProgress = (done, total) }
+        }
+        routeSketches = Dictionary(built.map { ($0.workoutID, $0) }, uniquingKeysWith: { first, _ in first })
+        routeSketchProgress = nil
+    }
+
     func dismissLoadError() {
         loadError = nil
     }
@@ -912,6 +934,8 @@ final class AppModel {
             try await store.deleteAll()
             try await seriesStore.deleteAll()
             try thumbnails.deleteAll()
+            await routeSketchCache?.clear()
+            routeSketches = [:]
             selection.removeAll()
             hasSeeded = true   // don't re-seed a store the user just asked to empty
             await load()

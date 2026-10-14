@@ -58,6 +58,7 @@ struct StatisticsView: View {
                                         suggestedMaximum: model.suggestedMaximumHeartRate,
                                         now: now, calendar: calendar)
                     ConsistencySection(workouts: workouts, now: now, calendar: calendar)
+                    RouteHeatmapSection(model: model, workouts: workouts)
                     BestsSection(workouts: workouts, kinds: model.presentKinds.map(\.kind)) { best, _ in
                         model.selection = [best.workoutID]
                         model.showsDetail = true

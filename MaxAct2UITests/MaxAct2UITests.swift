@@ -1073,6 +1073,27 @@ final class SeededTableUITests: XCTestCase {
         add(attachment)
     }
 
+    /// Issue 15: Statistics draws every route on one map and counts the explorer squares.
+    @MainActor
+    func testRoutesMapShowsExplorerSquares() throws {
+        let app = launchSeeded()
+        let sidebar = app.outlines["Sidebar"]
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 15))
+        sidebar.staticTexts.containing(NSPredicate(format: "value == 'Statistics' OR label == 'Statistics'"))
+            .firstMatch.click()
+        let scroll = app.scrollViews["StatisticsScroll"]
+        XCTAssertTrue(scroll.waitForExistence(timeout: 10))
+
+        let toggle = app.checkBoxes["Show squares"]
+        for _ in 0..<15 where !(toggle.exists && toggle.isHittable) { scroll.scroll(byDeltaX: 0, deltaY: -400) }
+        XCTAssertTrue(toggle.waitForExistence(timeout: 20), "The routes section should finish preparing and offer squares.")
+        let count = app.staticTexts.containing(NSPredicate(format: "value BEGINSWITH 'Explorer squares, '")).firstMatch
+        XCTAssertTrue(count.exists, "The explorer-square count should be shown.")
+        let squares = Int((count.value as? String ?? "").split(separator: " ").last ?? "") ?? 0
+        XCTAssertGreaterThan(squares, 0, "Seeded routes cross at least one square.")
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Map of '")).firstMatch.exists)
+    }
+
     /// Phase 8: an empty filter says what it means; only an actual search gets "No Results".
     /// The seed has no failed uploads, so Upload Failed is empty.
     @MainActor
@@ -1414,7 +1435,20 @@ final class RealContentUITests: XCTestCase {
             attachment.lifetime = .keepAlways
             add(attachment)
         }
-        scroll.scroll(byDeltaX: 0, deltaY: 3000)   // back to the top for the tour below
+        // Issue 15: the routes map over real data, without and with the explorer squares.
+        let squaresToggle = app.checkBoxes["Show squares"]
+        for _ in 0..<20 where !(squaresToggle.exists && squaresToggle.isHittable) { scroll.scroll(byDeltaX: 0, deltaY: -400) }
+        if squaresToggle.waitForExistence(timeout: 60) {
+            Thread.sleep(forTimeInterval: 3)   // map tiles
+            let routes = XCTAttachment(screenshot: window.screenshot())
+            routes.name = "s0-routes"; routes.lifetime = .keepAlways; add(routes)
+            squaresToggle.click()
+            Thread.sleep(forTimeInterval: 2)
+            let squares = XCTAttachment(screenshot: window.screenshot())
+            squares.name = "s0-routes-squares"; squares.lifetime = .keepAlways; add(squares)
+            squaresToggle.click()
+        }
+        scroll.scroll(byDeltaX: 0, deltaY: 6000)   // back to the top for the tour below
 
         for index in 1...4 {
             Thread.sleep(forTimeInterval: 1)
