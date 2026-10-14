@@ -391,8 +391,7 @@ final class MaxAct2UITests: XCTestCase {
 
         // The same month last year can.
         let lastYear = String(Calendar.current.component(.year, from: .now) - 1)
-        let year = app.popUpButtons.matching(NSPredicate(format: "value == %@", String(Calendar.current.component(.year, from: .now)))).firstMatch
-        year.click(); app.menuItems[lastYear].click()
+        app.popUpButtons["Year"].click(); app.menuItems[lastYear].click()
         XCTAssertFalse(app.staticTexts["That month hasn't started yet."].exists)
         XCTAssertTrue(start.isEnabled, "A past month can be imported.")
     }

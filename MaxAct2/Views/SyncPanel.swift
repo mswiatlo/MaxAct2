@@ -132,6 +132,9 @@ struct SyncPanel: View {
                 Text(option.title).tag(option)
             }
         }
+        // A menu picker's title is separate text; without this the pop-up itself is unnamed and
+        // VoiceOver reads only its value.
+        .accessibilityLabel("Import")
         .disabled(!isReady)
 
         if range == .specificMonth {
@@ -139,11 +142,14 @@ struct SyncPanel: View {
                 Picker("Month", selection: $chosenMonth) {
                     ForEach(1...12, id: \.self) { Text(Calendar.current.monthSymbols[$0 - 1]).tag($0) }
                 }
+                .accessibilityLabel("Month")
                 Picker("Year", selection: $chosenYear) {
                     // Back as far as "Everything" reaches.
                     let thisYear = Calendar.current.component(.year, from: .now)
                     ForEach((thisYear - 7...thisYear).reversed(), id: \.self) { Text(String($0)).tag($0) }
                 }
+                // `labelsHidden` keeps the title for accessibility; adding a label as well made
+                // VoiceOver say "Year, Year".
                 .labelsHidden()
                 .fixedSize()
             }

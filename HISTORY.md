@@ -1040,6 +1040,12 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-14** — **Issue 17 built: import a specific month** (the user's request, to make issue 16
+  checkable). Mutation-checked: without the "hasn't started" guard a future month builds an interval
+  ending before it starts, and Foundation traps. UI test found the Import menu had no accessible
+  name; and that `labelsHidden()` plus `.accessibilityLabel` reads "Year, Year". One run hit
+  "Timed out while enabling automation mode" — macOS, not the app; a retry ran normally.
+
 - **2026-10-14** — Recorded issue 16 (the user's request): check whether Strava's API can mark an
   activity as a race (`workout_type`). Research first; the user is downloading detail meanwhile for
   issue 15's route heat map.

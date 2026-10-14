@@ -740,3 +740,10 @@ the content's identifier) — relative widths alone hid the overflow.
   clipped them out of reach. Plain rows of `LabeledContent` work.
 - **A number `TextField` bound to an `Int` that uses 0 for "unset" shows "0"**, not its prompt.
   Bind through an `Int?` that maps 0 to `nil`.
+- **`labelsHidden()` keeps the title as the accessibility label**; adding `.accessibilityLabel`
+  too makes VoiceOver read it twice ("Year, Year"). Only pickers whose title is *shown* (and so
+  rendered as separate text) need the explicit label.
+- **"Timed out while enabling automation mode"** fails a UI run before any test starts. It's macOS's
+  automation switch (sometimes an unanswered authorization prompt), not the app; retry.
+- **Running UI tests quits a running MaxAct** (they launch it by bundle identifier). Check the user
+  isn't mid-sync or mid-download first.

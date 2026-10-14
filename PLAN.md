@@ -26,15 +26,15 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ## 1. Where things stand — 2026-10-12
 
-All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 312 in
-`MaxActCore` (`swift test`), 53 app and UI tests (`RunAllTests` — ask first, then leave the Mac
+All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 315 in
+`MaxActCore` (`swift test`), 54 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~5 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
 
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** issue 15 (deeper statistics). Issue 7 (TrainingPeaks) starts with
+**Next:** the user's check of 17, then 16 (Strava race flag), then the rest of 15. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -69,6 +69,13 @@ MaxAct's `activity:write` scope, and its values — believed to be 1 = race for 
 rides, unverified — and for which sports it exists at all (walks and hikes may have none). If it's
 writable, a "Race" tag could be mirrored like Commute and Trainer are; if not, record that and keep
 "Race" Mac-only. Verify against a real activity rather than the docs.
+
+**17. Import a specific month.** *(built 2026-10-14, awaiting the user's check — enables 16)*
+The sync panel's Import menu has "A specific month…", with Month and Year pickers back seven years,
+the estimate for that month, and no way to pick one that hasn't started. `SyncPlanner.month(_:of:)`
+gives the month's local span (ending now for the current month); 3 package tests, including a DST
+month. Labelling its pickers for VoiceOver also fixed the existing Import menu, which had no
+accessible name.
 
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.
