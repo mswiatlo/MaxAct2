@@ -1132,6 +1132,34 @@ final class SeededTableUITests: XCTestCase {
         add(attachment)
     }
 
+    /// Issue 15: the inspector shows the same zone breakdown for the selected workout.
+    @MainActor
+    func testInspectorShowsTheWorkoutsHeartRateZones() throws {
+        let app = launchMaxAct(seed: 40, defaults: [
+            "restingHeartRate": "55", "maximumHeartRate": "190", "trimpCurve": "male",
+        ])
+        let table = app.outlines["WorkoutTable"]
+        XCTAssertTrue(table.waitForExistence(timeout: 15))
+        table.cells.element(boundBy: 0).click()
+
+        let heartRate = app.otherElements.matching(NSPredicate(format: "label == 'Heart Rate'")).firstMatch
+        XCTAssertTrue(heartRate.waitForExistence(timeout: 15), "No heart-rate chart.")
+        let rows = app.descendants(matching: .any).matching(identifier: "ZoneRow")
+        let top = rows.element(boundBy: 0)
+        // Scrolling over the chart scrolls the detail pane that contains it.
+        for _ in 0..<8 where !(top.exists && top.isHittable) { heartRate.scroll(byDeltaX: 0, deltaY: -300) }
+        XCTAssertTrue(top.waitForExistence(timeout: 5), "The inspector should list the workout's zones.")
+        XCTAssertEqual(rows.count, 6, "Five zones and Below Z1.")
+        XCTAssertTrue(top.label.contains("Zone 5") && top.label.contains("177+ bpm"), "Got \(top.label)")
+        // Some time somewhere: the shares can't all be 0%.
+        XCTAssertTrue((0..<6).contains { !rows.element(boundBy: $0).label.hasSuffix(", 0%") },
+                      "A seeded workout with heart rate spends time in some zone.")
+        let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        attachment.name = "15-inspector-zones"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     /// Phase 8: an empty filter says what it means; only an actual search gets "No Results".
     /// The seed has no failed uploads, so Upload Failed is empty.
     @MainActor
@@ -1392,7 +1420,9 @@ final class RealContentUITests: XCTestCase {
 
     @MainActor
     func testInspectorLayoutWithRealContent() throws {
-        let app = launchMaxAct(extraArguments: ["--ui-testing-real-copy"])
+        // A plausible profile so the inspector's heart-rate zones draw.
+        let app = launchMaxAct(defaults: ["restingHeartRate": "55", "maximumHeartRate": "182", "trimpCurve": "male"],
+                               extraArguments: ["--ui-testing-real-copy"])
         let window = app.windows.firstMatch
         let table = app.outlines["WorkoutTable"]
         guard table.waitForExistence(timeout: 15) else {
@@ -1435,6 +1465,11 @@ final class RealContentUITests: XCTestCase {
             heartRate.scroll(byDeltaX: 0, deltaY: -600)
             heartRate.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
             capture("2b-charts-aligned")
+            // Issue 15: the zones below the charts, at the inspector's default (narrowest) width.
+            let zone = app.descendants(matching: .any).matching(identifier: "ZoneRow").firstMatch
+            let inspector = window.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5))
+            for _ in 0..<6 where !(zone.exists && zone.isHittable) { inspector.scroll(byDeltaX: 0, deltaY: -300) }
+            if zone.exists { capture("2c-zones") }
         }
 
         let edge = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5))

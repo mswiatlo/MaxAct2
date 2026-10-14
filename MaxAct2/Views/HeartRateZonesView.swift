@@ -58,12 +58,12 @@ struct HeartRateZonesSection: View {
                                              profile: profile, period: period, through: now, calendar: calendar)
         let focused = hovered.flatMap { hovered in buckets.last { $0.interval.start <= hovered } } ?? buckets.last
 
-        Text(focused.map { "\(period.label(for: $0.interval.start)) · " + Self.describe($0.times.values.reduce(0, +)) } ?? " ")
+        Text(focused.map { "\(period.label(for: $0.interval.start)) · " + HeartRateZoneBreakdown.describe($0.times.values.reduce(0, +)) } ?? " ")
             .font(.callout.monospacedDigit())
             .foregroundStyle(.secondary)
             .accessibilityIdentifier("ZonesFocus")
 
-        breakdown(focused?.times ?? [:], profile: profile)
+        HeartRateZoneBreakdown(times: focused?.times ?? [:], profile: profile)
 
         chart(buckets)
             .frame(height: 160)
@@ -88,10 +88,43 @@ struct HeartRateZonesSection: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    /// Hottest first, each with its bpm range, time and share of the period.
-    private func breakdown(_ times: [HeartRateZone: TimeInterval], profile: HeartRateProfile) -> some View {
+    private func chart(_ buckets: [(interval: DateInterval, times: [HeartRateZone: TimeInterval])]) -> some View {
+        let visibleCount = period.visibleCount
+        let shown = buckets.suffix(visibleCount)
+        let length = (buckets.last?.interval.end).map { end in
+            end.timeIntervalSince((buckets.count > visibleCount ? shown.first : buckets.first)?.interval.start ?? end)
+        } ?? 1
+        return Chart {
+            ForEach(buckets, id: \.interval.start) { bucket in
+                ForEach(HeartRateZone.allCases) { zone in
+                    BarMark(
+                        x: .value("Period", bucket.interval.start, unit: period.calendarComponent, calendar: calendar),
+                        y: .value("Hours", (bucket.times[zone] ?? 0) / 3600)
+                    )
+                    .foregroundStyle(by: .value("Zone", zone.title))
+                }
+            }
+        }
+        .chartForegroundStyleScale(domain: HeartRateZone.allCases.map(\.title),
+                                   range: HeartRateZone.allCases.map(\.color))
+        .chartLegend(.hidden)
+        .chartYAxisLabel("hours")
+        .chartXSelection(value: $hovered)
+        .chartScrollableAxes(buckets.count > visibleCount ? .horizontal : [])
+        .chartXVisibleDomain(length: length)
+        .chartScrollPosition(initialX: shown.first?.interval.start ?? now)
+    }
+}
+
+/// Time in each zone, hottest first, with each zone's bpm range, its time and its share, and a bar.
+/// Shared by the statistics (one period) and the inspector (one workout).
+struct HeartRateZoneBreakdown: View {
+    let times: [HeartRateZone: TimeInterval]
+    let profile: HeartRateProfile
+
+    var body: some View {
         let total = times.values.reduce(0, +)
-        return Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
+        Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
             ForEach(HeartRateZone.allCases.reversed()) { zone in
                 let time = times[zone] ?? 0
                 let share = total > 0 ? time / total : 0
@@ -131,34 +164,7 @@ struct HeartRateZonesSection: View {
         }
     }
 
-    private func chart(_ buckets: [(interval: DateInterval, times: [HeartRateZone: TimeInterval])]) -> some View {
-        let visibleCount = period.visibleCount
-        let shown = buckets.suffix(visibleCount)
-        let length = (buckets.last?.interval.end).map { end in
-            end.timeIntervalSince((buckets.count > visibleCount ? shown.first : buckets.first)?.interval.start ?? end)
-        } ?? 1
-        return Chart {
-            ForEach(buckets, id: \.interval.start) { bucket in
-                ForEach(HeartRateZone.allCases) { zone in
-                    BarMark(
-                        x: .value("Period", bucket.interval.start, unit: period.calendarComponent, calendar: calendar),
-                        y: .value("Hours", (bucket.times[zone] ?? 0) / 3600)
-                    )
-                    .foregroundStyle(by: .value("Zone", zone.title))
-                }
-            }
-        }
-        .chartForegroundStyleScale(domain: HeartRateZone.allCases.map(\.title),
-                                   range: HeartRateZone.allCases.map(\.color))
-        .chartLegend(.hidden)
-        .chartYAxisLabel("hours")
-        .chartXSelection(value: $hovered)
-        .chartScrollableAxes(buckets.count > visibleCount ? .horizontal : [])
-        .chartXVisibleDomain(length: length)
-        .chartScrollPosition(initialX: shown.first?.interval.start ?? now)
-    }
-
-    private static func range(_ zone: HeartRateZone, profile: HeartRateProfile) -> String {
+    static func range(_ zone: HeartRateZone, profile: HeartRateProfile) -> String {
         let lower = zone.lowerBound(profile: profile)
         let next = HeartRateZone(rawValue: zone.rawValue + 1)?.lowerBound(profile: profile)
         switch (zone, next) {
@@ -168,7 +174,7 @@ struct HeartRateZonesSection: View {
         }
     }
 
-    /// "3 h 20 min", or "45 min".
+    /// "3 hrs, 20 mins", or "45 mins".
     static func describe(_ seconds: TimeInterval) -> String {
         Duration.seconds(seconds.rounded()).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated))
     }

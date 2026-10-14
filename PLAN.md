@@ -27,7 +27,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 ## 1. Where things stand — 2026-10-12
 
 All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 330 in
-`MaxActCore` (`swift test`), 56 app and UI tests (`RunAllTests` — ask first, then leave the Mac
+`MaxActCore` (`swift test`), 57 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~5 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
 
@@ -63,7 +63,8 @@ The HealthFit-style analyses left out of issue 8's first cut, as separate pieces
   at each bpm is a histogram read in the same cached pass as the route sketches (each reading
   counts until the next; gaps over 30 s count nothing — measured, 30.7 h of 275 h are such gaps),
   so changing the profile is instant. Says how many workouts counted. Checked on a copy of the
-  real library: all 418 counted.
+  real library: all 418 counted. The inspector shows the same breakdown for the selected workout
+  (below the charts), sharing one view (`HeartRateZoneBreakdown`) with Statistics.
 - **Route heat map** *(built 2026-10-14, awaiting the user's check)* — a Routes section in
   Statistics: every route on one map, faint so overlaps build up, following the activity picker
   and search. Routes are grouped into places by where they start (25 km), named from place labels;

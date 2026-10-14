@@ -1059,6 +1059,17 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-14** — **Issue 15: heart-rate zones in the workout inspector** (the user's request).
+  The zone breakdown is now one view, `HeartRateZoneBreakdown`, used by the Statistics section
+  and by the inspector, which shows it below the charts for the selected workout (from its own
+  series, so a profile change shows at once). UI test, mutation-checked; checked on a copy of the
+  real library at the inspector's narrowest width. That check showed 32 min of readings for a
+  28:14 ride; measured, not a bug — its recording runs 32:25, and the workout's duration leaves out
+  pauses. Over all 417 workouts with heart rate, zone time never exceeds the recording. The
+  footnote now says it's recording time. One full-suite run failed
+  `testPointingAtAChartHighlightsTheMap` on an XCTest snapshot error; it passed on rerun (a flake,
+  not this change). 330 package tests, 57 app and UI tests (2 real-content skipped).
+
 - **2026-10-14** — **Issue 15: heart-rate zones built** (the user chose zones by heart-rate
   reserve). Measured first on a copy of the series: all 418 workouts carry heart rate (174,683
   readings, median gap 5 s, 99th percentile 13 s; gaps over 30 s total 30.7 h of 275 h, so they

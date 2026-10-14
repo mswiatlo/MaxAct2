@@ -85,6 +85,9 @@ struct WorkoutDetailView: View {
         let movingSpeedMetersPerSecond: Double?
         let splits: [Split]
         let heartRate: [ChartSegment]
+        /// Time at each heart rate, for the zones — kept rather than the zone times, so a change
+        /// to the profile in Settings shows at once.
+        let heartRateHistogram: HeartRateHistogram
         let elevation: [ChartSegment]
         let speed: [ChartSegment]
         let pace: [ChartSegment]
@@ -110,6 +113,9 @@ struct WorkoutDetailView: View {
 
                 if let series {
                     charts(series)
+                    if series.heartRateHistogram.total > 0 {
+                        zones(series.heartRateHistogram)
+                    }
                     SplitsTable(
                         splits: series.splits,
                         kind: workout.kind,
@@ -155,6 +161,7 @@ struct WorkoutDetailView: View {
             // thousands of points, and body runs on every hover, resize and scroll.
             splits: WorkoutSplits.splits(for: workout, series: series),
             heartRate: heartRate,
+            heartRateHistogram: HeartRateHistogram(series.heartRate),
             elevation: elevation,
             speed: speed,
             pace: pace,
@@ -328,6 +335,29 @@ struct WorkoutDetailView: View {
             highlighted: $highlighted,
             timeDomain: series.timeDomain
         )
+    }
+
+    /// The same breakdown as the statistics' Heart-Rate Zones, for this one workout.
+    @ViewBuilder
+    private func zones(_ histogram: HeartRateHistogram) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Heart-Rate Zones", systemImage: "heart.text.square")
+                .font(.headline)
+            if let profile = model.settings.heartRateProfile {
+                HeartRateZoneBreakdown(times: HeartRateZone.times(histogram, profile: profile), profile: profile)
+                // Recording time, which can exceed the workout's duration: that leaves out pauses,
+                // while stops under the gap limit still have readings (measured: a 28:14 ride had
+                // 32 min of readings over its 32 min recording).
+                Text(verbatim: HeartRateZoneBreakdown.describe(histogram.total)
+                     + " of readings, over the whole recording. Gaps over \(Int(HeartRateHistogram.maxGap)) s count nothing.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text("Set your resting and maximum heart rate in Settings to see zones.")
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 
     private func statsGrid(_ series: LoadedSeries?) -> some View {
