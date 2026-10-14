@@ -1086,6 +1086,19 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-14** — **Issue 19 fixed (partial Workout-app routes); issue 20 noted** (no descent on
+  some workouts, e.g. the Oct 12 2025 marathon). Measured on a copy: 3 routes cover 0–17% of their
+  workout, the rest ≥ 98% — cut short, not sparse (1 s fixes, cleaning dropped none). A raw
+  `get_workouts` with routes returned the same fragments (Oct 8: 12:22:04–12:23:01 of a 12:06–12:37
+  run; Oct 2: 26 s mid-run), both interval-style recordings with 8 and 20 `activities`. Strava's
+  streams have the whole tracks. Built: `StravaClient.route(ofActivity:)`, `routeIsIncomplete`
+  (under half the duration), a once-per-library fill when Strava is connected plus a fill after
+  each detail download (re-downloads bring the fragment back), thumbnail and digest invalidation,
+  and an inspector note for unlinked partial routes (checked on a real copy: "sent 26 secs. of 48
+  mins."). Live check: tracks span the workouts, 0 s start offset, ≤ 4 m from HAE's fragment at the
+  same time. A new no-GPS test caught a real bug (a count mismatch threw instead of returning no
+  route); timing mutation-checked. 338 package tests, 57 app and UI tests (2 real-content skipped).
+
 - **2026-10-14** — **Issue 15 closed**, confirmed by the user. **Issue 18 found and fixed:** the
   user saw missing heart rate for 8–21 Oct 2025. Measured: not a date range but a recording app —
   17 of the 18 Apple Workout-app workouts (all of them in 1–21 Oct 2025) had one reading per ~10

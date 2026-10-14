@@ -174,6 +174,41 @@ public actor StravaClient {
         return object?["workout_type"] as? Int
     }
 
+    /// An activity's GPS track as route points — two read requests: the activity, for its start
+    /// time, and its `latlng`, `altitude`, `time` and `velocity_smooth` streams (`time` is seconds
+    /// from the start). For routes Health Auto Export sent only part of (issue 19). Empty if the
+    /// activity has no GPS.
+    public func route(ofActivity id: Int) async throws -> [RoutePoint] {
+        let activity = try await send(method: "GET", path: "activities/\(id)", kind: .read)
+        guard let object = try JSONSerialization.jsonObject(with: activity.body) as? [String: Any],
+              let startText = object["start_date"] as? String,
+              let start = ISO8601DateFormatter().date(from: startText)
+        else { throw StravaError.invalidResponse("activity \(id) has no start_date") }
+
+        let response = try await send(
+            method: "GET", path: "activities/\(id)/streams", kind: .read,
+            query: [URLQueryItem(name: "keys", value: "latlng,altitude,time,velocity_smooth"),
+                    URLQueryItem(name: "key_by_type", value: "true")]
+        )
+        let streams = try JSONSerialization.jsonObject(with: response.body) as? [String: Any] ?? [:]
+        func data(_ key: String) -> [Any] { (streams[key] as? [String: Any])?["data"] as? [Any] ?? [] }
+        let positions = data("latlng"), times = data("time"), altitudes = data("altitude"), speeds = data("velocity_smooth")
+        if positions.isEmpty { return [] }
+        guard positions.count == times.count else {
+            throw StravaError.invalidResponse("activity \(id): \(positions.count) positions for \(times.count) times")
+        }
+        return positions.indices.compactMap { index in
+            guard let pair = positions[index] as? [Double], pair.count == 2,
+                  let offset = (times[index] as? NSNumber)?.doubleValue else { return nil }
+            return RoutePoint(
+                coordinate: Coordinate(latitude: pair[0], longitude: pair[1]),
+                timestamp: start.addingTimeInterval(offset),
+                altitudeMeters: index < altitudes.count ? (altitudes[index] as? NSNumber)?.doubleValue : nil,
+                speedMetersPerSecond: index < speeds.count ? (speeds[index] as? NSNumber)?.doubleValue : nil
+            )
+        }
+    }
+
     /// Of `activityIDs`, the ones Strava confirms no longer exist.
     ///
     /// For activities that were expected in a listing and weren't there. A missing row alone is

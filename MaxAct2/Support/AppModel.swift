@@ -214,6 +214,7 @@ final class AppModel {
     /// heart-rate zones' data (issue 15).
     private(set) var heartRateHistograms: [String: HeartRateHistogram] = [:]
     @ObservationIgnored private var isRepairingHeartRate = false
+    @ObservationIgnored private var isFillingRoutes = false
     /// (done, total) while sketches are being built for the first time.
     private(set) var routeSketchProgress: (done: Int, total: Int)?
     let thumbnails: RouteThumbnailRenderer
@@ -439,6 +440,47 @@ final class AppModel {
         await refreshStravaConnection()
         resumeStravaUploads()
         await repairSparseHeartRateIfNeeded()
+        await fillIncompleteRoutesIfNeeded()
+    }
+
+    /// Once (with Strava connected): routes Health Auto Export sent only part of — some
+    /// interval-style Apple Workout-app recordings, measured 3 of 418 — are replaced by the
+    /// linked Strava activity's full track. Reads every linked series (~7 s), off the main actor.
+    private func fillIncompleteRoutesIfNeeded() async {
+        guard !settings.hasFilledIncompleteRoutes, !isFillingRoutes, isStravaConnected, !syncStatus.isRunning else { return }
+        isFillingRoutes = true
+        defer { isFillingRoutes = false }
+        do {
+            let filled = try await fillIncompleteRoutes(in: items)
+            settings.hasFilledIncompleteRoutes = true
+            if filled > 0 { items = (try? await store.allItems()) ?? items }
+        } catch {
+            // Tried again next launch; said now, since a route stays incomplete until it works.
+            syncStatus = .failed("Couldn't fill incomplete routes from Strava: \(Self.describeUpload(error)). "
+                                 + "MaxAct will try again next time it opens.")
+        }
+    }
+
+    /// Replaces each of `candidates`' stored routes that covers under half its workout with the
+    /// linked Strava activity's track, when that's longer. Returns how many were replaced.
+    @discardableResult
+    private func fillIncompleteRoutes(in candidates: [WorkoutListItem]) async throws -> Int {
+        var filled = 0
+        for item in candidates {
+            guard let activityID = item.stravaActivityID,
+                  let series = await seriesStore.loadIfAvailable(item.id),
+                  series.routeIsIncomplete(duration: item.workout.duration)
+            else { continue }
+            let route = try await strava.route(ofActivity: activityID)
+            guard let last = route.last, let first = route.first,
+                  last.timestamp.timeIntervalSince(first.timestamp) > series.routeSpan
+            else { continue }
+            try await seriesStore.save(series.replacingRoute(route))
+            await routeSketchCache?.invalidate([item.id])
+            thumbnails.delete(workoutID: item.id)
+            filled += 1
+        }
+        return filled
     }
 
     /// Once per library: workouts whose heart rate the workout export averaged into a few readings
@@ -895,6 +937,10 @@ final class AppModel {
                     try await store.upsert([detail], seriesStore: seriesStore)
                     // A re-download replaces the series; its cached digest would be stale.
                     await routeSketchCache?.invalidate([item.id])
+                    // A partial route comes back with every re-download; refill it from Strava.
+                    if isStravaConnected, detail.series.routeIsIncomplete(duration: item.workout.duration) {
+                        _ = try? await fillIncompleteRoutes(in: [item])
+                    }
                     fetched += 1
                 }
                 syncStatus = .running(

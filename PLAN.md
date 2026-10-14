@@ -3,7 +3,7 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**
 (HAE), with batch upload to Strava.
 
-**Status:** Phases 0–8 complete and checked by the user. Next: issue 18's check, then 19.
+**Status:** Phases 0–8 complete and checked by the user. Next: checks of 18 and 19, then 20.
 **Last updated:** 2026-10-14.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first: the HAE data
@@ -26,7 +26,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ## 1. Where things stand — 2026-10-12
 
-All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 335 in
+All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 338 in
 `MaxActCore` (`swift test`), 57 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~5 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** the user's check of issue 18 (re-download the 17 Workout-app workouts), then 19. Issue 7 (TrainingPeaks) starts with
+**Next:** the user's checks of issues 18 and 19, then 20 (missing descent). Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -59,9 +59,22 @@ app marks the stored sparse ones as needing detail (measured on a copy: exactly 
 **Download Detail** re-fetches them with the phone in front. **To check:** after that download, the
 Oct 8 run's heart-rate chart should be dense and its zones filled.
 
-**19. Thin routes on some Apple Workout-app recordings** *(open, not investigated)* — noticed while
-fixing 18: the Oct 8 2025 run has 58 GPS points over 30 minutes, the Oct 2 run 27, where a
-WorkOutDoors run has ~1 per second. Possibly the same kind of export loss; measure before assuming.
+**19. Partial routes on interval-style Apple Workout-app recordings.** *(fix built 2026-10-14,
+awaiting the user's check)* 3 runs (Oct 2, 5, 8 2025) had routes covering 0–17% of the workout
+(27 s of 48 min, 15 of 90 min, 57 s of 30 min); every other route covers ≥ 98%. Measured live:
+Health Auto Export's `get_workouts` sends only one piece of these routes — the Oct 8 piece starts
+3 s after the first of its 8 `activities` ends — and no HAE tool returns the rest. Strava has the
+full tracks. Fixed: a route covering under half its workout, on a workout linked to Strava, is
+replaced by the activity's `latlng`/`altitude`/`time`/`velocity_smooth` streams (2 read requests) —
+once for the stored ones when Strava is connected, and after any detail download. Checked live:
+Strava's tracks span 51/30/91 min, start at the workout's start, and match HAE's piece within 4 m
+at the same timestamp. Unlinked partial routes show "Route incomplete — Health Auto Export sent N
+of M" in the inspector. **To check:** open MaxAct (Strava connected); the three runs' maps, splits
+and moving pace should be whole.
+
+**20. Some workouts show no descent** *(open, reported 2026-10-14, not investigated)* — e.g. the
+Oct 12 2025 marathon. Check what the summary's `elevationDescendedMeters` holds and where the
+detail view takes descent from.
 
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.

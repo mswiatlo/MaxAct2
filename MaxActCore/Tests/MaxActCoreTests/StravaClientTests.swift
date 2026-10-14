@@ -391,3 +391,59 @@ private func client(_ transport: ScriptedTransport, _ secrets: MemorySecrets) ->
         #expect(await transport.paths().isEmpty)
     }
 }
+
+/// Issue 19: a route Health Auto Export sent only part of is filled from Strava's streams.
+@Suite struct StravaRouteTests {
+    @Test("an activity's streams become route points timed from its start, with altitude and speed")
+    func route() async throws {
+        let transport = ScriptedTransport([
+            json(200, ["id": 16107243443, "start_date": "2025-10-08T19:06:42Z"]),
+            json(200, [
+                "latlng": ["data": [[49.26, -123.14], [49.2601, -123.1402], [49.2603, -123.1405]]],
+                "time": ["data": [0, 1, 3]],
+                "altitude": ["data": [20.5, 21.0, 21.4]],
+                "velocity_smooth": ["data": [0, 2.9, 3.1]],
+            ]),
+        ])
+        let route = try await client(transport, MemorySecrets(tokens: freshTokens)).route(ofActivity: 16107243443)
+
+        #expect(route.count == 3)
+        let start = ISO8601DateFormatter().date(from: "2025-10-08T19:06:42Z")!
+        #expect(route.map(\.timestamp) == [start, start.addingTimeInterval(1), start.addingTimeInterval(3)])
+        #expect(route[2].coordinate.latitude == 49.2603 && route[2].coordinate.longitude == -123.1405)
+        #expect(route[1].altitudeMeters == 21.0 && route[1].speedMetersPerSecond == 2.9)
+        let requests = await transport.requests
+        #expect(requests.map(\.url.path) == ["/api/v3/activities/16107243443", "/api/v3/activities/16107243443/streams"])
+        let query = URLComponents(url: requests[1].url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        #expect(query.contains(URLQueryItem(name: "keys", value: "latlng,altitude,time,velocity_smooth")))
+        #expect(query.contains(URLQueryItem(name: "key_by_type", value: "true")))
+    }
+
+    @Test("an activity without GPS gives no route")
+    func noGPS() async throws {
+        let transport = ScriptedTransport([
+            json(200, ["id": 1, "start_date": "2025-10-08T19:06:42Z"]),
+            json(200, ["time": ["data": [0, 1]], "heartrate": ["data": [90, 91]]]),
+        ])
+        let route = try await client(transport, MemorySecrets(tokens: freshTokens)).route(ofActivity: 1)
+        #expect(route.isEmpty)
+    }
+}
+
+@Suite struct IncompleteRouteTests {
+    private func series(spanning seconds: Int) -> WorkoutSeries {
+        let t0 = Date(timeIntervalSince1970: 0)
+        return WorkoutSeries(workoutID: "W", route: (0...seconds).map {
+            RoutePoint(coordinate: Coordinate(latitude: 49, longitude: -123), timestamp: t0.addingTimeInterval(Double($0)))
+        })
+    }
+
+    @Test("a route covering under half the workout is incomplete; a full one, or none, isn't")
+    func coverage() {
+        #expect(series(spanning: 57).routeIsIncomplete(duration: 1824))       // the Oct 8 run
+        #expect(series(spanning: 900).routeIsIncomplete(duration: 5454))      // the Oct 5 run, 15 of 90 min
+        #expect(!series(spanning: 2640).routeIsIncomplete(duration: 2700))    // 98%, the lowest otherwise
+        #expect(!WorkoutSeries(workoutID: "W").routeIsIncomplete(duration: 1800), "no route isn't a partial one")
+        #expect(!series(spanning: 10).routeIsIncomplete(duration: 60), "too short to judge")
+    }
+}

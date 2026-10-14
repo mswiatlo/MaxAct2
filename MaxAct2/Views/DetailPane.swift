@@ -105,6 +105,9 @@ struct WorkoutDetailView: View {
 
                 if let series, !series.coordinates.isEmpty {
                     routeMap(series)
+                    if series.series.routeIsIncomplete(duration: workout.duration) {
+                        incompleteRouteNote(series.series)
+                    }
                 } else if workout.hasRoute && !item.hasDetail {
                     notDownloadedNotice
                 }
@@ -335,6 +338,25 @@ struct WorkoutDetailView: View {
             highlighted: $highlighted,
             timeDomain: series.timeDomain
         )
+    }
+
+    /// Health Auto Export sent only part of this route (issue 19). Linked workouts are filled from
+    /// Strava automatically, so this shows for the rest — or if that failed.
+    private func incompleteRouteNote(_ series: WorkoutSeries) -> some View {
+        let sent = Duration.seconds(series.routeSpan.rounded())
+            .formatted(.units(allowed: [.hours, .minutes, .seconds], width: .abbreviated, maximumUnitCount: 2))
+        let whole = Duration.seconds(workout.duration.rounded())
+            .formatted(.units(allowed: [.hours, .minutes], width: .abbreviated))
+        return Label {
+            Text(verbatim: "Route incomplete — Health Auto Export sent \(sent) of \(whole)."
+                 + (item.stravaActivityID == nil ? "" : " The Strava activity has all of it; MaxAct fills it in while Strava is connected."))
+        } icon: {
+            Image(systemName: "exclamationmark.triangle")
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("IncompleteRouteNote")
     }
 
     /// The same breakdown as the statistics' Heart-Rate Zones, for this one workout.

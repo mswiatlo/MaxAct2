@@ -260,6 +260,15 @@ the "no laps" note below was measured on WorkOutDoors workouts only.
 Python is blocked by macOS Local Network privacy and fails with "No route to host" even while
 `ping` and `curl` reach the phone; `swift test` (`LiveMCPTests`) works.
 
+### Interval-style Workout-app routes arrive partial *(measured 2026-10-14)*
+
+For Workout-app recordings with several `activities` (intervals), `get_workouts` with
+`includeRoutes` returned **one piece of the route** — 57 s of a 30-minute run, 26 s of 48 minutes,
+15 of 90 minutes — consistent with HealthKit holding several route samples and the export taking
+one. Narrowing the window doesn't help (it selects workouts). MaxAct fills these from Strava
+(`WorkoutSeries.routeIsIncomplete`, `StravaClient.route(ofActivity:)`); 415 other routes covered
+≥ 98% of their workouts.
+
 ## No laps or splits on the MCP path
 
 The workout object has **no lap, split, segment or interval data at all** — only swimming carries

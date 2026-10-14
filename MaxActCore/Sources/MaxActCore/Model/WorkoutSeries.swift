@@ -130,3 +130,26 @@ extension WorkoutSeries {
                       activeEnergyKilocalories: activeEnergyKilocalories, stepCount: stepCount)
     }
 }
+
+extension WorkoutSeries {
+    /// Whether the route covers under half the workout's duration — what Health Auto Export sends
+    /// for some interval-style Apple Workout-app recordings: one piece of a route stored in several
+    /// (measured: 57 s of a 30-minute run, and 27 s of 48 minutes, where Strava had all of it).
+    /// Every other route in the user's library covers at least 98%. `false` with no route at all.
+    public func routeIsIncomplete(duration: TimeInterval) -> Bool {
+        guard duration >= 120, let first = route.first, let last = route.last else { return false }
+        return last.timestamp.timeIntervalSince(first.timestamp) < duration / 2
+    }
+
+    /// How long the route spans, start to finish.
+    public var routeSpan: TimeInterval {
+        guard let first = route.first, let last = route.last else { return 0 }
+        return last.timestamp.timeIntervalSince(first.timestamp)
+    }
+
+    /// The same series with its route replaced.
+    public func replacingRoute(_ route: [RoutePoint]) -> WorkoutSeries {
+        WorkoutSeries(workoutID: workoutID, route: route, heartRate: heartRate, heartRateRecovery: heartRateRecovery,
+                      activeEnergyKilocalories: activeEnergyKilocalories, stepCount: stepCount)
+    }
+}

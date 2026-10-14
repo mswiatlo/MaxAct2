@@ -130,6 +130,12 @@ final class AppSettings {
         didSet { defaults.set(hasRepairedSparseHeartRate, forKey: "hasRepairedSparseHeartRate") }
     }
 
+    /// Whether stored routes Health Auto Export sent only part of have been filled from Strava
+    /// (issue 19). Set once a pass completes with Strava connected.
+    var hasFilledIncompleteRoutes: Bool {
+        didSet { defaults.set(hasFilledIncompleteRoutes, forKey: "hasFilledIncompleteRoutes") }
+    }
+
     /// Colour of route tracks on thumbnails and the detail map.
     var routeColor: RouteColor {
         didSet { defaults.set(routeColor.rawValue, forKey: "routeColor") }
@@ -148,6 +154,7 @@ final class AppSettings {
         sidebarSelectionKey = defaults.string(forKey: "sidebarSelection")
         tableSortKey = defaults.string(forKey: "tableSort")
         hasRepairedSparseHeartRate = defaults.bool(forKey: "hasRepairedSparseHeartRate")
+        hasFilledIncompleteRoutes = defaults.bool(forKey: "hasFilledIncompleteRoutes")
     }
 
     /// The address as actually parsed, or `nil` if it can't be. Shown in the UI so there is no

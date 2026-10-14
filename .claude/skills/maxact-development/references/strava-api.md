@@ -145,3 +145,12 @@ assumed to have it — it was made with Strava's defaults.
   (run its Strava check), then read only `accessToken` from the Keychain item
   `com.swiatlowski.MaxAct.strava` / `tokens` (a JSON object; macOS prompts — Allow once). Never
   refresh outside the app: it rotates the refresh token MaxAct holds.
+
+## Activity streams *(measured 2026-10-14)*
+
+`GET activities/{id}/streams?keys=latlng,altitude,time,velocity_smooth&key_by_type=true` — one read
+request — returns `{"latlng": {"data": [[lat, lon], …]}, "time": {"data": [seconds from start]}, …}`.
+For a Health-synced Workout-app run: 1,825 points at 1 s for 30 min, with `time` 0 at the HealthKit
+workout's start (`start_date` from `GET activities/{id}`, a second read). Keys an activity lacks are
+simply absent (no `latlng` without GPS). `StravaClient.route(ofActivity:)` builds route points from
+these, to fill routes Health Auto Export sent only part of (`hae-data-contract.md`).

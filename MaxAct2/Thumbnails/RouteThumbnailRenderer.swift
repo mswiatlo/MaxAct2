@@ -86,6 +86,15 @@ final class RouteThumbnailRenderer {
         return files.count
     }
 
+    /// Drops one workout's thumbnails, every size and appearance — for when its route changed.
+    func delete(workoutID: String) {
+        memory.removeAllObjects()   // NSCache can't be enumerated; it refills from disk quickly
+        let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+        for file in files where file.lastPathComponent.hasPrefix("\(workoutID)-") {
+            try? FileManager.default.removeItem(at: file)
+        }
+    }
+
     func totalBytes() -> Int {
         let files = (try? FileManager.default.contentsOfDirectory(
             at: directory, includingPropertiesForKeys: [.fileSizeKey]
