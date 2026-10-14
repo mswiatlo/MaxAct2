@@ -19,12 +19,19 @@ final class AppModel {
 
     // MARK: View state
 
-    var sidebarSelection: SidebarSelection? = .filter(.all)
+    /// Remembered between launches, as is `sortOrder` (Phase 8); restored in `init`. The search
+    /// and the selection are deliberately not — a relaunch starts with a clean slate there.
+    var sidebarSelection: SidebarSelection? = .filter(.all) {
+        didSet { settings.sidebarSelectionKey = sidebarSelection?.storageKey }
+    }
     var searchText = ""
     var selection: Set<String> = []
-    var sortOrder: [KeyPathComparator<WorkoutListItem>] = [
-        KeyPathComparator(\.workout.start, order: .reverse)
-    ]
+    var sortOrder: [KeyPathComparator<WorkoutListItem>] = TableSort.default {
+        didSet { settings.tableSortKey = TableSort.storageKey(for: sortOrder) }
+    }
+
+    /// Whether a restored sidebar choice has been checked against the loaded library yet.
+    private var hasCheckedRestoredSelection = false
 
     /// Whether the sync popover is showing. Held here rather than in the view so the menu-bar
     /// command can open it directly — it used to go through a `NotificationCenter` hop, which was
@@ -220,6 +227,8 @@ final class AppModel {
         self.seriesStore = seriesStore
         self.thumbnails = thumbnails
         self.settings = settings
+        sidebarSelection = SidebarSelection(storageKey: settings.sidebarSelectionKey) ?? .filter(.all)
+        sortOrder = TableSort.order(storageKey: settings.tableSortKey) ?? TableSort.default
         self.seedCount = seedCount
         self.resolvesPlaces = resolvesPlaces
         placeResolver = PlaceResolver(store: store)
@@ -373,12 +382,30 @@ final class AppModel {
             try await seedIfRequested()
             items = try await store.allItems()
             loadError = nil
+            checkRestoredSelection()
         } catch {
             loadError = "Could not load workouts: \(error.localizedDescription)"
         }
         resolvePlaces()
         await refreshStravaConnection()
         resumeStravaUploads()
+    }
+
+    /// A remembered activity or tag can be gone by the next launch — its last workout deleted or
+    /// untagged — and an empty list under a sidebar row that no longer exists would be baffling.
+    /// Checked once, after the first load: later in a session, emptying the row you're looking at
+    /// should leave you there.
+    private func checkRestoredSelection() {
+        guard !hasCheckedRestoredSelection else { return }
+        hasCheckedRestoredSelection = true
+        switch sidebarSelection {
+        case .kind(let key) where !presentKinds.contains(where: { $0.key == key }):
+            sidebarSelection = .filter(.all)
+        case .tag(let name) where !usedTags.contains(name):
+            sidebarSelection = .filter(.all)
+        default:
+            break
+        }
     }
 
     // MARK: Strava

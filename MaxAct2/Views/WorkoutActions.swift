@@ -92,6 +92,15 @@ final class AppSettings {
         didSet { defaults.set(muteStravaUploads, forKey: "muteStravaUploads") }
     }
 
+    /// The sidebar choice and table sort, remembered between launches (Phase 8). Stored here so
+    /// UI tests, which get a throwaway defaults domain, can never disturb the real ones.
+    var sidebarSelectionKey: String? {
+        didSet { defaults.set(sidebarSelectionKey, forKey: "sidebarSelection") }
+    }
+    var tableSortKey: String? {
+        didSet { defaults.set(tableSortKey, forKey: "tableSort") }
+    }
+
     /// Colour of route tracks on thumbnails and the detail map.
     var routeColor: RouteColor {
         didSet { defaults.set(routeColor.rawValue, forKey: "routeColor") }
@@ -103,6 +112,8 @@ final class AppSettings {
         token = defaults.string(forKey: "syncToken") ?? ""
         routeColor = RouteColor(storageKey: defaults.string(forKey: "routeColor"))
         muteStravaUploads = defaults.object(forKey: "muteStravaUploads") as? Bool ?? true
+        sidebarSelectionKey = defaults.string(forKey: "sidebarSelection")
+        tableSortKey = defaults.string(forKey: "tableSort")
     }
 
     /// The address as actually parsed, or `nil` if it can't be. Shown in the UI so there is no
