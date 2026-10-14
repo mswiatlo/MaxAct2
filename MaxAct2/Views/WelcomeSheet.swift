@@ -45,7 +45,7 @@ struct ConnectionFields: View {
                     .disabled(!settings.isConfigured || model.isCheckingConnection || model.syncStatus.isRunning)
                 if model.isCheckingConnection {
                     ProgressView().controlSize(.small)
-                    Text("Checking…").font(.caption).foregroundStyle(.secondary)
+                    Text(model.connectionProgress).font(.caption).foregroundStyle(.secondary)
                 }
             }
             if let check = model.connectionCheck, !model.isCheckingConnection {

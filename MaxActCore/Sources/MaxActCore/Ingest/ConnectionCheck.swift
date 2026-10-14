@@ -11,21 +11,50 @@ public enum ConnectionCheck: Equatable, Sendable {
     case connected(server: String, recentWorkouts: Int)
     case failed(SyncProblem)
 
-    /// How far back the test looks for workouts: long enough that an active person has some.
-    public static let lookback: TimeInterval = 14 * 86_400
+    /// How far back the test looks for workouts. A week, not two: listing is slow on the phone's
+    /// side — measured on a real one, 1 day took ~3 s, 7 days 11–16 s, 14 days 19–21 s — and the
+    /// week is enough to show workouts flowing for anyone active.
+    public static let lookback: TimeInterval = 7 * 86_400
 
-    /// A sync waits up to ten minutes for a slow reply; a test that hung that long on a phone
-    /// that isn't there would defeat the point.
-    public static let timeout: TimeInterval = 15
+    /// The handshake's deadline: it answers in 0.05–0.6 s (measured), so an absent phone is
+    /// reported within seconds.
+    public static let connectDeadline: TimeInterval = 10
 
-    public static func run(_ source: HAEWorkoutSource, now: Date = .now) async -> ConnectionCheck {
+    /// The per-request timeout for the source the check runs on, covering the slow listing. A
+    /// single 15 s limit for everything, as first built, cut off a healthy phone mid-listing.
+    public static let requestTimeout: TimeInterval = 90
+
+    /// - Parameter onConnected: called with the server's name once the handshake succeeds, so the
+    ///   UI can say what it's waiting for during the listing.
+    public static func run(
+        _ source: HAEWorkoutSource, now: Date = .now, connectDeadline: TimeInterval = connectDeadline,
+        onConnected: @Sendable (String) async -> Void = { _ in }
+    ) async -> ConnectionCheck {
         do {
-            let info = try await source.connect()
+            let info = try await withDeadline(connectDeadline) { try await source.connect() }
+            let server = "\(info.name) \(info.version)"
+            await onConnected(server)
             let result = try await source.listWorkouts(in: SyncWindow(start: now.addingTimeInterval(-lookback), end: now))
-            return .connected(server: "\(info.name) \(info.version)",
-                              recentWorkouts: result.workouts.count + result.failures.count)
+            return .connected(server: server, recentWorkouts: result.workouts.count + result.failures.count)
         } catch {
             return .failed(SyncProblem(error: error))
+        }
+    }
+
+    /// Runs `operation`, failing with `URLError(.timedOut)` — what an unanswered request reports —
+    /// if it takes longer than `seconds`. The loser is cancelled, which cancels its request.
+    static func withDeadline<T: Sendable>(
+        _ seconds: TimeInterval, _ operation: @escaping @Sendable () async throws -> T
+    ) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask { try await operation() }
+            group.addTask {
+                try await Task.sleep(for: .seconds(seconds))
+                throw URLError(.timedOut)
+            }
+            defer { group.cancelAll() }
+            guard let first = try await group.next() else { throw URLError(.timedOut) }
+            return first
         }
     }
 
@@ -33,10 +62,10 @@ public enum ConnectionCheck: Equatable, Sendable {
     public var summary: String {
         switch self {
         case .connected(let server, 0):
-            "Connected to \(server), but it found no workouts in the last two weeks. "
+            "Connected to \(server), but it found no workouts in the last week. "
                 + SyncProblem.nothingReturned.advice
         case .connected(let server, let count):
-            "Connected to \(server) — \(count) workout\(count == 1 ? "" : "s") in the last two weeks."
+            "Connected to \(server) — \(count) workout\(count == 1 ? "" : "s") in the last week."
         case .failed(let problem):
             problem.message
         }

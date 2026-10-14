@@ -45,16 +45,24 @@ final class AppModel {
     /// The last Test Connection result, and whether one is running.
     private(set) var connectionCheck: ConnectionCheck?
     private(set) var isCheckingConnection = false
+    /// What a running check is waiting for — the listing takes a while on a healthy phone.
+    private(set) var connectionProgress = "" 
 
-    /// Checks the phone, the token, and that workouts come back — with a short timeout, so an
-    /// absent phone answers in seconds rather than a sync's ten minutes. Not while a sync runs:
-    /// Health Auto Export serves one client at a time.
+    /// Checks the phone, the token, and that workouts come back. The handshake has a short
+    /// deadline, so an absent phone answers in seconds; the listing that follows is slow on a
+    /// healthy phone and gets longer (see `ConnectionCheck`). Not while a sync runs: Health Auto
+    /// Export serves one client at a time.
     func checkConnection() async {
         guard !isCheckingConnection, !syncStatus.isRunning,
-              let source = settings.makeSource(timeout: ConnectionCheck.timeout) else { return }
+              let source = settings.makeSource(timeout: ConnectionCheck.requestTimeout) else { return }
         isCheckingConnection = true
         connectionCheck = nil
-        connectionCheck = await ConnectionCheck.run(source)
+        connectionProgress = "Connecting…"
+        connectionCheck = await ConnectionCheck.run(source) { server in
+            await MainActor.run {
+                self.connectionProgress = "Connected to \(server) — reading the last week's workouts…"
+            }
+        }
         isCheckingConnection = false
     }
 

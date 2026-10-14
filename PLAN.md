@@ -26,7 +26,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ## 1. Where things stand — 2026-10-12
 
-All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 303 in
+All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 304 in
 `MaxActCore` (`swift test`), 52 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~5 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
@@ -155,9 +155,11 @@ choice and sort (not the selection or search).
 - **Welcome sheet** on a first launch with nothing configured (never to existing users), and from
   Help ▸ Getting Started with MaxAct…: what's needed (HAE Premium, same Wi-Fi), where the address and
   token come from, the fields, **Test Connection**, and how long a year's sync takes.
-- **Test Connection** (welcome sheet and sync panel): handshake, tool list and a two-week listing
-  with a 15 s timeout; reports the recent-workout count, so "connected, but Health isn't sharing
-  workouts" shows up before a long sync.
+- **Test Connection** (welcome sheet and sync panel): handshake and tool list under a 10 s
+  deadline (they take ≤0.6 s on a real phone), then a one-week listing with up to 90 s and a
+  progress line (it takes 11–16 s); reports the recent-workout count, so "connected, but Health
+  isn't sharing workouts" shows up before a long sync. The first version's single 15 s limit cut
+  off a healthy phone mid-listing — the user saw HAE answer just after.
 - **Sync errors name their cause** (`SyncProblem`): server not running (refused) vs phone
   unreachable (time-out, unknown host) vs token rejected vs server error vs unexpected reply —
   mapping measured. A sync that returns nothing warns and points at Health ▸ Sharing ▸ Apps;

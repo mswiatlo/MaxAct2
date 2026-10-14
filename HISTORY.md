@@ -1028,6 +1028,13 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-14** — **Test Connection timeout fixed.** The user saw HAE's log answer a few seconds
+  after MaxAct declared a connection problem. Measured on the real phone: handshake 0.05–0.6 s;
+  listing 1 day ~3 s, 7 days 11–16 s, 14 days 19–21 s — past the single 15 s limit, which was a
+  guess (only the *absent*-phone case had been measured). Now the handshake alone has a 10 s
+  deadline, the listing gets 90 s with a progress line, and the lookback is one week. Live check
+  after the fix: success in 11.5 s, 5 workouts. New test for a slow listing; mutation-checked.
+
 - **2026-10-14** — **Phase 8 built.** Surveyed first: much existed (a one-screen setup guide, a
   token-vs-network split), but every empty filter said "No Results for ''", an empty sync said "No
   new workouts", unreadable workouts vanished, raw errors leaked ("MCP error -32600"), load errors

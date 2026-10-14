@@ -403,3 +403,16 @@ it, which is the substantive argument against relying on `.hae` alone.
 Not an automation, and the only path with no 30-second window and no foreground requirement. JSON
 (one file, all types) plus optional per-workout GPX route files, any date range, shared out via the
 Files app. This is how years of history get imported in one pass, whichever live path wins.
+
+## Response times *(measured 2026-10-14, real phone, HAE 1.1.0, foreground)*
+
+| Request | Time |
+|---|---|
+| `initialize` + `tools/list` | 0.05–0.6 s |
+| `get_workouts`, 1 day, no routes | ~3 s |
+| `get_workouts`, 7 days, no routes | 11–16 s |
+| `get_workouts`, 14 days, no routes | 19–21 s |
+
+Listing time grows with the span, not just the workout count. Interactive features must budget for
+it: a check that put one short timeout over the whole exchange reported a healthy phone as
+unreachable. Time the handshake separately from the listing.
