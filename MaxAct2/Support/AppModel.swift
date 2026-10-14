@@ -640,6 +640,7 @@ final class AppModel {
     func startStravaCheck() {
         guard !syncStatus.isRunning, isStravaConnected, !items.isEmpty else { return }
         let workouts = items.map(\.workout)
+        let linkedBefore = Set(items.filter { $0.stravaActivityID != nil }.map(\.id))
         syncTask = Task {
             syncStatus = .running(.checkingStrava, completed: 0, total: 1, found: 0)
             do {
@@ -647,6 +648,11 @@ final class AppModel {
                 // overwriting them with Strava's stale value.
                 _ = await sendPendingStravaFlags()
                 let result = try await markWorkoutsAlreadyOnStrava(workouts)
+                // Newly linked workouts may have a route Health Auto Export sent only part of
+                // (issue 19); the activity just found has all of it.
+                await refreshItems()
+                let newlyLinked = items.filter { $0.stravaActivityID != nil && !linkedBefore.contains($0.id) }
+                if try await fillIncompleteRoutes(in: newlyLinked) > 0 { await refreshItems() }
                 syncStatus = .checkedStrava(result)
             } catch let error as StravaError {
                 syncStatus = .failed(error.description)

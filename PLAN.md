@@ -3,7 +3,7 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**
 (HAE), with batch upload to Strava.
 
-**Status:** Phases 0–8 complete and checked by the user. Next: checks of 18 and 19, then 20.
+**Status:** Phases 0–8 complete and checked by the user. Next: issue 20 (missing descent).
 **Last updated:** 2026-10-14.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first: the HAE data
@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** the user's checks of issues 18 and 19, then 20 (missing descent). Issue 7 (TrainingPeaks) starts with
+**Next:** ⌥⌘U to link and fill the 9 September runs (issue 19's fill), then 20 (missing descent). Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -43,34 +43,15 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–17 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–19 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
-**18. Sparse heart rate on Apple Workout-app recordings.** *(fix built 2026-10-14, awaiting the
-user's check)* 17 workouts (1–21 Oct 2025, all recorded by the watch's Workout app, "MaxWatch7")
-had 2–22 heart-rate readings — one per ~10 minutes — where Strava has 1 s. Measured live: Health
-Auto Export's `get_workouts` averages the Workout app's heart-rate series samples (~10-minute
-chunks) into one reading each; `get_health_metrics` (`heart_rate`, `aggregate: true`,
-`interval: "seconds"`) has every reading (353 at 5 s for the Oct 8 run, 83–169 bpm, matching its
-summary). WorkOutDoors stores readings individually, so its 400 workouts were never affected.
-Fixed: a detail download whose heart rate is under one reading a minute fetches it from
-`get_health_metrics` instead (one extra ~1 s query, only for such workouts). On first launch the
-app marks the stored sparse ones as needing detail (measured on a copy: exactly the 17), so
-**Download Detail** re-fetches them with the phone in front. **To check:** after that download, the
-Oct 8 run's heart-rate chart should be dense and its zones filled.
-
-**19. Partial routes on interval-style Apple Workout-app recordings.** *(fix built 2026-10-14,
-awaiting the user's check)* 3 runs (Oct 2, 5, 8 2025) had routes covering 0–17% of the workout
-(27 s of 48 min, 15 of 90 min, 57 s of 30 min); every other route covers ≥ 98%. Measured live:
-Health Auto Export's `get_workouts` sends only one piece of these routes — the Oct 8 piece starts
-3 s after the first of its 8 `activities` ends — and no HAE tool returns the rest. Strava has the
-full tracks. Fixed: a route covering under half its workout, on a workout linked to Strava, is
-replaced by the activity's `latlng`/`altitude`/`time`/`velocity_smooth` streams (2 read requests) —
-once for the stored ones when Strava is connected, and after any detail download. Checked live:
-Strava's tracks span 51/30/91 min, start at the workout's start, and match HAE's piece within 4 m
-at the same timestamp. Unlinked partial routes show "Route incomplete — Health Auto Export sent N
-of M" in the inspector. **To check:** open MaxAct (Strava connected); the three runs' maps, splits
-and moving pace should be whole.
+**21. Health Auto Export bug report** *(drafted 2026-10-14; the user is posting it)* — two export
+defects behind 18 and 19, on every HAE path (MCP, manual JSON and GPX): Workout-app heart rate comes
+as one average per series sample, and interval workouts' routes as one interval's piece (the Sept
+17 2025 run: interval 3 of 28, 27 s of 42 min — identical in the manual GPX/JSON export). Until
+HAE fixes it, MaxAct fills heart rate from `get_health_metrics` and routes from Strava. If HAE
+ships a fix, re-download the affected workouts and consider retiring the Strava route fallback.
 
 **20. Some workouts show no descent** *(open, reported 2026-10-14, not investigated)* — e.g. the
 Oct 12 2025 marathon. Check what the summary's `elevationDescendedMeters` holds and where the

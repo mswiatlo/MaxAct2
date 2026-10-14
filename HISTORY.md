@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed or closed known issues (1–17)
+## 2. Fixed or closed known issues (1–19)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -458,6 +458,37 @@ The HealthFit-style analyses left out of issue 8's first cut, as separate pieces
   squares (zoom-14 tiles, counted from the full routes) as a total and per place, with an optional
   overlay. Sketches are built once (all 418 routes: ~9 s) and cached beside the series. Checked on
   a copy of the real library: 83 squares, 32 in Vancouver.
+
+**18. ~~Sparse heart rate on Apple Workout-app recordings.~~ — done 2026-10-14, confirmed by the user.** 17 workouts (1–21 Oct 2025, all recorded by the watch's Workout app, "MaxWatch7")
+had 2–22 heart-rate readings — one per ~10 minutes — where Strava has 1 s. Measured live: Health
+Auto Export's `get_workouts` averages the Workout app's heart-rate series samples (~10-minute
+chunks) into one reading each; `get_health_metrics` (`heart_rate`, `aggregate: true`,
+`interval: "seconds"`) has every reading (353 at 5 s for the Oct 8 run, 83–169 bpm, matching its
+summary). WorkOutDoors stores readings individually, so its 400 workouts were never affected.
+Fixed: a detail download whose heart rate is under one reading a minute fetches it from
+`get_health_metrics` instead (one extra ~1 s query, only for such workouts). On first launch the
+app marks the stored sparse ones as needing detail (measured on a copy: exactly the 17), so
+**Download Detail** re-fetches them with the phone in front. **To check:** after that download, the
+Oct 8 run's heart-rate chart should be dense and its zones filled.
+
+**19. ~~Partial routes on interval-style Apple Workout-app recordings.~~ — done 2026-10-14, confirmed by the user.** 3 runs (Oct 2, 5, 8 2025) had routes covering 0–17% of the workout
+(27 s of 48 min, 15 of 90 min, 57 s of 30 min); every other route covers ≥ 98%. Measured live:
+Health Auto Export's `get_workouts` sends only one piece of these routes — the Oct 8 piece starts
+3 s after the first of its 8 `activities` ends — and no HAE tool returns the rest. Strava has the
+full tracks. Fixed: a route covering under half its workout, on a workout linked to Strava, is
+replaced by the activity's `latlng`/`altitude`/`time`/`velocity_smooth` streams (2 read requests) —
+once for the stored ones when Strava is connected, and after any detail download. Checked live:
+Strava's tracks span 51/30/91 min, start at the workout's start, and match HAE's piece within 4 m
+at the same timestamp. Unlinked partial routes show "Route incomplete — Health Auto Export sent N
+of M" in the inspector. **To check:** open MaxAct (Strava connected); the three runs' maps, splits
+and moving pace should be whole.
+
+Follow-up the same day: 9 more partial routes in September 2025 (after the library grew to 464).
+Every HAE path returns the same single piece — MCP at any aggregation, with or without metadata, a
+whole-day window (no neighbouring workouts to stitch), and HAE's manual JSON and GPX export (28
+points, 17:45:13–17:45:40, exactly interval 3 of the run's 28). All 9 are on Strava (with maps) but
+weren't linked, since no Strava check had run since September was imported; the Strava check now
+fills partial routes on workouts it newly links. Reported to HAE as issue 21.
 
 **16. ~~Mark races on Strava.~~ — done 2026-10-14, confirmed by the user.**
 
@@ -1085,6 +1116,12 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-14** — **Issues 18 and 19 closed**, confirmed by the user. The user found a partial
+  route on 17 Sep 2025 and asked whether HAE could supply the rest. Measured: no — every
+  `get_workouts` variant and HAE's manual GPX/JSON export give the same one-interval piece; 9
+  September Workout-app runs are partial, all on Strava but unlinked. The Strava check now fills
+  partial routes for workouts it newly links. Drafted the HAE bug report (issue 21).
 
 - **2026-10-14** — **Issue 19 fixed (partial Workout-app routes); issue 20 noted** (no descent on
   some workouts, e.g. the Oct 12 2025 marathon). Measured on a copy: 3 routes cover 0–17% of their

@@ -268,6 +268,10 @@ For Workout-app recordings with several `activities` (intervals), `get_workouts`
 one. Narrowing the window doesn't help (it selects workouts). MaxAct fills these from Strava
 (`WorkoutSeries.routeIsIncomplete`, `StravaClient.route(ofActivity:)`); 415 other routes covered
 ≥ 98% of their workouts.
+Checked 2026-10-14 on a 28-interval run: the piece is exactly one interval (the third); every
+`get_workouts` variant (aggregation, metadata on/off, a whole-day window) and **HAE's manual JSON
+and GPX export** return the same 28 points. A window inside the workout returns nothing (windows
+select workouts by start). There is no HAE path to the rest; reported to the developer.
 
 ## No laps or splits on the MCP path
 
