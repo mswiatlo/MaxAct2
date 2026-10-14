@@ -92,6 +92,11 @@ final class AppSettings {
         didSet { defaults.set(muteStravaUploads, forKey: "muteStravaUploads") }
     }
 
+    /// Whether the welcome sheet has been seen (or dismissed). Set on its first close.
+    var hasSeenWelcome: Bool {
+        didSet { defaults.set(hasSeenWelcome, forKey: "hasSeenWelcome") }
+    }
+
     /// The sidebar choice and table sort, remembered between launches (Phase 8). Stored here so
     /// UI tests, which get a throwaway defaults domain, can never disturb the real ones.
     var sidebarSelectionKey: String? {
@@ -112,6 +117,7 @@ final class AppSettings {
         token = defaults.string(forKey: "syncToken") ?? ""
         routeColor = RouteColor(storageKey: defaults.string(forKey: "routeColor"))
         muteStravaUploads = defaults.object(forKey: "muteStravaUploads") as? Bool ?? true
+        hasSeenWelcome = defaults.bool(forKey: "hasSeenWelcome")
         sidebarSelectionKey = defaults.string(forKey: "sidebarSelection")
         tableSortKey = defaults.string(forKey: "tableSort")
     }
@@ -124,9 +130,10 @@ final class AppSettings {
         endpoint != nil && !token.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
-    func makeSource() -> HAEWorkoutSource? {
+    func makeSource(timeout: TimeInterval = 600) -> HAEWorkoutSource? {
         guard let endpoint, !token.isEmpty else { return nil }
-        return HAEWorkoutSource(endpoint: endpoint, token: token.trimmingCharacters(in: .whitespaces))
+        return HAEWorkoutSource(endpoint: endpoint, token: token.trimmingCharacters(in: .whitespaces),
+                                timeout: timeout)
     }
 }
 

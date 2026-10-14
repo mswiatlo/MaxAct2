@@ -322,6 +322,45 @@ final class MaxAct2UITests: XCTestCase {
         )
     }
 
+    /// Phase 8: a first launch with nothing configured opens the welcome sheet, whose Test
+    /// Connection names the problem — here, this Mac, where no server is running.
+    @MainActor
+    func testTheWelcomeSheetGuidesAFirstLaunchAndTestsTheConnection() throws {
+        let app = launchMaxAct(extraArguments: ["--ui-testing-welcome"])
+        let sheet = app.sheets.firstMatch
+        XCTAssertTrue(sheet.waitForExistence(timeout: 10), "A first launch should show the welcome sheet.")
+        XCTAssertTrue(sheet.staticTexts["Welcome to MaxAct"].exists)
+
+        let test = sheet.buttons["Test Connection"]
+        XCTAssertFalse(test.isEnabled, "Nothing to test until an address and token are entered.")
+        let address = sheet.textFields.element(boundBy: 0)
+        address.click()
+        address.typeText("127.0.0.1")
+        let token = sheet.textFields.element(boundBy: 1)
+        token.click()
+        token.typeText("irrelevant")
+        XCTAssertTrue(test.isEnabled)
+        test.click()
+
+        let result = sheet.staticTexts["ConnectionCheckResult"]
+        XCTAssertTrue(result.waitForExistence(timeout: 20), "Test Connection should report a result.")
+        XCTAssertTrue((result.value as? String ?? "").contains("server isn't running"),
+                      "Got '\(result.value ?? "")'.")
+
+        sheet.buttons["Later"].click()
+        XCTAssertTrue(sheet.waitForNonExistence(timeout: 5))
+    }
+
+    /// Phase 8: Help ▸ Getting Started reopens the welcome sheet at any time.
+    @MainActor
+    func testHelpReopensTheWelcomeSheet() throws {
+        let app = launchApp()
+        XCTAssertFalse(app.sheets.firstMatch.exists, "UI tests don't get the welcome sheet unasked.")
+        app.menuBars.menuBarItems["Help"].click()
+        app.menuItems["Getting Started with MaxAct…"].click()
+        XCTAssertTrue(app.sheets.firstMatch.staticTexts["Welcome to MaxAct"].waitForExistence(timeout: 5))
+    }
+
     /// Phase 8: a refused connection names its cause.
     @MainActor
     func testARefusedConnectionSaysTheServerIsntRunning() throws {

@@ -39,6 +39,14 @@ struct MaxActApp: App {
     /// as a file to open, and that request — for a document this app can't open, in an app with no
     /// `DocumentGroup` — suppresses `WindowGroup`'s window. `App.body` runs; its content closure
     /// never does. Joining the value into one token leaves nothing stray.
+    /// Whether a first launch shows the welcome sheet by itself. Not under UI tests — every test
+    /// launches with fresh settings, and a sheet over the window would block them all — unless a
+    /// test asks for it with `--ui-testing-welcome`.
+    static var showsWelcomeOnFirstLaunch: Bool {
+        let arguments = ProcessInfo.processInfo.arguments
+        return !arguments.contains("--ui-testing") || arguments.contains("--ui-testing-welcome")
+    }
+
     static var uiTestingSeedCount: Int? {
         let prefix = "--ui-testing-seed="
         guard let argument = ProcessInfo.processInfo.arguments
@@ -164,6 +172,10 @@ struct MaxActApp: App {
             // View ▸ Show/Hide Inspector with its standard shortcut. The detail pane starts
             // hidden, so there has to be a way to open it that isn't "select something".
             InspectorToggleCommand(model: model)
+            // Replaces the system Help item, which only says help isn't available.
+            CommandGroup(replacing: .help) {
+                Button("Getting Started with MaxAct…") { model.isWelcomePresented = true }
+            }
         }
 
         Settings {

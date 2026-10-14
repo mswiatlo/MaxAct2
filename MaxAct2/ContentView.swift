@@ -91,7 +91,17 @@ struct ContentView: View {
 
         .toolbar { toolbarContent }
         .safeAreaInset(edge: .bottom) { syncBanner }
-        .task { await model.load() }
+        .task {
+            // A first launch with nothing set up: say what MaxAct needs before anything else. Not
+            // shown to anyone already configured, so an update doesn't greet existing users.
+            if MaxActApp.showsWelcomeOnFirstLaunch && !settings.hasSeenWelcome && !settings.isConfigured {
+                model.isWelcomePresented = true
+            }
+            await model.load()
+        }
+        .sheet(isPresented: $model.isWelcomePresented, onDismiss: { settings.hasSeenWelcome = true }) {
+            WelcomeSheet(model: model)
+        }
     }
 
     /// The window's real inspector, **kept shut while Statistics is showing** (issue 8a). Beside

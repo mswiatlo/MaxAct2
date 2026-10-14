@@ -38,6 +38,30 @@ final class AppModel {
     /// indirection with no benefit and one more thing that could silently not fire.
     var isSyncPanelPresented = false
 
+    /// The welcome sheet (Phase 8): shown on a first launch with nothing configured, and from
+    /// Help ▸ Getting Started.
+    var isWelcomePresented = false
+
+    /// The last Test Connection result, and whether one is running.
+    private(set) var connectionCheck: ConnectionCheck?
+    private(set) var isCheckingConnection = false
+
+    /// Checks the phone, the token, and that workouts come back — with a short timeout, so an
+    /// absent phone answers in seconds rather than a sync's ten minutes. Not while a sync runs:
+    /// Health Auto Export serves one client at a time.
+    func checkConnection() async {
+        guard !isCheckingConnection, !syncStatus.isRunning,
+              let source = settings.makeSource(timeout: ConnectionCheck.timeout) else { return }
+        isCheckingConnection = true
+        connectionCheck = nil
+        connectionCheck = await ConnectionCheck.run(source)
+        isCheckingConnection = false
+    }
+
+    func clearConnectionCheck() {
+        if !isCheckingConnection { connectionCheck = nil }
+    }
+
     /// The selection a "New Tag…" prompt will apply to, while it's showing.
     var newTagTargets: Set<String>?
 

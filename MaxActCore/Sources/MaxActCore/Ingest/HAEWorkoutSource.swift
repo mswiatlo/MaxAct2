@@ -26,8 +26,8 @@ public struct HAEWorkoutSource: WorkoutSource {
         self.toolName = toolName
     }
 
-    public init(endpoint: MCPEndpoint, token: String?) {
-        self.init(client: MCPClient(endpoint: endpoint, token: token))
+    public init(endpoint: MCPEndpoint, token: String?, timeout: TimeInterval = 600) {
+        self.init(client: MCPClient(endpoint: endpoint, token: token, timeout: timeout))
     }
 
     /// Convenience for anything holding raw user input. `nil` when the text can't be parsed —

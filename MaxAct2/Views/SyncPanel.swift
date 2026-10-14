@@ -79,7 +79,7 @@ struct SyncPanel: View {
             if model.syncStatus.isRunning {
                 running
             } else {
-                connection(host: $settings.host, token: $settings.token)
+                connection
                 Divider()
                 importControls(isReady: model.settings.isConfigured)
                 Divider()
@@ -93,7 +93,7 @@ struct SyncPanel: View {
     // MARK: - Connection
 
     @ViewBuilder
-    private func connection(host: Binding<String>, token: Binding<String>) -> some View {
+    private var connection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("In Health Auto Export on your iPhone, open the **Server** screen and start the "
                  + "server. Copy the address and token it shows. The IP alone is enough — "
@@ -102,49 +102,8 @@ struct SyncPanel: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            LabeledContent("iPhone address") {
-                // No placeholder that looks like a real value: the previous prompt read
-                // "10.0.0.158", which is indistinguishable from a filled-in field at a glance,
-                // so the host stayed empty and nothing said so.
-                TextField("", text: host, prompt: Text("required"))
-                    .textFieldStyle(.roundedBorder)
-            }
-
-            // Shows exactly what will be contacted. Whether to include the scheme, port and path
-            // was genuinely ambiguous — all four forms are accepted, and echoing the resolved URL
-            // answers the question better than any amount of instruction text.
-            if let endpoint = model.settings.endpoint {
-                Label("Connects to \(endpoint.description)", systemImage: "checkmark.circle")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-            }
-            LabeledContent("Token") {
-                TextField("", text: token, prompt: Text("required"))
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(.body, design: .monospaced))
-            }
-
-            if let missing = missingFieldDescription {
-                Label(missing, systemImage: "exclamationmark.circle")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-            }
+            ConnectionFields(model: model)
         }
-    }
-
-    private var missingFieldDescription: String? {
-        let host = model.settings.host.trimmingCharacters(in: .whitespaces)
-        let token = model.settings.token.trimmingCharacters(in: .whitespaces)
-        if host.isEmpty && token.isEmpty {
-            return "Enter the address and token shown on the Server screen."
-        }
-        if host.isEmpty { return "The iPhone address is still empty." }
-        if MCPEndpoint(host) == nil {
-            return "That address can't be read. Try just the IP, like 10.0.0.158."
-        }
-        if token.isEmpty { return "The token is still empty." }
-        return nil
     }
 
     // MARK: - Import
