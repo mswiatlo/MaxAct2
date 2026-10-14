@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** the user's check of 16 and 17, then the rest of 15 (HR zones, route heat map). Issue 7 (TrainingPeaks) starts with
+**Next:** the rest of 15 (HR zones, route heat map). Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -43,7 +43,7 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–14 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–14, 16 and 17 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
 **15. Deeper statistics.** *(deferred from issue 8; training load built)*
@@ -60,23 +60,6 @@ The HealthFit-style analyses left out of issue 8's first cut, as separate pieces
   whose detail has been downloaded; say how many weren't counted.
 - **Route heat map** — every route on one map, plus an Explorer-style count of map tiles visited.
   Also needs downloaded detail.
-
-**16. Mark races on Strava.** *(built 2026-10-14, awaiting the user's check)*
-Measured on the user's account: Strava's "Race" is `workout_type` — a race run reads 1, an ordinary
-run 0, a walk has none — and `PUT activities/{id}` with `workout_type: 1` set it on the April 26,
-2026 run (read back as 1, shown as Race on Strava). Built: a **Race** tag, Strava-backed like
-Commute and Trainer, for runs (1) and rides (11 — Strava's documented value, not yet seen live);
-on other sports it stays Mac-only. Sent in the post-upload `PUT`; tag edits push it; the Strava
-check mirrors it back (so already-raced activities gain the tag). Removing the tag only clears a
-race — a Long Run or Workout set on Strava is left alone (one read to check). 8 new package tests,
-mutation-checked.
-
-**17. Import a specific month.** *(built 2026-10-14, awaiting the user's check — enables 16)*
-The sync panel's Import menu has "A specific month…", with Month and Year pickers back seven years,
-the estimate for that month, and no way to pick one that hasn't started. `SyncPlanner.month(_:of:)`
-gives the month's local span (ending now for the current month); 3 package tests, including a DST
-month. Labelling its pickers for VoiceOver also fixed the existing Import menu, which had no
-accessible name.
 
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.

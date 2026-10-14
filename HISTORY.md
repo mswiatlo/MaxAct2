@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed or closed known issues (1–14)
+## 2. Fixed or closed known issues (1–14, 16, 17)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -431,6 +431,25 @@ website's internal API (`tpapi.trainingpeaks.com`) with a copied browser session
 unsupported, breaks without notice and may breach the terms, so it was ruled out. The fallback the
 plan proposed — an Export TCX… command for manual upload — was offered and declined; nothing was
 built. Revisit only if TrainingPeaks opens personal access.
+
+**16. ~~Mark races on Strava.~~ — done 2026-10-14, confirmed by the user.**
+
+Measured on the user's account: Strava's "Race" is `workout_type` — a race run reads 1, an ordinary
+run 0, a walk has none — and `PUT activities/{id}` with `workout_type: 1` set it on the April 26,
+2026 run (read back as 1, shown as Race on Strava). Built: a **Race** tag, Strava-backed like
+Commute and Trainer, for runs (1) and rides (11 — Strava's documented value, not yet seen live);
+on other sports it stays Mac-only. Sent in the post-upload `PUT`; tag edits push it; the Strava
+check mirrors it back (so already-raced activities gain the tag). Removing the tag only clears a
+race — a Long Run or Workout set on Strava is left alone (one read to check). 8 new package tests,
+mutation-checked.
+
+**17. ~~Import a specific month.~~ — done 2026-10-14, confirmed by the user.**
+
+The sync panel's Import menu has "A specific month…", with Month and Year pickers back seven years,
+the estimate for that month, and no way to pick one that hasn't started. `SyncPlanner.month(_:of:)`
+gives the month's local span (ending now for the current month); 3 package tests, including a DST
+month. Labelling its pickers for VoiceOver also fixed the existing Import menu, which had no
+accessible name.
 
 ---
 
@@ -1039,6 +1058,9 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-14** — **Issues 16 and 17 closed**, confirmed by the user (Race tag round-trips with
+  Strava; specific-month import works). Back to issue 15.
 
 - **2026-10-14** — **Issue 16 built: Race tag mirrored to Strava.** Read-only first: the 2025-10-12
   marathon reads `workout_type` 1, the day-before run 0, a walk null. Then, with the user's go-ahead,
