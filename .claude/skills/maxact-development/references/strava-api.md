@@ -132,3 +132,16 @@ page lets the user untick "View data about your private activities", and without
 activities are hidden from the listing (and presumably from direct lookup), so a private ride
 would be indistinguishable from a deleted one. The existing connection predates this check and is
 assumed to have it — it was made with Strava's defaults.
+
+## Race: `workout_type` *(measured 2026-10-14)*
+
+- On the user's account: a race run (2025-10-12 marathon) reads `workout_type` **1**; an ordinary
+  run **0**; a walk **null**. An activity freshly uploaded as TCX reads null.
+- `PUT /activities/{id}` with `{"workout_type": 1}` and the `activity:write` scope **works**: it
+  returned 1 and read back 1, and Strava's site showed the run as a Race.
+- Documented but unseen live: rides use 10 (default), **11 (race)**, 12 (workout); runs also 2 (long
+  run) and 3 (workout). MaxAct never overwrites those except to clear a race.
+- To test against the live API without breaking MaxAct's connection: have MaxAct refresh the token
+  (run its Strava check), then read only `accessToken` from the Keychain item
+  `com.swiatlowski.MaxAct.strava` / `tokens` (a JSON object; macOS prompts — Allow once). Never
+  refresh outside the app: it rotates the refresh token MaxAct holds.

@@ -146,19 +146,63 @@ extension ActivityKind {
     }
 }
 
-/// The two activity flags Strava exposes, and the only tags that travel to it.
+/// The activity flags Strava exposes, and the only tags that travel to it.
 public struct StravaFlags: Sendable, Equatable {
     public var commute: Bool
     public var trainer: Bool
+    /// Whether it's a race. `nil` from Strava when the sport has no workout type (a walk), so
+    /// reading Strava never removes a Race tag it can't express.
+    public var race: Bool?
 
-    public init(commute: Bool, trainer: Bool) {
+    public init(commute: Bool, trainer: Bool, race: Bool? = nil) {
         self.commute = commute
         self.trainer = trainer
+        self.race = race
     }
 
     public init(tags: [String]) {
         commute = tags.contains(WorkoutTag.commute)
         trainer = tags.contains(WorkoutTag.trainer)
+        race = tags.contains(WorkoutTag.race)
+    }
+}
+
+/// Strava's "Race" workout type (issue 16).
+///
+/// Measured 2026-10-14 on the user's account: a race run reads `workout_type` 1, an ordinary run
+/// 0, and a walk has none; `PUT activities/{id}` with `workout_type: 1` marked a run as a race,
+/// read back as 1, with MaxAct's existing `activity:write` scope. Rides use 11 (default 10) per
+/// Strava's documentation — **not yet seen live**, since the user had no ride marked as a race.
+/// Runs also have 2 (long run) and 3 (workout), rides 12 (workout): never overwritten here except
+/// to clear a race.
+public enum StravaRace {
+    public static func raceValue(for kind: ActivityKind) -> Int? {
+        switch kind {
+        case .running: 1
+        case .cycling, .indoorCycling: 11
+        default: nil
+        }
+    }
+
+    public static func defaultValue(for kind: ActivityKind) -> Int? {
+        switch kind {
+        case .running: 0
+        case .cycling, .indoorCycling: 10
+        default: nil
+        }
+    }
+
+    public static func isRace(_ workoutType: Int?) -> Bool {
+        workoutType == 1 || workoutType == 11
+    }
+
+    /// What to send as `workout_type` for a workout of `kind` that should (or shouldn't) be a race,
+    /// given Strava's `current` value — `nil` to leave it alone. Not-a-race only clears a race:
+    /// a Long Run or Workout set on Strava is never reset to default.
+    public static func value(toSend race: Bool, for kind: ActivityKind, current: Int?) -> Int? {
+        guard let raceValue = raceValue(for: kind) else { return nil }
+        if race { return current == raceValue ? nil : raceValue }
+        return isRace(current) ? defaultValue(for: kind) : nil
     }
 }
 
@@ -170,15 +214,21 @@ public struct StravaActivityUpdate: Sendable, Equatable {
     /// Strava's "Mute Activity": `hide_from_home`, documented as *"Whether this activity is
     /// muted"*. Not accepted at upload, so it can only be set this way.
     public var muted: Bool?
+    /// Strava's `workout_type` — see ``StravaRace``.
+    public var workoutType: Int?
 
-    public init(sportType: String? = nil, commute: Bool? = nil, trainer: Bool? = nil, muted: Bool? = nil) {
+    public init(sportType: String? = nil, commute: Bool? = nil, trainer: Bool? = nil, muted: Bool? = nil,
+                workoutType: Int? = nil) {
         self.sportType = sportType
         self.commute = commute
         self.trainer = trainer
         self.muted = muted
+        self.workoutType = workoutType
     }
 
-    public var isEmpty: Bool { sportType == nil && commute == nil && trainer == nil && muted == nil }
+    public var isEmpty: Bool {
+        sportType == nil && commute == nil && trainer == nil && muted == nil && workoutType == nil
+    }
 
     var json: [String: Any] {
         var body: [String: Any] = [:]
@@ -186,6 +236,7 @@ public struct StravaActivityUpdate: Sendable, Equatable {
         if let commute { body["commute"] = commute }
         if let trainer { body["trainer"] = trainer }
         if let muted { body["hide_from_home"] = muted }
+        if let workoutType { body["workout_type"] = workoutType }
         return body
     }
 }

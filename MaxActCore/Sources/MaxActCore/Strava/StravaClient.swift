@@ -166,6 +166,14 @@ public actor StravaClient {
         try await updateActivity(id: id, StravaActivityUpdate(sportType: sportType))
     }
 
+    /// An activity's current `workout_type`, or `nil` if it has none — one read request. Needed
+    /// before clearing a race, so a Long Run or Workout set on Strava isn't reset to default.
+    public func workoutType(ofActivity id: Int) async throws -> Int? {
+        let response = try await send(method: "GET", path: "activities/\(id)", kind: .read)
+        let object = try JSONSerialization.jsonObject(with: response.body) as? [String: Any]
+        return object?["workout_type"] as? Int
+    }
+
     /// Of `activityIDs`, the ones Strava confirms no longer exist.
     ///
     /// For activities that were expected in a listing and weren't there. A missing row alone is

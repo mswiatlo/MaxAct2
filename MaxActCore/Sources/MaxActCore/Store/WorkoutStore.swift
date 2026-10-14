@@ -157,7 +157,7 @@ public actor WorkoutStore {
         for record in records {
             guard let id = record.stravaActivityID, let flag = flags[id],
                   let updated = WorkoutTag.applying(commute: flag.commute, trainer: flag.trainer,
-                                                    to: record.tagNames)
+                                                    race: flag.race, to: record.tagNames)
             else { continue }
             record.tagNames = updated
             changed += 1
@@ -167,11 +167,11 @@ public actor WorkoutStore {
     }
 
     /// Local edits to Strava-backed tags not yet on Strava: what to send for each.
-    public func pendingStravaFlags() throws -> [(workoutID: String, activityID: Int, flags: StravaFlags)] {
+    public func pendingStravaFlags() throws -> [(workoutID: String, activityID: Int, kind: ActivityKind, flags: StravaFlags)] {
         try modelContext.fetch(FetchDescriptor<WorkoutRecord>(
             predicate: #Predicate { $0.stravaFlagsPending == true && $0.stravaActivityID != nil }
         )).compactMap { record in
-            record.stravaActivityID.map { (record.id, $0, StravaFlags(tags: record.tagNames)) }
+            record.stravaActivityID.map { (record.id, $0, record.snapshot.kind, StravaFlags(tags: record.tagNames)) }
         }
     }
 

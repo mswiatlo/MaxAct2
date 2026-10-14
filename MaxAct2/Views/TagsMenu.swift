@@ -20,7 +20,9 @@ struct TagsMenu: View {
                 } label: {
                     Label(name, systemImage: state.symbol)
                 }
-                .help(WorkoutTag.isStravaBacked(name)
+                .help(name == WorkoutTag.race
+                      ? "Also set on Strava for runs and rides — other sports have no race type there"
+                      : WorkoutTag.isStravaBacked(name)
                       ? "Also set on Strava for workouts already there"
                       : "Stays on this Mac — Strava has no field for it")
             }
@@ -55,6 +57,7 @@ struct TagsMenu: View {
         switch name {
         case WorkoutTag.commute: "briefcase"
         case WorkoutTag.trainer: "figure.indoor.cycle"
+        case WorkoutTag.race: "flag.checkered"
         default: "tag"
         }
     }

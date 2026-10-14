@@ -16,11 +16,17 @@ public struct StravaActivitySummary: Decodable, Sendable, Equatable {
     /// Read from the live API, which returns both in the activity list (verified 2026-10-07).
     public let commute: Bool?
     public let trainer: Bool?
+    /// Strava's workout type: 1 or 11 for a race, `nil` for sports without one (issue 16).
+    public let workoutType: Int?
 
-    public var flags: StravaFlags { StravaFlags(commute: commute ?? false, trainer: trainer ?? false) }
+    public var flags: StravaFlags {
+        StravaFlags(commute: commute ?? false, trainer: trainer ?? false,
+                    race: workoutType.map(StravaRace.isRace))
+    }
 
     enum CodingKeys: String, CodingKey {
         case id, name, distance, commute, trainer
+        case workoutType = "workout_type"
         case sportType = "sport_type"
         case startDate = "start_date"
         case elapsedTime = "elapsed_time"
@@ -29,7 +35,7 @@ public struct StravaActivitySummary: Decodable, Sendable, Equatable {
 
     public init(id: Int, name: String? = nil, sportType: String? = nil, startDate: Date,
                 elapsedTime: TimeInterval, distance: Double? = nil, externalID: String? = nil,
-                commute: Bool? = nil, trainer: Bool? = nil) {
+                commute: Bool? = nil, trainer: Bool? = nil, workoutType: Int? = nil) {
         self.id = id
         self.name = name
         self.sportType = sportType
@@ -39,6 +45,7 @@ public struct StravaActivitySummary: Decodable, Sendable, Equatable {
         self.externalID = externalID
         self.commute = commute
         self.trainer = trainer
+        self.workoutType = workoutType
     }
 
     var end: Date { startDate.addingTimeInterval(elapsedTime) }

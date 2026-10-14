@@ -26,7 +26,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ## 1. Where things stand — 2026-10-12
 
-All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 315 in
+All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 320 in
 `MaxActCore` (`swift test`), 54 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~5 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** the user's check of 17, then 16 (Strava race flag), then the rest of 15. Issue 7 (TrainingPeaks) starts with
+**Next:** the user's check of 16 and 17, then the rest of 15 (HR zones, route heat map). Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -61,14 +61,15 @@ The HealthFit-style analyses left out of issue 8's first cut, as separate pieces
 - **Route heat map** — every route on one map, plus an Explorer-style count of map tiles visited.
   Also needs downloaded detail.
 
-**16. Mark races on Strava ("Race" workout type).** *(open, the user's request — research first)*
-On Strava "Race" isn't a tag but the activity's **workout type** (the Race option in the run/ride
-"workout type" menu). Known: the API *returns* `workout_type` on activities (measured 2026-10-07,
-see the Strava reference). To check: whether `PUT /activities/{id}` accepts `workout_type` with
-MaxAct's `activity:write` scope, and its values — believed to be 1 = race for runs and 11 = race for
-rides, unverified — and for which sports it exists at all (walks and hikes may have none). If it's
-writable, a "Race" tag could be mirrored like Commute and Trainer are; if not, record that and keep
-"Race" Mac-only. Verify against a real activity rather than the docs.
+**16. Mark races on Strava.** *(built 2026-10-14, awaiting the user's check)*
+Measured on the user's account: Strava's "Race" is `workout_type` — a race run reads 1, an ordinary
+run 0, a walk has none — and `PUT activities/{id}` with `workout_type: 1` set it on the April 26,
+2026 run (read back as 1, shown as Race on Strava). Built: a **Race** tag, Strava-backed like
+Commute and Trainer, for runs (1) and rides (11 — Strava's documented value, not yet seen live);
+on other sports it stays Mac-only. Sent in the post-upload `PUT`; tag edits push it; the Strava
+check mirrors it back (so already-raced activities gain the tag). Removing the tag only clears a
+race — a Long Run or Workout set on Strava is left alone (one read to check). 8 new package tests,
+mutation-checked.
 
 **17. Import a specific month.** *(built 2026-10-14, awaiting the user's check — enables 16)*
 The sync panel's Import menu has "A specific month…", with Month and Year pickers back seven years,

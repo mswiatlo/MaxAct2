@@ -124,9 +124,13 @@ public struct StravaUploader: WorkoutDestination {
             // Everything to change after upload goes in **one** `PUT`, and none at all when nothing
             // needs changing. Commute and trainer were sent with the upload already; they're not
             // repeated here, so a run or ride with no mute costs no extra write.
+            // A race goes here too: the upload can't carry `workout_type`, and a new activity has
+            // none, so there's nothing to read first.
             let update = StravaActivityUpdate(
                 sportType: workout.kind.stravaNeedsSportCorrection ? workout.kind.stravaSportType : nil,
-                muted: options.muted ? true : nil
+                muted: options.muted ? true : nil,
+                workoutType: options.flags.race == true
+                    ? StravaRace.value(toSend: true, for: workout.kind, current: nil) : nil
             )
             var warning: String?
             do {
@@ -139,7 +143,8 @@ public struct StravaUploader: WorkoutDestination {
     }
 
     private static func describe(_ update: StravaActivityUpdate) -> String {
-        [update.sportType.map { "the activity type (\($0))" }, update.muted == true ? "mute" : nil]
+        [update.sportType.map { "the activity type (\($0))" }, update.muted == true ? "mute" : nil,
+         update.workoutType.map { _ in "the race flag" }]
             .compactMap { $0 }.joined(separator: " and ")
     }
 

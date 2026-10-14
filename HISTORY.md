@@ -1040,6 +1040,13 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-14** — **Issue 16 built: Race tag mirrored to Strava.** Read-only first: the 2025-10-12
+  marathon reads `workout_type` 1, the day-before run 0, a walk null. Then, with the user's go-ahead,
+  `PUT workout_type: 1` on the April 26, 2026 run (uploaded by MaxAct) succeeded and read back 1.
+  The first attempt found no activity — the run hadn't actually been uploaded yet; the script
+  stopped without writing. Token read once from the Keychain (user approved the prompt) after
+  MaxAct refreshed it, so the stored refresh token was never rotated outside the app.
+
 - **2026-10-14** — **Issue 17 built: import a specific month** (the user's request, to make issue 16
   checkable). Mutation-checked: without the "hasn't started" guard a future month builds an interval
   ending before it starts, and Foundation traps. UI test found the Import menu had no accessible

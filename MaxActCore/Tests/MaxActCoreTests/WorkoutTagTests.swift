@@ -19,9 +19,30 @@ import Testing
         #expect(WorkoutTag.applying(commute: true, trainer: false, to: tags) == nil, "already matches")
     }
 
+    @Test("Race follows Strava where Strava can say, and is left alone where it can't")
+    func applyingRace() {
+        #expect(WorkoutTag.applying(commute: false, trainer: false, race: true, to: ["With Kid"]) == ["Race", "With Kid"])
+        #expect(WorkoutTag.applying(commute: false, trainer: false, race: false, to: ["Race"]) == [])
+        // A walk: Strava has no workout type, so a Mac-only Race tag stays.
+        #expect(WorkoutTag.applying(commute: false, trainer: false, race: nil, to: ["Race"]) == nil)
+    }
+
+    @Test("what to send as workout_type: set a race, clear only a race, leave other types alone")
+    func raceDecision() {
+        #expect(StravaRace.value(toSend: true, for: .running, current: nil) == 1)
+        #expect(StravaRace.value(toSend: true, for: .running, current: 0) == 1)
+        #expect(StravaRace.value(toSend: true, for: .running, current: 1) == nil, "already a race")
+        #expect(StravaRace.value(toSend: true, for: .cycling, current: 10) == 11)
+        #expect(StravaRace.value(toSend: false, for: .running, current: 1) == 0, "clearing a race")
+        #expect(StravaRace.value(toSend: false, for: .cycling, current: 11) == 10)
+        #expect(StravaRace.value(toSend: false, for: .running, current: 2) == nil, "a Long Run stays a Long Run")
+        #expect(StravaRace.value(toSend: false, for: .running, current: nil) == nil)
+        #expect(StravaRace.value(toSend: true, for: .walking, current: nil) == nil, "walks have no workout type")
+    }
+
     @Test("Strava-backed tags sort first, the rest alphabetically")
     func ordering() {
-        #expect(WorkoutTag.sorted(["zebra", "Trainer", "apple", "Commute"]) == ["Commute", "Trainer", "apple", "zebra"])
+        #expect(WorkoutTag.sorted(["zebra", "Race", "Trainer", "apple", "Commute"]) == ["Commute", "Trainer", "Race", "apple", "zebra"])
     }
 
     @Test("an update sends only the fields that are set, under Strava's names")
@@ -30,7 +51,10 @@ import Testing
         #expect(update.json["sport_type"] as? String == "Walk")
         #expect(update.json["hide_from_home"] as? Bool == true)
         #expect(update.json["commute"] == nil)
+        #expect(update.json["workout_type"] == nil)
+        #expect(StravaActivityUpdate(workoutType: 1).json["workout_type"] as? Int == 1)
         #expect(StravaActivityUpdate().isEmpty)
+        #expect(!StravaActivityUpdate(workoutType: 0).isEmpty)
     }
 }
 
@@ -60,12 +84,12 @@ import Testing
         #expect(try await store.item(id: "B")?.tags == [])
     }
 
-    @Test("Commute and Trainer are always offered, even before any workout has them")
+    @Test("Commute, Trainer and Race are always offered, even before any workout has them")
     func builtInsOffered() async throws {
         let store = try store()
         try await store.upsert([ingested("A")])
         try await store.addTag("With Kid", to: ["A"])
-        #expect(try await store.allTagNames() == ["Commute", "Trainer", "With Kid"])
+        #expect(try await store.allTagNames() == ["Commute", "Trainer", "Race", "With Kid"])
     }
 
     @Test("editing a Strava-backed tag on a synced workout queues a push; a local tag doesn't")
@@ -81,7 +105,9 @@ import Testing
         let pending = try await store.pendingStravaFlags()
         #expect(pending.count == 1)
         #expect(pending.first?.activityID == 900)
-        #expect(pending.first?.flags == StravaFlags(commute: true, trainer: false))
+        // `race: false`, not unknown: a pushed workout without the tag may need a race cleared.
+        #expect(pending.first?.flags == StravaFlags(commute: true, trainer: false, race: false))
+        #expect(pending.first?.kind == .cycling)
     }
 
     @Test("Strava's flags are mirrored onto synced workouts")
@@ -170,6 +196,43 @@ import Testing
         let body = String(decoding: try #require(await transport.requests.first?.body), as: UTF8.self)
         #expect(body.contains("name=\"commute\"\r\n\r\n1\r\n"))
         #expect(body.contains("name=\"trainer\"\r\n\r\n0\r\n"))
+    }
+
+    @Test("a race goes in the one post-upload PUT, as workout_type")
+    func raceAtUpload() async throws {
+        let transport = ScriptedTransport([ready(), StravaHTTPResponse(status: 200, body: Data("{}".utf8))])
+        let (workout, series) = workout(.running)
+        _ = try await uploader(transport).send(
+            workout, series: series, options: UploadOptions(flags: StravaFlags(commute: false, trainer: false, race: true))
+        ) { _ in }
+        let puts = await transport.requests.filter { $0.method == "PUT" }
+        #expect(puts.count == 1)
+        let body = try JSONSerialization.jsonObject(with: try #require(puts.first?.body)) as? [String: Any]
+        #expect(body?["workout_type"] as? Int == 1)
+    }
+
+    @Test("a race tag on a walk sends no workout_type: Strava has none for it")
+    func raceOnAWalk() async throws {
+        let transport = ScriptedTransport([ready(), StravaHTTPResponse(status: 200, body: Data("{}".utf8))])
+        let (workout, series) = workout(.walking)
+        _ = try await uploader(transport).send(
+            workout, series: series, options: UploadOptions(flags: StravaFlags(commute: false, trainer: false, race: true))
+        ) { _ in }
+        let put = try #require(await transport.requests.first { $0.method == "PUT" })
+        let body = try JSONSerialization.jsonObject(with: try #require(put.body)) as? [String: Any]
+        #expect(body?["workout_type"] == nil)
+        #expect(body?["sport_type"] as? String == "Walk")
+    }
+
+    @Test("the activity list's workout type decodes into the race flag")
+    func summaryRace() throws {
+        let json = #"[{"id":1,"start_date":"2025-10-12T15:23:39Z","elapsed_time":15000,"workout_type":1},"#
+            + #"{"id":2,"start_date":"2025-10-11T18:14:10Z","elapsed_time":2000,"workout_type":0},"#
+            + #"{"id":3,"start_date":"2025-10-13T18:25:11Z","elapsed_time":2000,"workout_type":null}]"#
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let summaries = try decoder.decode([StravaActivitySummary].self, from: Data(json.utf8))
+        #expect(summaries.map(\.flags.race) == [true, false, nil])
     }
 
     @Test("the activity list's flags decode")

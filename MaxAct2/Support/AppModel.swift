@@ -485,10 +485,16 @@ final class AppModel {
         guard let pending = try? await store.pendingStravaFlags() else { return nil }
         for entry in pending {
             do {
-                try await strava.updateActivity(
-                    id: entry.activityID,
-                    StravaActivityUpdate(commute: entry.flags.commute, trainer: entry.flags.trainer)
-                )
+                var update = StravaActivityUpdate(commute: entry.flags.commute, trainer: entry.flags.trainer)
+                // Race (issue 16), for sports that have it on Strava. Setting one needs no read;
+                // clearing one checks Strava's current type first, so a Long Run or Workout set
+                // there isn't reset — one extra read, only for runs and rides without the tag.
+                if StravaRace.raceValue(for: entry.kind) != nil {
+                    let race = entry.flags.race == true
+                    let current = race ? nil : try await strava.workoutType(ofActivity: entry.activityID)
+                    update.workoutType = StravaRace.value(toSend: race, for: entry.kind, current: current)
+                }
+                try await strava.updateActivity(id: entry.activityID, update)
                 try? await store.clearStravaFlagsPending(entry.workoutID)
             } catch {
                 return "Couldn't update tags on Strava: \(Self.describeUpload(error)). "

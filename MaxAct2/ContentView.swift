@@ -86,7 +86,7 @@ struct ContentView: View {
             .keyboardShortcut(.defaultAction)
             Button("Cancel", role: .cancel) { newTagName = "" }
         } message: {
-            Text("Commute and Trainer are also set on Strava. Other tags stay on this Mac.")
+            Text("Commute, Trainer and Race (runs and rides) are also set on Strava. Other tags stay on this Mac.")
         }
 
         .toolbar { toolbarContent }
