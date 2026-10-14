@@ -60,6 +60,27 @@ public struct RouteSketch: Codable, Sendable, Equatable {
     }
 }
 
+/// What the statistics need from one workout's stored series, read once and cached
+/// (``RouteSketchCache``): its route sketch, if it has a usable route, and its time at each heart
+/// rate. Loading the series is the slow part — 7.4 s for 418 — so everything derived from them is
+/// taken in the same pass.
+public struct SeriesDigest: Codable, Sendable, Equatable {
+    public let workoutID: String
+    public let sketch: RouteSketch?
+    public let heartRate: HeartRateHistogram
+
+    public init(workoutID: String, sketch: RouteSketch?, heartRate: HeartRateHistogram) {
+        self.workoutID = workoutID
+        self.sketch = sketch
+        self.heartRate = heartRate
+    }
+
+    public init(series: WorkoutSeries) {
+        self.init(workoutID: series.workoutID, sketch: RouteSketch(series: series),
+                  heartRate: HeartRateHistogram(series.heartRate))
+    }
+}
+
 /// A place where workouts happen: the routes that start within ``radius`` of each other, named
 /// after the place most of them were labelled with.
 public struct RouteRegion: Identifiable, Equatable, Sendable {

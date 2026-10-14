@@ -97,6 +97,10 @@ import Testing
         let reloaded = await second.sketches(for: ["A", "INDOOR"], seriesStore: seriesStore) { _, _ in await calls.bump() }
         #expect(reloaded.map(\.workoutID) == ["A"])
         #expect(await calls.value == 0, "nothing should have needed building")
+        // The indoor workout has a digest — heart rate, no sketch.
+        let digests = await second.digests(for: ["A", "INDOOR"], seriesStore: seriesStore)
+        #expect(digests.map(\.workoutID) == ["A", "INDOOR"])
+        #expect(digests.last?.sketch == nil)
     }
 }
 
