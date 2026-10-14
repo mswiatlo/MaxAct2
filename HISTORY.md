@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed known issues (1–6, 8–14)
+## 2. Fixed or closed known issues (1–14)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -419,6 +419,18 @@ user; their check of the fix raised 8c, still open:
 - **8b. The statistics didn't adapt to a narrow window.** Every section now reflows to a 480pt
   minimum (controls stack, totals tighten, the heat map shows as many weeks as fit, best cards go
   to one column).
+
+**7. ~~Sync to TrainingPeaks as well as Strava.~~ — closed 2026-10-14, not built (the user's call).**
+
+TrainingPeaks' API is **closed to personal use**. Its Partner API FAQ: "At this time, we are not
+accepting any API requests for personal use" — only organisations may apply, via
+api.trainingpeaks.com/request-access, and are then developed against a sandbox before promotion.
+The API itself would have fitted (OAuth 2.0; `POST v3/file` takes FIT, TCX or PWX), and its docs
+are public on the PartnersAPI GitHub wiki. Community tools get round the gate by calling the
+website's internal API (`tpapi.trainingpeaks.com`) with a copied browser session; that's
+unsupported, breaks without notice and may breach the terms, so it was ruled out. The fallback the
+plan proposed — an Export TCX… command for manual upload — was offered and declined; nothing was
+built. Revisit only if TrainingPeaks opens personal access.
 
 ---
 
@@ -1027,6 +1039,10 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-14** — **Issue 7 closed**: TrainingPeaks' API isn't available for personal use
+  (confirmed on its Partner API FAQ). The user chose to drop it rather than add Export TCX…;
+  findings in §2. Next: issue 15.
 
 - **2026-10-14** — **Phase 8 complete**, checked by the user (welcome sheet, Test Connection, empty
   states, remembered sidebar and sort; sync error wording untestable while sync works). The

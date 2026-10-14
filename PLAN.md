@@ -3,7 +3,7 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**
 (HAE), with batch upload to Strava.
 
-**Status:** Phases 0–8 complete and checked by the user. Next: issue 7 (TrainingPeaks), then 15.
+**Status:** Phases 0–8 complete and checked by the user. Next: issue 15 (deeper statistics).
 **Last updated:** 2026-10-14.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first: the HAE data
@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** issue 7 (TrainingPeaks — first, whether its API is open to us), then 15 (deeper statistics). Issue 7 (TrainingPeaks) starts with
+**Next:** issue 15 (deeper statistics). Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -43,15 +43,8 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–6 and 8–14 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–14 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
-
-**7. Sync to TrainingPeaks as well as Strava.** *(speculative, unresearched)*
-TrainingPeaks accepts TCX, so the file is free. **First establish whether its API is open** — it is
-understood to be partner-gated. If closed, offer a plain "Export TCX…" command instead, useful for
-Garmin, Runalyze and archiving anyway. The uploader sits behind `WorkoutDestination`, but upload
-*state* on `WorkoutRecord` is still Strava-shaped; a second destination means per-destination
-state, which is a schema and UI change.
 
 **15. Deeper statistics.** *(deferred from issue 8, not started)*
 The HealthFit-style analyses left out of issue 8's first cut, as separate pieces:
