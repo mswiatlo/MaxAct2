@@ -1040,6 +1040,10 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-14** — Recorded issue 16 (the user's request): check whether Strava's API can mark an
+  activity as a race (`workout_type`). Research first; the user is downloading detail meanwhile for
+  issue 15's route heat map.
+
 - **2026-10-14** — **Issue 15: training load built.** Measured first: all 49 workouts have an
   average HR, highest max 182, history only seven weeks (Fitness is still ramping — the view says
   so). The user chose to be offered both TRIMP curves and asked on first use. UI-testing found three

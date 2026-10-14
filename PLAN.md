@@ -61,6 +61,15 @@ The HealthFit-style analyses left out of issue 8's first cut, as separate pieces
 - **Route heat map** — every route on one map, plus an Explorer-style count of map tiles visited.
   Also needs downloaded detail.
 
+**16. Mark races on Strava ("Race" workout type).** *(open, the user's request — research first)*
+On Strava "Race" isn't a tag but the activity's **workout type** (the Race option in the run/ride
+"workout type" menu). Known: the API *returns* `workout_type` on activities (measured 2026-10-07,
+see the Strava reference). To check: whether `PUT /activities/{id}` accepts `workout_type` with
+MaxAct's `activity:write` scope, and its values — believed to be 1 = race for runs and 11 = race for
+rides, unverified — and for which sports it exists at all (walks and hikes may have none). If it's
+writable, a "Race" tag could be mirrored like Commute and Trainer are; if not, record that and keep
+"Race" Mac-only. Verify against a real activity rather than the docs.
+
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.
 
