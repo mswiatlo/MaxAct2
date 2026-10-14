@@ -51,6 +51,33 @@ import Testing
         #expect(RouteHeatmap.tiles(sketches).count >= 6)
     }
 
+    @Test("nearby cities are separate places; a suburb is the same place")
+    func cities() throws {
+        let victoria = Coordinate(latitude: 48.4284, longitude: -123.3656)   // ~95 km away
+        let burnaby = Coordinate(latitude: 49.2488, longitude: -122.9805)    // ~11 km away
+        let sketches = try [("V", vancouver), ("B", burnaby), ("VIC", victoria)].map { id, start in
+            try #require(RouteSketch(series: series(id, from: start, east: 2000)))
+        }
+        let regions = RouteHeatmap.regions(sketches, placeNames: [:])
+        #expect(regions.map(\.count) == [2, 1])
+        #expect(regions.last?.workoutIDs == ["VIC"])
+    }
+
+    @Test("a place is framed on where most routes are, not stretched by one far-off ride")
+    func focus() throws {
+        // Straight test routes simplify to two points each, so 100 of them make the trip 1% of the
+        // points — still more than one trip weighs in the real library (about 0.5%).
+        let home = try (0..<100).map { try #require(RouteSketch(series: series("H\($0)", from: vancouver, east: 3000))) }
+        // Starting 20 km west, inside the place's radius, and running another 60 km west.
+        let tripStart = Coordinate(latitude: 49.2827, longitude: -123.395)
+        let trip = try #require(RouteSketch(series: series("TRIP", from: tripStart, east: -60_000)))
+        let place = try #require(RouteHeatmap.regions(home + [trip], placeNames: [:]).first)
+        #expect(place.count == 101)
+        #expect(place.bounds.minLongitude < -124.0, "the full extent includes the trip")
+        #expect(place.focus.minLongitude > -123.2, "the framing doesn't")
+        #expect(place.focus.maxLongitude < -123.07)
+    }
+
     @Test("sketches are built once and survive a restart; a route-less workout isn't reloaded")
     func cache() async throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "RouteHeatmapTests-\(UUID())")

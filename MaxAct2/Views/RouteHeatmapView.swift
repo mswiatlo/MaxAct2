@@ -145,6 +145,6 @@ struct RouteHeatmapSection: View {
     }
 
     static func region(for place: RouteRegion) -> MKCoordinateRegion {
-        MKCoordinateRegion(fitting: place.bounds, headroom: 1.15, minimumSpan: 0.02)
+        MKCoordinateRegion(fitting: place.focus, headroom: 1.15, minimumSpan: 0.02)
     }
 }

@@ -1059,6 +1059,17 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-14** — **Issue 15: route heat map built.** Measured first on a copy of the series
+  (418 routes, 926k points): 7.4 s to load, 1.7 s to simplify to 72k points, 83 explorer squares;
+  half of all workouts start within 70 m of home but 10% more than 1,600 km away. So sketches are
+  cached, and routes are grouped into places. The real-content check took three tries: fitting the
+  whole place showed Vancouver-to-Seattle (one Victoria trip stretched it), so the map frames the
+  2nd–98th percentile; that still spanned the strait, because a 100 km place radius merged
+  Vancouver with Victoria (~95 km, with real workouts in both) — now 25 km, and the map opens on
+  Vancouver's routes. Verified the cache stays beside the series (inside the test copy, never the
+  real folder). Squares are counted from the full route (mutation-checked: from the simplified one,
+  a straight ride loses its middle squares).
+
 - **2026-10-14** — **Issues 16 and 17 closed**, confirmed by the user (Race tag round-trips with
   Strava; specific-month import works). Back to issue 15.
 

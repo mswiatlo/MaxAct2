@@ -65,7 +65,12 @@ public struct RouteSketch: Codable, Sendable, Equatable {
 public struct RouteRegion: Identifiable, Equatable, Sendable {
     public let name: String
     public let workoutIDs: [String]
+    /// Everything in the place.
     public let bounds: CoordinateBounds
+    /// Where most of it is: the 2nd–98th percentile of route points on each axis. What the map
+    /// frames — measured on the user's home place, the full bounds ran from Vancouver to Seattle
+    /// because of one trip to Victoria, and the routes were a speck in a corner.
+    public let focus: CoordinateBounds
 
     /// Its first workout: unique, unlike the name (two places can share one).
     public var id: String { workoutIDs.first ?? name }
@@ -79,9 +84,11 @@ public struct RouteRegion: Identifiable, Equatable, Sendable {
 /// would show a continent and no routes, so routes are grouped by where they start and the map
 /// opens on the biggest group.
 public enum RouteHeatmap {
-    /// How close starts must be to count as one place. Generous enough to keep a long day's ride
-    /// out of town with home; tight enough to separate cities.
-    public static let radius: Double = 100_000
+    /// How close starts must be to count as one place. Places group by where routes *start*, so a
+    /// long ride from home stays with home however far it goes; the radius only has to span a
+    /// metro area. 100 km was tried first and merged Vancouver with Victoria (~95 km), framing the
+    /// map on the strait between them — the user had real workouts in both.
+    public static let radius: Double = 25_000
 
     /// Groups sketches into places, biggest first. `placeNames` maps workout ids to their place
     /// labels ("Vancouver BC"); a place is named after its most common label, or "Unnamed place".
@@ -103,9 +110,24 @@ public enum RouteHeatmap {
             guard let bounds = CoordinateBounds(group.members.flatMap(\.coordinates)) else { return nil }
             let names = group.members.compactMap { placeNames[$0.workoutID] }
             let name = Dictionary(grouping: names, by: { $0 }).max { ($0.value.count, $1.key) < ($1.value.count, $0.key) }?.key
-            return RouteRegion(name: name ?? "Unnamed place", workoutIDs: group.members.map(\.workoutID), bounds: bounds)
+            let points = group.members.flatMap(\.coordinates)
+            return RouteRegion(name: name ?? "Unnamed place", workoutIDs: group.members.map(\.workoutID),
+                               bounds: bounds, focus: focus(of: points) ?? bounds)
         }
         .sorted { ($0.count, $1.name) > ($1.count, $0.name) }
+    }
+
+    /// The 2nd–98th percentile box of `points`, so a few outlying routes don't set the framing.
+    static func focus(of points: [Coordinate]) -> CoordinateBounds? {
+        guard !points.isEmpty else { return nil }
+        let latitudes = points.map(\.latitude).sorted(), longitudes = points.map(\.longitude).sorted()
+        func at(_ values: [Double], _ fraction: Double) -> Double {
+            values[min(values.count - 1, Int(Double(values.count - 1) * fraction))]
+        }
+        return CoordinateBounds([
+            Coordinate(latitude: at(latitudes, 0.02), longitude: at(longitudes, 0.02)),
+            Coordinate(latitude: at(latitudes, 0.98), longitude: at(longitudes, 0.98)),
+        ])
     }
 
     /// Every tile any of `sketches` passed through.
