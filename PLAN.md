@@ -31,10 +31,10 @@ All work is on `main`, pushed; no open branches. Builds clean with **zero warnin
 alone for ~5 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
 
-Phases 0–7 are done and verified live. Since then: issues 6 and 9–14 fixed or closed; View ▸ Hide
+Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** the user's check of the inspector over the statistics (8a/8d), then Phase 8. Issue 7 (TrainingPeaks) starts with
+**Next:** Phase 8 (polish). Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -43,7 +43,7 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–6 and 9–14 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–6 and 8–14 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
 **7. Sync to TrainingPeaks as well as Strava.** *(speculative, unresearched)*
@@ -52,32 +52,6 @@ understood to be partner-gated. If closed, offer a plain "Export TCX…" command
 Garmin, Runalyze and archiving anyway. The uploader sits behind `WorkoutDestination`, but upload
 *state* on `WorkoutRecord` is still Strava-shaped; a second destination means per-destination
 state, which is a schema and UI change.
-
-**8. Summary statistics.** *(built 2026-10-12; checked by the user — works, two layout problems open)*
-A **Statistics** row at the top of the sidebar swaps the table for: totals (this week, month, year,
-all time), a history bar chart by week/month/year, this year against last year and the best year
-(HealthFit's comparison), a calendar heat map with day and week streaks, and personal bests per
-activity that open their workout. Its own activity picker; it follows the search field. Arithmetic
-in `WorkoutStatistics` (package, tested); missing values are counted, never summed as zero. The
-year comparison stays a single line until older history is synced (the library starts
-2026-08-23). Deferred, as separate ideas: training load (CTL/ATL/TSB), heart-rate zones, a route
-heat map.
-
-The user's check (2026-10-12) found two layout problems, both fixed 2026-10-12 and checked by the
-user; their check of the fix raised 8c, still open:
-- **8a/8d. The inspector over the statistics.** *(fixed 2026-10-14, awaiting the user's check)*
-  The window's real inspector can't sit beside the statistics: SwiftUI pins a pure-SwiftUI
-  column's width when it opens (measured with a layout dump; a plain colour does it), so the panes
-  overflowed and the sidebar was cut off. An interim sheet worked; the user preferred the inspector
-  (8d). Now, over the statistics, **the same detail view is drawn as a panel inside the statistics'
-  own column** (`StatisticsWithInspector`), so the split view never changes: full 440pt width, its
-  own drag handle (440–760pt, remembered), the toolbar toggle and ⌃⌘I (now our own View ▸ Inspector
-  command) work as beside the list, and a personal best opens there. The statistics take what's left
-  and scroll sideways below 480pt. The window's real inspector stays shut over the statistics.
-  8c (the sheet's header) is moot — the sheet is gone. UI test mutation-checked.
-- **8b. The statistics didn't adapt to a narrow window.** Every section now reflows to a 480pt
-  minimum (controls stack, totals tighten, the heat map shows as many weeks as fit, best cards go
-  to one column).
 
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.

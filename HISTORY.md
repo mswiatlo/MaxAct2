@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed known issues (1–6, 9–14)
+## 2. Fixed known issues (1–6, 8–14)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -393,6 +393,32 @@ in a fixed 64 pt column (`SeriesChart.axisLabelWidth`), and the speed axis print
 than "—" at zero. Verified on a real ride: ticks and highlight rule at the same x in all three, the
 widest label ("14.4 km/h") untruncated.
 
+**8. ~~Summary statistics.~~ — done 2026-10-14, confirmed by the user.**
+
+A **Statistics** row at the top of the sidebar swaps the table for: totals (this week, month, year,
+all time), a history bar chart by week/month/year, this year against last year and the best year
+(HealthFit's comparison), a calendar heat map with day and week streaks, and personal bests per
+activity that open their workout. Its own activity picker; it follows the search field. Arithmetic
+in `WorkoutStatistics` (package, tested); missing values are counted, never summed as zero. The
+year comparison stays a single line until older history is synced (the library starts
+2026-08-23). Deferred, as separate ideas: training load (CTL/ATL/TSB), heart-rate zones, a route
+heat map.
+
+The user's check (2026-10-12) found two layout problems, both fixed 2026-10-12 and checked by the
+user; their check of the fix raised 8c, still open:
+- **8a/8d. The inspector over the statistics.** *(fixed 2026-10-14, awaiting the user's check)*
+  The window's real inspector can't sit beside the statistics: SwiftUI pins a pure-SwiftUI
+  column's width when it opens (measured with a layout dump; a plain colour does it), so the panes
+  overflowed and the sidebar was cut off. An interim sheet worked; the user preferred the inspector
+  (8d). Now, over the statistics, **the same detail view is drawn as a panel inside the statistics'
+  own column** (`StatisticsWithInspector`), so the split view never changes: full 440pt width, its
+  own drag handle (440–760pt, remembered), the toolbar toggle and ⌃⌘I (now our own View ▸ Inspector
+  command) work as beside the list, and a personal best opens there. The statistics take what's left
+  and scroll sideways below 480pt. The window's real inspector stays shut over the statistics.
+  8c (the sheet's header) is moot — the sheet is gone. UI test mutation-checked.
+- **8b. The statistics didn't adapt to a narrow window.** Every section now reflows to a 480pt
+  minimum (controls stack, totals tighten, the heat map shows as many weeks as fit, best cards go
+  to one column).
 
 ---
 
@@ -1001,6 +1027,9 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-14** — **Issue 8 closed**: the user confirmed the inspector over the statistics (8a/8d).
+  Diagnosis moved to §2. Next: Phase 8.
 
 - **2026-10-14** — **Issue 8d: the inspector is back over the statistics**, drawn as a panel inside
   their own column rather than as the window's split-view inspector, so nothing gets pinned.
