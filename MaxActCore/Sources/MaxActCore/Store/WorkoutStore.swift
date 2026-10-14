@@ -416,6 +416,25 @@ public actor WorkoutStore {
         try modelContext.save()
     }
 
+    /// Marks workouts whose stored heart rate is too sparse (``WorkoutSeries/heartRateIsSparse``)
+    /// as needing detail again, so the next detail download re-fetches them — now with the dense
+    /// heart rate. Only workouts that had a heart rate at all (an average in the summary); the rest
+    /// would come back just as empty. Returns their ids. Loads every series, so run it once.
+    @discardableResult
+    public func markSparseHeartRateForRedownload(seriesStore: SeriesStore) async throws -> [String] {
+        var marked: [String] = []
+        for record in try modelContext.fetch(FetchDescriptor<WorkoutRecord>(predicate: #Predicate { $0.hasDetail == true }))
+        where record.averageHeartRate != nil {
+            guard let series = await seriesStore.loadIfAvailable(record.id),
+                  WorkoutSeries.heartRateIsSparse(series.heartRate, duration: record.duration)
+            else { continue }
+            record.hasDetail = false
+            marked.append(record.id)
+        }
+        if !marked.isEmpty { try modelContext.save() }
+        return marked
+    }
+
     /// Reconciles the `hasDetail` flags against what is actually on disk. Cheap insurance against
     /// the database and the blob directory drifting apart — a blob deleted outside the app, or a
     /// database restored from backup.

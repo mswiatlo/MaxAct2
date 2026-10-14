@@ -76,7 +76,34 @@ public struct HAEWorkoutSource: WorkoutSource {
             throw failure.underlying
         }
         // A narrow window can still return neighbours; take the one we asked for.
-        return result.workouts.first { $0.workout.id == workout.id }
+        guard let found = result.workouts.first(where: { $0.workout.id == workout.id }) else { return nil }
+        guard WorkoutSeries.heartRateIsSparse(found.series.heartRate, duration: found.workout.duration) else {
+            return found
+        }
+        // The export averaged the heart rate into a few readings (Apple Workout app recordings);
+        // the metrics tool has every one. Kept only if it really is denser.
+        let dense = try await heartRate(from: found.workout.start, to: found.workout.end, recordedBy: found.workout.sourceName)
+        guard dense.count > found.series.heartRate.count else { return found }
+        return IngestedWorkout(workout: found.workout, series: found.series.replacingHeartRate(dense))
+    }
+
+    /// Heart rate between `start` and `end` at its native rate, from `get_health_metrics` —
+    /// measured: 5 s readings where the workout export had one per ~10 minutes. Readings from
+    /// `device` only, when it has any (another source could overlap the workout).
+    public func heartRate(from start: Date, to end: Date, recordedBy device: String?) async throws -> [HeartRateSample] {
+        let payload = try await client.callTool(
+            "get_health_metrics",
+            arguments: [
+                "start": HAEDateFormatting.string(from: start),
+                "end": HAEDateFormatting.string(from: end),
+                "metrics": "heart_rate",
+                "aggregate": true,
+                "interval": "seconds",
+            ]
+        )
+        let readings = try decoder.decodeHeartRateMetric(payload).filter { $0.sample.date >= start && $0.sample.date <= end }
+        let own = readings.filter { reading in device.map { reading.source?.contains($0) == true } ?? false }
+        return (own.isEmpty ? readings : own).map(\.sample)
     }
 
     private func arguments(

@@ -231,6 +231,35 @@ workouts, zero exceptions)*. A 5-second bucket holds exactly one Apple Watch rea
 nothing to aggregate. Don't build a min–max band on the assumption that the range means something
 — at this aggregation it is always zero-width. It would only carry information at `"minutes"`.
 
+### Apple Workout-app recordings: the export averages series samples *(measured 2026-10-14)*
+
+The above holds for WorkOutDoors, which stores each reading as its own sample. The **Apple Workout
+app** stores heart rate as HealthKit *series samples* — ~10-minute chunks holding a reading every
+few seconds — and `get_workouts` returns **one averaged entry per chunk**, at either aggregation:
+3 entries for a 30-minute run (non-integer `Avg`, Min = Max = Avg; segment metrics say
+`sampleCount: 1`), while that reply's steps and energy were per second and Strava had 1 s heart
+rate. The workout's summary min/max (83/169) are right — HealthKit's statistics see inside chunks.
+
+**`get_health_metrics` has every reading:**
+
+```json
+{"start": "…", "end": "…", "metrics": "heart_rate", "aggregate": true, "interval": "seconds"}
+→ {"data": {"metrics": [{"name": "heart_rate", "units": "count/min",
+    "data": [{"date": "…", "Min": 90, "Avg": 90, "Max": 90, "source": "MaxWatch7"}, …]}]}}
+```
+
+367 readings at 5 s (80–169) for the same window; ~1 s per query. `aggregate: false` returned only
+17 entries, and `interval: "minutes"` per-minute buckets. The detail fetch uses it whenever the
+export's heart rate is under one reading a minute (`WorkoutSeries.heartRateIsSparse`), keeping the
+workout's own device's readings (`source` names it, as the workout's `source.name` does).
+
+Workout-app workouts also carry `activities`, `segments`, `splits` and `events` (pause/resume) —
+the "no laps" note below was measured on WorkOutDoors workouts only.
+
+**Probing the phone from a shell:** use `curl` (token via `-H @file`, never echoed). Homebrew's
+Python is blocked by macOS Local Network privacy and fails with "No route to host" even while
+`ping` and `curl` reach the phone; `swift test` (`LiveMCPTests`) works.
+
 ## No laps or splits on the MCP path
 
 The workout object has **no lap, split, segment or interval data at all** — only swimming carries

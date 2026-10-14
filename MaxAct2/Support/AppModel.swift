@@ -213,6 +213,7 @@ final class AppModel {
     /// Time at each heart rate by workout id, read in the same pass as the sketches — the
     /// heart-rate zones' data (issue 15).
     private(set) var heartRateHistograms: [String: HeartRateHistogram] = [:]
+    @ObservationIgnored private var isRepairingHeartRate = false
     /// (done, total) while sketches are being built for the first time.
     private(set) var routeSketchProgress: (done: Int, total: Int)?
     let thumbnails: RouteThumbnailRenderer
@@ -437,6 +438,23 @@ final class AppModel {
         resolvePlaces()
         await refreshStravaConnection()
         resumeStravaUploads()
+        await repairSparseHeartRateIfNeeded()
+    }
+
+    /// Once per library: workouts whose heart rate the workout export averaged into a few readings
+    /// (Apple Workout app recordings, measured 17 of 418) are marked as needing detail, so the
+    /// Download Detail action re-fetches them — the detail fetch now fills in the dense heart rate.
+    /// Reads every series (~7 s for 418), off the main actor.
+    private func repairSparseHeartRateIfNeeded() async {
+        guard !settings.hasRepairedSparseHeartRate, !isRepairingHeartRate, items.contains(where: \.hasDetail) else { return }
+        isRepairingHeartRate = true
+        defer { isRepairingHeartRate = false }
+        guard let marked = try? await store.markSparseHeartRateForRedownload(seriesStore: seriesStore) else { return }
+        settings.hasRepairedSparseHeartRate = true
+        if !marked.isEmpty {
+            await routeSketchCache?.invalidate(marked)
+            items = (try? await store.allItems()) ?? items
+        }
     }
 
     /// A remembered activity or tag can be gone by the next launch — its last workout deleted or
@@ -875,6 +893,8 @@ final class AppModel {
                 if Task.isCancelled { break }
                 if let detail = try await source.fetchDetail(for: item.workout) {
                     try await store.upsert([detail], seriesStore: seriesStore)
+                    // A re-download replaces the series; its cached digest would be stale.
+                    await routeSketchCache?.invalidate([item.id])
                     fetched += 1
                 }
                 syncStatus = .running(

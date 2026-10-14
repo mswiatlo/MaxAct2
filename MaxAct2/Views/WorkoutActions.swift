@@ -124,6 +124,12 @@ final class AppSettings {
         didSet { defaults.set(tableSortKey, forKey: "tableSort") }
     }
 
+    /// Whether stored workouts have been checked for heart rate the workout export averaged away
+    /// (Apple Workout app recordings), and the sparse ones marked for re-download. Once per library.
+    var hasRepairedSparseHeartRate: Bool {
+        didSet { defaults.set(hasRepairedSparseHeartRate, forKey: "hasRepairedSparseHeartRate") }
+    }
+
     /// Colour of route tracks on thumbnails and the detail map.
     var routeColor: RouteColor {
         didSet { defaults.set(routeColor.rawValue, forKey: "routeColor") }
@@ -141,6 +147,7 @@ final class AppSettings {
         trimpCurve = defaults.string(forKey: "trimpCurve").flatMap(HeartRateProfile.Curve.init(rawValue:))
         sidebarSelectionKey = defaults.string(forKey: "sidebarSelection")
         tableSortKey = defaults.string(forKey: "tableSort")
+        hasRepairedSparseHeartRate = defaults.bool(forKey: "hasRepairedSparseHeartRate")
     }
 
     /// The address as actually parsed, or `nil` if it can't be. Shown in the UI so there is no

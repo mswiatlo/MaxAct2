@@ -3,7 +3,7 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**
 (HAE), with batch upload to Strava.
 
-**Status:** Phases 0–8 complete and checked by the user. Next: issue 15 (deeper statistics).
+**Status:** Phases 0–8 complete and checked by the user. Next: issue 18's check, then 19.
 **Last updated:** 2026-10-14.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first: the HAE data
@@ -26,7 +26,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ## 1. Where things stand — 2026-10-12
 
-All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 330 in
+All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 335 in
 `MaxActCore` (`swift test`), 57 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~5 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** the user's check of issue 15 (training load, route heat map, heart-rate zones). Issue 7 (TrainingPeaks) starts with
+**Next:** the user's check of issue 18 (re-download the 17 Workout-app workouts), then 19. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -43,35 +43,25 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–14, 16 and 17 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–17 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
-**15. Deeper statistics.** *(deferred from issue 8; all three parts built, awaiting the user's check)*
-The HealthFit-style analyses left out of issue 8's first cut, as separate pieces:
-- **Training load** *(built 2026-10-14, awaiting the user's check)* — Fitness/Fatigue/Form
-  (CTL 42 days, ATL 7 days, TSB = yesterday's difference) from Banister's TRIMP on each workout's
-  average heart rate, in the package (`TrainingLoad`, 8 tests against independently computed
-  values, mutation-checked). Statistics gets a Training Load section (last 90 days) that asks for
-  resting HR, maximum HR (suggesting the highest recorded, 182) and the TRIMP curve on first use;
-  the same fields are in Settings. The curve (male 1.92 / female 1.67) is the user's choice, never
-  defaulted. Workouts without heart rate are counted and reported. Checked on a copy of the real
-  library with placeholder rates.
-- **Heart-rate zones** *(built 2026-10-14, awaiting the user's check)* — five zones by heart-rate
-  reserve (Karvonen: Z1 50–60% … Z5 90%+, plus Below Z1) from the Training Load profile. A
-  Statistics section above Routes: the current period's time per zone with bpm ranges, and
-  stacked bars per period, following the period, activity picker and search. Each workout's time
-  at each bpm is a histogram read in the same cached pass as the route sketches (each reading
-  counts until the next; gaps over 30 s count nothing — measured, 30.7 h of 275 h are such gaps),
-  so changing the profile is instant. Says how many workouts counted. Checked on a copy of the
-  real library: all 418 counted. The inspector shows the same breakdown for the selected workout
-  (below the charts), sharing one view (`HeartRateZoneBreakdown`) with Statistics.
-- **Route heat map** *(built 2026-10-14, awaiting the user's check)* — a Routes section in
-  Statistics: every route on one map, faint so overlaps build up, following the activity picker
-  and search. Routes are grouped into places by where they start (25 km), named from place labels;
-  the map opens on the biggest and frames its densest 96%, with a menu for the rest. Explorer
-  squares (zoom-14 tiles, counted from the full routes) as a total and per place, with an optional
-  overlay. Sketches are built once (all 418 routes: ~9 s) and cached beside the series. Checked on
-  a copy of the real library: 83 squares, 32 in Vancouver.
+**18. Sparse heart rate on Apple Workout-app recordings.** *(fix built 2026-10-14, awaiting the
+user's check)* 17 workouts (1–21 Oct 2025, all recorded by the watch's Workout app, "MaxWatch7")
+had 2–22 heart-rate readings — one per ~10 minutes — where Strava has 1 s. Measured live: Health
+Auto Export's `get_workouts` averages the Workout app's heart-rate series samples (~10-minute
+chunks) into one reading each; `get_health_metrics` (`heart_rate`, `aggregate: true`,
+`interval: "seconds"`) has every reading (353 at 5 s for the Oct 8 run, 83–169 bpm, matching its
+summary). WorkOutDoors stores readings individually, so its 400 workouts were never affected.
+Fixed: a detail download whose heart rate is under one reading a minute fetches it from
+`get_health_metrics` instead (one extra ~1 s query, only for such workouts). On first launch the
+app marks the stored sparse ones as needing detail (measured on a copy: exactly the 17), so
+**Download Detail** re-fetches them with the phone in front. **To check:** after that download, the
+Oct 8 run's heart-rate chart should be dense and its zones filled.
+
+**19. Thin routes on some Apple Workout-app recordings** *(open, not investigated)* — noticed while
+fixing 18: the Oct 8 2025 run has 58 GPS points over 30 minutes, the Oct 2 run 27, where a
+WorkOutDoors run has ~1 per second. Possibly the same kind of export loss; measure before assuming.
 
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.

@@ -57,6 +57,14 @@ public actor RouteSketchCache {
         await digests(for: workoutIDs, seriesStore: seriesStore, progress: progress).compactMap(\.sketch)
     }
 
+    /// Forget these workouts' digests — for when their series has been downloaded again.
+    public func invalidate(_ workoutIDs: some Sequence<String>) {
+        loadIfNeeded()
+        var changed = false
+        for id in workoutIDs where digests.removeValue(forKey: id) != nil { changed = true }
+        if changed { save() }
+    }
+
     /// Forget everything — for when the library itself is deleted.
     public func clear() {
         digests = [:]

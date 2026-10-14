@@ -110,3 +110,23 @@ public struct IngestedWorkout: Hashable, Sendable {
         self.series = series
     }
 }
+
+extension WorkoutSeries {
+    /// Whether `samples` are too sparse to be a workout's heart rate: fewer than one reading a
+    /// minute, over a workout of at least two minutes.
+    ///
+    /// Health Auto Export's workout export sends the Apple Workout app's heart rate this way. That
+    /// app stores heart rate as series samples, chunks of ~10 minutes holding a reading every few
+    /// seconds, and the export gives one averaged reading per chunk — measured: 3 readings for a
+    /// 30-minute run that Strava and `get_health_metrics` both have at 1–5 s. WorkOutDoors stores
+    /// each reading on its own, and its workouts come through at 5 s.
+    public static func heartRateIsSparse(_ samples: [HeartRateSample], duration: TimeInterval) -> Bool {
+        duration >= 120 && Double(samples.count) < duration / 60
+    }
+
+    /// The same series with its heart rate replaced.
+    public func replacingHeartRate(_ heartRate: [HeartRateSample]) -> WorkoutSeries {
+        WorkoutSeries(workoutID: workoutID, route: route, heartRate: heartRate, heartRateRecovery: heartRateRecovery,
+                      activeEnergyKilocalories: activeEnergyKilocalories, stepCount: stepCount)
+    }
+}

@@ -68,6 +68,32 @@ public struct HAEWorkoutDecoder: Sendable {
         return Result(workouts: workouts, failures: failures)
     }
 
+    /// Decodes a `get_health_metrics` reply for `heart_rate`: `{"data": {"metrics": [{"name":
+    /// "heart_rate", "units": "count/min", "data": [{"date", "Min", "Avg", "Max", "source"}]}]}}`.
+    /// Each reading keeps its source, so the caller can keep the recording device's.
+    public func decodeHeartRateMetric(_ data: Data) throws -> [(sample: HeartRateSample, source: String?)] {
+        let root = try JSONSerialization.jsonObject(with: data)
+        guard let object = root as? [String: Any] else { throw EnvelopeError.notAnObject }
+        let container = (object["data"] as? [String: Any]) ?? object
+        let metrics = (container["metrics"] as? [[String: Any]]) ?? []
+        let parser = HAEDateParser()
+        var result: [(sample: HeartRateSample, source: String?)] = []
+        for metric in metrics where metric["name"] as? String == "heart_rate" {
+            let unit = metric["units"] as? String
+            for point in (metric["data"] as? [[String: Any]]) ?? [] {
+                guard let date = point["date"] as? String, let avg = point["Avg"] as? Double else { continue }
+                if let unit { _ = try Units.value(avg, in: unit, as: .rate, field: "heart_rate") }
+                result.append((
+                    HeartRateSample(date: try parser.date(from: date, field: "heart_rate.date"),
+                                    minimum: point["Min"] as? Double ?? avg, average: avg,
+                                    maximum: point["Max"] as? Double ?? avg),
+                    point["source"] as? String
+                ))
+            }
+        }
+        return result.sorted { $0.sample.date < $1.sample.date }
+    }
+
     // MARK: - One workout
 
     func decodeWorkout(_ entry: [String: Any], parser: HAEDateParser) throws -> IngestedWorkout {

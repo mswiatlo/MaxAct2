@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed or closed known issues (1–14, 16, 17)
+## 2. Fixed or closed known issues (1–17)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -431,6 +431,33 @@ website's internal API (`tpapi.trainingpeaks.com`) with a copied browser session
 unsupported, breaks without notice and may breach the terms, so it was ruled out. The fallback the
 plan proposed — an Export TCX… command for manual upload — was offered and declined; nothing was
 built. Revisit only if TrainingPeaks opens personal access.
+
+**15. ~~Deeper statistics.~~ — done 2026-10-14, confirmed by the user.** *(deferred from issue 8)*
+The HealthFit-style analyses left out of issue 8's first cut, as separate pieces:
+- **Training load** *(built 2026-10-14)* — Fitness/Fatigue/Form
+  (CTL 42 days, ATL 7 days, TSB = yesterday's difference) from Banister's TRIMP on each workout's
+  average heart rate, in the package (`TrainingLoad`, 8 tests against independently computed
+  values, mutation-checked). Statistics gets a Training Load section (last 90 days) that asks for
+  resting HR, maximum HR (suggesting the highest recorded, 182) and the TRIMP curve on first use;
+  the same fields are in Settings. The curve (male 1.92 / female 1.67) is the user's choice, never
+  defaulted. Workouts without heart rate are counted and reported. Checked on a copy of the real
+  library with placeholder rates.
+- **Heart-rate zones** *(built 2026-10-14)* — five zones by heart-rate
+  reserve (Karvonen: Z1 50–60% … Z5 90%+, plus Below Z1) from the Training Load profile. A
+  Statistics section above Routes: the current period's time per zone with bpm ranges, and
+  stacked bars per period, following the period, activity picker and search. Each workout's time
+  at each bpm is a histogram read in the same cached pass as the route sketches (each reading
+  counts until the next; gaps over 30 s count nothing — measured, 30.7 h of 275 h are such gaps),
+  so changing the profile is instant. Says how many workouts counted. Checked on a copy of the
+  real library: all 418 counted. The inspector shows the same breakdown for the selected workout
+  (below the charts), sharing one view (`HeartRateZoneBreakdown`) with Statistics.
+- **Route heat map** *(built 2026-10-14)* — a Routes section in
+  Statistics: every route on one map, faint so overlaps build up, following the activity picker
+  and search. Routes are grouped into places by where they start (25 km), named from place labels;
+  the map opens on the biggest and frames its densest 96%, with a menu for the rest. Explorer
+  squares (zoom-14 tiles, counted from the full routes) as a total and per place, with an optional
+  overlay. Sketches are built once (all 418 routes: ~9 s) and cached beside the series. Checked on
+  a copy of the real library: 83 squares, 32 in Vancouver.
 
 **16. ~~Mark races on Strava.~~ — done 2026-10-14, confirmed by the user.**
 
@@ -1058,6 +1085,20 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-14** — **Issue 15 closed**, confirmed by the user. **Issue 18 found and fixed:** the
+  user saw missing heart rate for 8–21 Oct 2025. Measured: not a date range but a recording app —
+  17 of the 18 Apple Workout-app workouts (all of them in 1–21 Oct 2025) had one reading per ~10
+  minutes; all 400 WorkOutDoors workouts have 5 s. Strava's stream for the Oct 8 run: 1,825
+  readings at 1 s. A raw `get_workouts` reply (curl; Homebrew Python is blocked by Local Network
+  privacy — "No route to host" while ping and curl work) had 3 `heartRateData` entries at either
+  aggregation, non-integer averages with `sampleCount: 1`, while steps and energy were per second:
+  the export averages the Workout app's series-sample chunks. `get_health_metrics` had 367 readings
+  at 5 s. Built: the detail fetch falls back to it for sparse heart rate; a one-time pass marks
+  stored sparse workouts as needing detail (exactly the 17, on a copy); re-downloads invalidate
+  the cached digest. Checked live: 353 readings for the Oct 8 run in 4 s. 5 package tests,
+  mutation-checked (fallback skipped; device filter dropped). Opened 19 (thin Workout-app routes).
+  335 package tests, 57 app and UI tests (2 real-content skipped).
 
 - **2026-10-14** — **Issue 15: heart-rate zones in the workout inspector** (the user's request).
   The zone breakdown is now one view, `HeartRateZoneBreakdown`, used by the Statistics section
