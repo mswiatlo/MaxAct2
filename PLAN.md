@@ -3,7 +3,7 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**
 (HAE), with batch upload to Strava.
 
-**Status:** Phases 0–7 complete and verified live; Phase 8 built 2026-10-14, awaiting the user's check.
+**Status:** Phases 0–8 complete and checked by the user. Next: issue 7 (TrainingPeaks), then 15.
 **Last updated:** 2026-10-14.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first: the HAE data
@@ -20,7 +20,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 | 5 — Detail view | Complete |
 | 6 — Approximate location | Complete |
 | 7 — TCX + Strava | Complete, verified live |
-| 8 — Polish | Built, awaiting the user's check |
+| 8 — Polish | Complete, checked by the user |
 
 ---
 
@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** the user's check of Phase 8. Issue 7 (TrainingPeaks) starts with
+**Next:** issue 7 (TrainingPeaks — first, whether its API is open to us), then 15 (deeper statistics). Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -52,6 +52,16 @@ understood to be partner-gated. If closed, offer a plain "Export TCX…" command
 Garmin, Runalyze and archiving anyway. The uploader sits behind `WorkoutDestination`, but upload
 *state* on `WorkoutRecord` is still Strava-shaped; a second destination means per-destination
 state, which is a schema and UI change.
+
+**15. Deeper statistics.** *(deferred from issue 8, not started)*
+The HealthFit-style analyses left out of issue 8's first cut, as separate pieces:
+- **Training load** — Fitness/Fatigue/Form (CTL/ATL/TSB) from TRIMP, using each workout's average
+  heart rate. Needs resting and maximum heart rate as settings; an approximation without beat-level
+  data. Works from summary data, so covers every workout.
+- **Heart-rate zones** — time in zones per period. Needs the HR series, so it only covers workouts
+  whose detail has been downloaded; say how many weren't counted.
+- **Route heat map** — every route on one map, plus an Explorer-style count of map tiles visited.
+  Also needs downloaded detail.
 
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.
@@ -148,7 +158,7 @@ leaves without an explicit action on an explicit selection. UI tests run fully i
 
 ---
 
-## 5. Phase 8 — Polish *(built 2026-10-14, awaiting the user's check)*
+## 5. Phase 8 — Polish *(complete 2026-10-14, checked by the user)*
 
 Scope chosen with the user: a welcome sheet with a connection test, and remembering the sidebar
 choice and sort (not the selection or search).
@@ -168,6 +178,10 @@ choice and sort (not the selection or search).
   only a real search gets "No Results".
 - **Remembered** between launches: sidebar choice and table sort.
 - **Library load errors** are shown in a banner (they were recorded and never displayed).
+
+Checked by the user: welcome sheet, Test Connection, empty states, remembered sidebar and sort. The
+sync error messages couldn't be checked live (sync was working); they rest on the tests and the
+measured URLError mapping.
 
 ---
 

@@ -1028,6 +1028,12 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-14** — **Phase 8 complete**, checked by the user (welcome sheet, Test Connection, empty
+  states, remembered sidebar and sort; sync error wording untestable while sync works). The
+  statistics deferred from issue 8 (training load, HR zones, route heat map) had left PLAN.md along
+  with issue 8's diagnosis — the user noticed; restored as issue 15. Lesson: when moving a fixed
+  issue to §2, carry anything still open back into PLAN.md.
+
 - **2026-10-14** — The user confirmed Test Connection works against their phone after the timeout
   fix.
 

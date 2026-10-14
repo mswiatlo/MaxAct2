@@ -23,6 +23,7 @@ fixed issues and the dated change log are in `HISTORY.md`.
 - `PLAN.md`: edit sections in place, bump **Last updated**, update the phase table. Keep it short.
 - `HISTORY.md` §8: add a dated change-log entry.
 - **When an issue is fixed**, move its diagnosis to `HISTORY.md` §2 and drop it from `PLAN.md`.
+  Anything in it that's still open — deferred ideas, follow-ups — stays in `PLAN.md` as its own item.
 - Use today's real date. Earlier entries were misdated and had to be corrected.
 - Durable how-to knowledge goes in the skill's references, not here or in `PLAN.md`.
 
