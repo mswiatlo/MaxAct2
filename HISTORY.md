@@ -1002,6 +1002,11 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-14** — Issue 8c: the personal-best sheet is headed by the record ("Longest — 11.66 km")
+  instead of repeating the activity and date. The best's title and formatting moved to an
+  extension on `PersonalBest`, shared by the cards and the sheet. UI test extended and
+  mutation-checked (a sheet headed "Cycling" fails it).
+
 - **2026-10-12** — The user confirmed the issue 8 layout fixes work, and asked for 8d: explore
   putting the inspector back over the statistics (scrolling sideways if needed), keeping the sheet
   if that proves impossible. Recorded with first ideas; paused.

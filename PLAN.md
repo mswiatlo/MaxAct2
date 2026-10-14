@@ -4,7 +4,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 (HAE), with batch upload to Strava.
 
 **Status:** Phases 0–7 complete and verified live. Next: known issues, then Phase 8.
-**Last updated:** 2026-10-12.
+**Last updated:** 2026-10-14.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first: the HAE data
 > contract, the Xcode tooling limits, and the Strava API facts. **`HISTORY.md`** holds how we got
@@ -71,10 +71,9 @@ user; their check of the fix raised 8c, still open:
   doesn't). An AppKit scroll-view host didn't help. Fix, the user's choice: **a best opens its
   workout in a sheet** (the same detail view), and the **inspector stays shut while Statistics is
   showing** — toolbar toggle, ⌃⌘I and the menu included — returning as it was with the list.
-- **8c. The personal-best sheet's header repeats the workout.** *(open, from the user's check)*
-  It shows the activity and date, which the detail view repeats just below. It should name the
-  **personal best** instead — e.g. "Longest ride · 11.66 km" — so the sheet says why it opened.
-  Needs the best's category passed through from `BestsSection` to `WorkoutSheet`.
+- **8c. The personal-best sheet's header repeated the workout.** *(fixed 2026-10-14, awaiting the
+  user's check)* It's now headed by the record — "🏆 Longest — 11.66 km · Personal best" — and the
+  detail view below keeps the activity and date. UI test checks the heading (mutation-checked).
 - **8d. Bring back the inspector over the statistics, if possible.** *(open, exploratory — the
   user's request)* Instead of the sheet, the inspector should sit beside or on top of the
   statistics, with the statistics scrolling left–right if they don't fit. Keep the sheet (it works)

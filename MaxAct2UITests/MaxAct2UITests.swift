@@ -729,9 +729,17 @@ final class SeededTableUITests: XCTestCase {
         assertLaidOut("after ⌃⌘I")
 
         // A personal best opens its workout in a sheet; Done returns to the statistics as they were.
-        app.links["PersonalBest"].firstMatch.click()
+        let best = app.links["PersonalBest"].firstMatch
+        let record = best.label   // e.g. "26.56 km", the card's first row: Longest
+        best.click()
         let sheet = app.sheets.firstMatch
         XCTAssertTrue(sheet.waitForExistence(timeout: 10), "A personal best should open a sheet.")
+        // Headed by the record it shows, not by the workout (issue 8c).
+        let heading = sheet.descendants(matching: .any)["PersonalBestSheetTitle"].firstMatch
+        XCTAssertTrue(heading.waitForExistence(timeout: 5), "The sheet should be headed by the personal best.")
+        let headingText = [heading.label, heading.value as? String ?? ""].joined(separator: " ")
+        XCTAssertTrue(headingText.contains("Longest — \(record)"),
+                      "The sheet's heading should name the record: got '\(headingText)'.")
         XCTAssertTrue(sheet.staticTexts.containing(NSPredicate(format: "value CONTAINS[c] 'Duration'"))
             .firstMatch.waitForExistence(timeout: 10), "The sheet should show the workout's detail.")
         sheet.buttons["Done"].click()

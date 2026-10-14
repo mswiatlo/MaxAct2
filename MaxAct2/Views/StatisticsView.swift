@@ -21,7 +21,7 @@ struct StatisticsView: View {
     @AppStorage("statistics.metric") private var metric: StatisticsMetric = .distance
 
     /// A personal best's workout, shown in a sheet over the statistics (issue 8a).
-    @State private var shownWorkout: WorkoutListItem?
+    @State private var shownBest: ShownBest?
 
     private var workouts: [Workout] {
         model.visibleItems.map(\.workout).filter { kindKey == nil || $0.kind.storageKey == kindKey }
@@ -55,8 +55,9 @@ struct StatisticsView: View {
                         today: WorkoutStatistics.referenceDate(for: now, calendar: calendar)
                     )
                     ConsistencySection(workouts: workouts, now: now, calendar: calendar)
-                    BestsSection(workouts: workouts, kinds: model.presentKinds.map(\.kind)) { id in
-                        shownWorkout = model.items.first { $0.id == id }
+                    BestsSection(workouts: workouts, kinds: model.presentKinds.map(\.kind)) { best, kind in
+                        shownBest = model.items.first { $0.id == best.workoutID }
+                            .map { ShownBest(item: $0, best: best, kind: kind) }
                     }
                 }
             }
@@ -72,8 +73,8 @@ struct StatisticsView: View {
         // SwiftUI shifted them left and cut the sidebar off.
         .frame(minWidth: Self.minimumWidth, idealWidth: Self.minimumWidth, maxWidth: .infinity)
         .accessibilityIdentifier("StatisticsScroll")
-        .sheet(item: $shownWorkout) { item in
-            WorkoutSheet(model: model, item: item)
+        .sheet(item: $shownBest) { shown in
+            WorkoutSheet(model: model, shown: shown)
         }
         .navigationTitle("Statistics")
         .navigationSubtitle(subtitle(count: workouts.count))
@@ -587,8 +588,8 @@ struct BestsSection: View {
     let workouts: [Workout]
     /// In sidebar order: most frequent first.
     let kinds: [ActivityKind]
-    /// Shows the workout with this id.
-    let open: (String) -> Void
+    /// Shows a best's workout.
+    let open: (PersonalBest, ActivityKind) -> Void
 
     var body: some View {
         let byKind = Dictionary(grouping: workouts, by: \.kind)
@@ -628,9 +629,9 @@ struct BestsSection: View {
             Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
                 ForEach(bests) { best in
                     GridRow {
-                        Text(title(best.category))
+                        Text(best.title)
                             .foregroundStyle(.secondary)
-                        Button(value(best, kind: kind)) { open(best.workoutID) }
+                        Button(best.formattedValue(for: kind)) { open(best, kind) }
                         .buttonStyle(.link)
                         .monospacedDigit()
                         .help("Show this workout")
@@ -649,8 +650,11 @@ struct BestsSection: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(kind.displayName) personal bests")
     }
+}
 
-    private func title(_ category: PersonalBest.Category) -> String {
+extension PersonalBest {
+    /// "Longest", "Most climbing" — the card's row label and the sheet's heading.
+    var title: String {
         switch category {
         case .longestDistance: "Longest"
         case .longestDuration: "Longest time"
@@ -660,32 +664,47 @@ struct BestsSection: View {
         }
     }
 
-    private func value(_ best: PersonalBest, kind: ActivityKind) -> String {
-        switch best.category {
-        case .longestDistance: WorkoutFormatting.distance(best.value)
-        case .longestDuration: WorkoutFormatting.duration(best.value)
-        case .mostClimbing: WorkoutFormatting.elevationGain(meters: best.value)
-        case .fastest: WorkoutFormatting.paceOrSpeed(metersPerSecond: best.value, for: kind)
-        case .mostEnergy: WorkoutFormatting.energy(kilocalories: best.value)
+    /// The record itself, in the unit the sport reads in.
+    func formattedValue(for kind: ActivityKind) -> String {
+        switch category {
+        case .longestDistance: WorkoutFormatting.distance(value)
+        case .longestDuration: WorkoutFormatting.duration(value)
+        case .mostClimbing: WorkoutFormatting.elevationGain(meters: value)
+        case .fastest: WorkoutFormatting.paceOrSpeed(metersPerSecond: value, for: kind)
+        case .mostEnergy: WorkoutFormatting.energy(kilocalories: value)
         }
     }
 }
 
 // MARK: - A workout from the statistics
 
+/// A personal best's workout, as the sheet needs it: the workout, and which record it holds.
+struct ShownBest: Identifiable {
+    let item: WorkoutListItem
+    let best: PersonalBest
+    let kind: ActivityKind
+
+    var id: String { "\(item.id)/\(best.category.rawValue)" }
+}
+
 /// The workout detail — the same view as the inspector's — in a sheet over the statistics, so a
 /// personal best can be looked at without leaving them. Escape or Done closes it.
+///
+/// **Headed by the record, not the workout:** the detail view's own header already names the
+/// activity and date, and the user found the sheet repeating them; what the sheet adds is *why*
+/// it opened (issue 8c).
 private struct WorkoutSheet: View {
     let model: AppModel
-    let item: WorkoutListItem
+    let shown: ShownBest
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Label(item.workout.kind.displayName, systemImage: item.workout.kind.symbolName)
+            HStack(alignment: .firstTextBaseline) {
+                Label("\(shown.best.title) — \(shown.best.formattedValue(for: shown.kind))", systemImage: "trophy")
                     .font(.headline)
-                Text(item.workout.start.formatted(date: .abbreviated, time: .shortened))
+                    .accessibilityIdentifier("PersonalBestSheetTitle")
+                Text("Personal best")
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button("Done") { dismiss() }
@@ -693,7 +712,7 @@ private struct WorkoutSheet: View {
             }
             .padding(12)
             Divider()
-            WorkoutDetailView(model: model, item: item)
+            WorkoutDetailView(model: model, item: shown.item)
         }
         .frame(minWidth: 560, idealWidth: 720, minHeight: 560, idealHeight: 820)
     }

@@ -47,7 +47,7 @@ import Testing
                 years: WorkoutStatistics.yearProgression(workouts, metric: .distance, now: now, calendar: calendar),
                 metric: .distance, today: WorkoutStatistics.referenceDate(for: now, calendar: calendar)))),
             ("consistency", AnyView(ConsistencySection(workouts: workouts, now: now, calendar: calendar))),
-            ("bests", AnyView(BestsSection(workouts: workouts, kinds: kinds) { _ in })),
+            ("bests", AnyView(BestsSection(workouts: workouts, kinds: kinds) { _, _ in })),
         ]
         for (name, view) in sections {
             let width = narrowest(view)
