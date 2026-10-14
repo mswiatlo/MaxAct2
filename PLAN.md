@@ -24,7 +24,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ---
 
-## 1. Where things stand — 2026-10-12
+## 1. Where things stand — 2026-10-14 (paused)
 
 All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 338 in
 `MaxActCore` (`swift test`), 57 app and UI tests (`RunAllTests` — ask first, then leave the Mac
@@ -46,7 +46,7 @@ Numbered independently of the phases: "known issue 8" (summary stats) is not "Ph
 Fixed or closed issues — 1–19 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
-**21. Health Auto Export bug report** *(drafted 2026-10-14; the user is posting it)* — two export
+**21. Health Auto Export bug report** *(sent by the user 2026-10-14; awaiting HAE's reply)* — two export
 defects behind 18 and 19, on every HAE path (MCP, manual JSON and GPX): Workout-app heart rate comes
 as one average per series sample, and interval workouts' routes as one interval's piece (the Sept
 17 2025 run: interval 3 of 28, 27 s of 42 min — identical in the manual GPX/JSON export). Until

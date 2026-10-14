@@ -1117,6 +1117,9 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-14** — The user sent the HAE bug report (issue 21). Paused; next is ⌥⌘U to fill the 9
+  September routes, then issue 20.
+
 - **2026-10-14** — **Issues 18 and 19 closed**, confirmed by the user. The user found a partial
   route on 17 Sep 2025 and asked whether HAE could supply the rest. Measured: no — every
   `get_workouts` variant and HAE's manual GPX/JSON export give the same one-interval piece; 9
