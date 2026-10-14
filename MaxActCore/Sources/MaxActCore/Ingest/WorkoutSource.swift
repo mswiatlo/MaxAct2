@@ -57,6 +57,16 @@ public enum SyncPlanner {
 
     /// Newest first. A multi-year backfill should surface recent workouts immediately rather than
     /// starting seven years ago and showing nothing useful for an hour.
+    /// One calendar month, in `calendar`'s time zone, for importing a specific month (issue 17).
+    /// Ends at `now` for the month in progress; `nil` for a month that hasn't started.
+    public static func month(_ month: Int, of year: Int, calendar: Calendar, now: Date = .now) -> DateInterval? {
+        guard let start = calendar.date(from: DateComponents(year: year, month: month, day: 1)),
+              start <= now,
+              let interval = calendar.dateInterval(of: .month, for: start)
+        else { return nil }
+        return DateInterval(start: interval.start, end: min(interval.end, now))
+    }
+
     public static func windowsNewestFirst(
         from start: Date,
         to end: Date,

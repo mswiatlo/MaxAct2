@@ -363,6 +363,40 @@ final class MaxAct2UITests: XCTestCase {
         XCTAssertTrue(app.sheets.firstMatch.staticTexts["Welcome to MaxAct"].waitForExistence(timeout: 5))
     }
 
+    /// Issue 17: the sync panel can import one chosen month, and won't offer one still to come.
+    @MainActor
+    func testTheSyncPanelImportsASpecificMonth() throws {
+        let app = launchApp()
+        app.buttons["Sync"].click()
+        let address = app.textFields.element(boundBy: 0)
+        XCTAssertTrue(address.waitForExistence(timeout: 5))
+        address.click(); address.typeText("10.255.255.1")
+        let token = app.textFields.element(boundBy: 1)
+        token.click(); token.typeText("irrelevant")
+
+        app.popUpButtons["Import"].click()
+        app.menuItems["A specific month…"].click()
+        let month = app.popUpButtons["Month"]
+        XCTAssertTrue(month.waitForExistence(timeout: 5), "Choosing a specific month should offer a month picker.")
+        let start = app.buttons["Start Sync"]
+
+        // December of this year hasn't started (unless it's December, when November stands in).
+        let thisMonth = Calendar.current.component(.month, from: .now)
+        let future = thisMonth == 12 ? nil : "December"
+        if let future {
+            month.click(); app.menuItems[future].click()
+            XCTAssertTrue(app.staticTexts["That month hasn't started yet."].waitForExistence(timeout: 3))
+            XCTAssertFalse(start.isEnabled, "A month still to come can't be imported.")
+        }
+
+        // The same month last year can.
+        let lastYear = String(Calendar.current.component(.year, from: .now) - 1)
+        let year = app.popUpButtons.matching(NSPredicate(format: "value == %@", String(Calendar.current.component(.year, from: .now)))).firstMatch
+        year.click(); app.menuItems[lastYear].click()
+        XCTAssertFalse(app.staticTexts["That month hasn't started yet."].exists)
+        XCTAssertTrue(start.isEnabled, "A past month can be imported.")
+    }
+
     /// Phase 8: a refused connection names its cause.
     @MainActor
     func testARefusedConnectionSaysTheServerIsntRunning() throws {

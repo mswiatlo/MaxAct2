@@ -7,6 +7,9 @@ import SwiftUI
 /// top-up wants a week, the initial import wants everything — not a preference you set once.
 enum SyncRange: String, CaseIterable, Identifiable {
     case week, month, threeMonths, year, everything
+    /// One chosen calendar month (issue 17) — e.g. to fetch a race month for checking Strava's
+    /// race flag, without re-syncing everything since.
+    case specificMonth
 
     var id: Self { self }
 
@@ -17,6 +20,7 @@ enum SyncRange: String, CaseIterable, Identifiable {
         case .threeMonths: "Last 3 months"
         case .year: "Last year"
         case .everything: "Everything (7 years)"
+        case .specificMonth: "A specific month…"
         }
     }
 
@@ -27,6 +31,7 @@ enum SyncRange: String, CaseIterable, Identifiable {
         case .threeMonths: 0.25
         case .year: 1
         case .everything: 7
+        case .specificMonth: 31.0 / 365   // the picked month's own length is used where it matters
         }
     }
 
@@ -67,6 +72,18 @@ struct SyncPanel: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var range: SyncRange = .month
+    @State private var chosenMonth = Calendar.current.component(.month, from: .now)
+    @State private var chosenYear = Calendar.current.component(.year, from: .now)
+
+    /// The chosen month, in local time; `nil` for one that hasn't started yet.
+    private var chosenInterval: DateInterval? {
+        SyncPlanner.month(chosenMonth, of: chosenYear, calendar: .current)
+    }
+
+    /// What Start Sync will import, or `nil` if the choice can't be imported.
+    private var importInterval: DateInterval? {
+        range == .specificMonth ? chosenInterval : DateInterval(start: range.startDate(), end: .now)
+    }
     @State private var backfillScope: AppModel.BackfillScope = .everything
 
     var body: some View {
@@ -117,8 +134,29 @@ struct SyncPanel: View {
         }
         .disabled(!isReady)
 
+        if range == .specificMonth {
+            HStack {
+                Picker("Month", selection: $chosenMonth) {
+                    ForEach(1...12, id: \.self) { Text(Calendar.current.monthSymbols[$0 - 1]).tag($0) }
+                }
+                Picker("Year", selection: $chosenYear) {
+                    // Back as far as "Everything" reaches.
+                    let thisYear = Calendar.current.component(.year, from: .now)
+                    ForEach((thisYear - 7...thisYear).reversed(), id: \.self) { Text(String($0)).tag($0) }
+                }
+                .labelsHidden()
+                .fixedSize()
+            }
+            .disabled(!isReady)
+            if chosenInterval == nil {
+                Label("That month hasn't started yet.", systemImage: "exclamationmark.circle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+        }
+
         Text(isReady
-             ? "Takes \(range.estimate). Keep Health Auto Export open and in the foreground with "
+             ? "Takes \(estimate). Keep Health Auto Export open and in the foreground with "
                + "the phone unlocked. You can stop at any point and resume later — finished weeks "
                + "are kept."
              : "Health Auto Export must stay open and in the foreground while syncing, with the "
@@ -131,13 +169,19 @@ struct SyncPanel: View {
             SettingsLink { Text("Settings…") }
             Spacer()
             Button("Start Sync") {
-                model.startSync(from: range.startDate())
+                guard let interval = importInterval else { return }
+                model.startSync(from: interval.start, to: interval.end)
                 dismiss()
             }
             .keyboardShortcut(.defaultAction)
             .buttonStyle(.borderedProminent)
-            .disabled(!isReady)
+            .disabled(!isReady || importInterval == nil)
         }
+    }
+
+    private var estimate: String {
+        guard let interval = importInterval else { return range.estimate }
+        return SyncEstimate.describe(SyncEstimate.seconds(forDays: interval.duration / 86_400))
     }
 
     // MARK: - Detail backfill

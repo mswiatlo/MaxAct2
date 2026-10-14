@@ -917,13 +917,14 @@ final class AppModel {
 
     // MARK: Task lifecycle
 
-    /// Starts a list-pass sync back to `start`.
+    /// Starts a list-pass sync of `start`…`end` — by default back from now.
     ///
     /// The span is a parameter rather than a stored preference: it's a per-sync decision, since a
-    /// daily top-up wants a week and the initial import wants everything.
-    func startSync(from start: Date) {
+    /// daily top-up wants a week, the initial import wants everything, and a single past month
+    /// (issue 17) wants neither.
+    func startSync(from start: Date, to end: Date = .now) {
         guard let source = settings.makeSource(), !syncStatus.isRunning else { return }
-        syncTask = Task { await sync(source: source, from: start) }
+        syncTask = Task { await sync(source: source, from: start, to: end) }
     }
 
     /// Walks the whole backlog for a scope, newest first.
