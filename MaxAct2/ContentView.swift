@@ -53,7 +53,7 @@ struct ContentView: View {
         } detail: {
             workoutList
         }
-        .inspector(isPresented: inspectorPresented) {
+        .inspector(isPresented: systemInspectorPresented) {
             DetailPane(model: model)
         }
         // Lets View ▸ Hide Sidebar read and write the same state the split view uses.
@@ -94,14 +94,12 @@ struct ContentView: View {
         .task { await model.load() }
     }
 
-    /// The inspector, **kept shut while Statistics is showing** (issue 8a). Beside statistics it
-    /// can't be laid out: SwiftUI pins a pure-SwiftUI column's minimum to its current width when
-    /// the inspector opens (measured with a layout dump; even a plain colour does it), so the panes
-    /// overflowed and the sidebar was cut off. A personal best opens its workout in a sheet
-    /// instead. The toolbar toggle, ⌃⌘I and View ▸ Show Inspector all go through this, so none
-    /// of them can bring it back there; `showsDetail` is untouched, so the inspector returns as it
-    /// was when the list does.
-    private var inspectorPresented: Binding<Bool> {
+    /// The window's real inspector, **kept shut while Statistics is showing** (issue 8a). Beside
+    /// statistics it can't be laid out: SwiftUI pins a pure-SwiftUI column's minimum to its current
+    /// width when the inspector opens (measured with a layout dump; even a plain colour does it), so
+    /// the panes overflowed and the sidebar was cut off. There the same `showsDetail` drives
+    /// `StatisticsWithInspector`'s overlay instead (issue 8d), which never enters the split view.
+    private var systemInspectorPresented: Binding<Bool> {
         Binding(
             get: { model.showsDetail && model.sidebarSelection != .statistics },
             set: { if model.sidebarSelection != .statistics { model.showsDetail = $0 } }
@@ -126,7 +124,7 @@ struct ContentView: View {
                 .buttonStyle(.borderedProminent)
             }
         } else if model.sidebarSelection == .statistics {
-            StatisticsView(model: model)
+            StatisticsWithInspector(model: model)
         } else if model.visibleItems.isEmpty {
             ContentUnavailableView.search(text: model.searchText)
         } else {
@@ -166,11 +164,10 @@ struct ContentView: View {
         // Finder and Xcode put theirs. A close button inside the pane would be a fair addition but
         // no substitute — it vanishes with the pane, so it can't bring it back.
         ToolbarItem {
-            Toggle(isOn: inspectorPresented) {
+            Toggle(isOn: $model.showsDetail) {
                 Label("Inspector", systemImage: "sidebar.trailing")
             }
             .help(model.showsDetail ? "Hide the workout details" : "Show the workout details")
-            .disabled(model.sidebarSelection == .statistics)
         }
     }
 

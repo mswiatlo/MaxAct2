@@ -1002,6 +1002,15 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-14** — **Issue 8d: the inspector is back over the statistics**, drawn as a panel inside
+  their own column rather than as the window's split-view inspector, so nothing gets pinned.
+  Replaced `InspectorCommands()` with our own ⌃⌘I command (the system one drives the real
+  inspector's binding, held shut over the statistics). Statistics scroll sideways below 480pt.
+  First test run mis-measured the panel (its identifier lands on an inner element) — screenshots
+  showed it right; the test now measures by edges. Mutation-checked: letting the real inspector open
+  over the statistics cuts the sidebar off by 105pt. The 8c sheet header (done earlier today) is
+  superseded along with the sheet.
+
 - **2026-10-14** — Issue 8c: the personal-best sheet is headed by the record ("Longest — 11.66 km")
   instead of repeating the activity and date. The best's title and formatting moved to an
   extension on `PersonalBest`, shared by the cards and the sheet. UI test extended and

@@ -163,11 +163,30 @@ struct MaxActApp: App {
             SidebarToggleCommand()
             // View ▸ Show/Hide Inspector with its standard shortcut. The detail pane starts
             // hidden, so there has to be a way to open it that isn't "select something".
-            InspectorCommands()
+            InspectorToggleCommand(model: model)
         }
 
         Settings {
             SettingsView(settings: model.settings, model: model)
+        }
+    }
+}
+
+/// View ▸ Show/Hide Inspector, with the system's ⌃⌘I.
+///
+/// **Not `InspectorCommands()`**, which toggles the binding of the window's `.inspector` — and over
+/// the statistics that one is held shut (see `ContentView.systemInspectorPresented`), so the
+/// shortcut did nothing there. This toggles `showsDetail`, which drives the system inspector beside
+/// the list and the overlay inspector over the statistics alike.
+struct InspectorToggleCommand: Commands {
+    @Bindable var model: AppModel
+
+    var body: some Commands {
+        CommandGroup(after: .sidebar) {
+            Button(model.showsDetail ? "Hide Inspector" : "Show Inspector") {
+                model.showsDetail.toggle()
+            }
+            .keyboardShortcut("i", modifiers: [.control, .command])
         }
     }
 }

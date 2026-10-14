@@ -695,8 +695,12 @@ but didn't cure it.
 
 Also tried, and no help: hosting the content in an AppKit `NSScrollView` with an `NSHostingView`
 document sized to it — same pinned width, and XCUITest could no longer scroll links into view.
-**What MaxAct does:** keeps the inspector shut while Statistics is showing (one `Binding` that the
-toolbar toggle, ⌃⌘I and View ▸ Inspector all go through) and shows a workout from there in a sheet.
+**What MaxAct does:** keeps the window's inspector shut while Statistics is showing, and draws the
+same detail view as a panel *inside the statistics' column* (`StatisticsWithInspector`: an `HStack`
+with a drag-handle divider), so the split view never changes and nothing is pinned. ⌃⌘I is our own
+command toggling `showsDetail` — `InspectorCommands()` toggles the real inspector's binding, which
+is held shut there. In UI tests, an `accessibilityIdentifier` on that panel lands on an inner
+element; measure the panel by the content's edge and the window's.
 
 **UI tests launch the app by bundle identifier**, so every extra build of the app LaunchServices
 knows about (e.g. an `xcodebuild -derivedDataPath /tmp/...` copy) is a candidate to be launched

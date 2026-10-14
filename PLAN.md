@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 9–14 fixed or closed; View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** issue 8c (the personal-best sheet's header) and 8d (try to restore the inspector over the statistics), then Phase 8. Issue 7 (TrainingPeaks) starts with
+**Next:** the user's check of the inspector over the statistics (8a/8d), then Phase 8. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -65,30 +65,16 @@ heat map.
 
 The user's check (2026-10-12) found two layout problems, both fixed 2026-10-12 and checked by the
 user; their check of the fix raised 8c, still open:
-- **8a. A personal best opened a cramped inspector and cut the sidebar off.** Root cause, from a
-  layout dump: when the inspector opens beside pure-SwiftUI content, SwiftUI pins that column's
-  minimum to its current width, so the panes overflow (a plain colour does it; the AppKit table
-  doesn't). An AppKit scroll-view host didn't help. Fix, the user's choice: **a best opens its
-  workout in a sheet** (the same detail view), and the **inspector stays shut while Statistics is
-  showing** — toolbar toggle, ⌃⌘I and the menu included — returning as it was with the list.
-- **8c. The personal-best sheet's header repeated the workout.** *(fixed 2026-10-14, awaiting the
-  user's check)* It's now headed by the record — "🏆 Longest — 11.66 km · Personal best" — and the
-  detail view below keeps the activity and date. UI test checks the heading (mutation-checked).
-- **8d. Bring back the inspector over the statistics, if possible.** *(open, exploratory — the
-  user's request)* Instead of the sheet, the inspector should sit beside or on top of the
-  statistics, with the statistics scrolling left–right if they don't fit. Keep the sheet (it works)
-  and abandon this if it truly can't be done. What's known: the real `.inspector` can't do it —
-  SwiftUI pins any SwiftUI column's width when it opens, even a plain colour, so horizontal
-  scrolling inside the statistics wouldn't help. Ideas to try, cheapest first:
-  - **An overlay, not a split pane:** draw the detail view as a trailing panel *over* the
-    statistics (`.overlay(alignment: .trailing)` with a material background, a drag handle for
-    width, the same toggle/⌃⌘I), with the statistics given trailing room or scrolling. It never
-    enters the split view, so nothing gets pinned. Costs: hand-rolled resizing and no system
-    inspector behaviour (state restoration, standard divider).
-  - **A second `NavigationSplitView` column** for the detail in statistics mode, instead of
-    `.inspector` — unmeasured; may pin the same way.
-  - The UI test `testStatisticsKeepTheirLayoutAndOpenABestInASheet` and the layout-dump technique
-    in the Xcode conventions reference are the tools for judging any attempt.
+- **8a/8d. The inspector over the statistics.** *(fixed 2026-10-14, awaiting the user's check)*
+  The window's real inspector can't sit beside the statistics: SwiftUI pins a pure-SwiftUI
+  column's width when it opens (measured with a layout dump; a plain colour does it), so the panes
+  overflowed and the sidebar was cut off. An interim sheet worked; the user preferred the inspector
+  (8d). Now, over the statistics, **the same detail view is drawn as a panel inside the statistics'
+  own column** (`StatisticsWithInspector`), so the split view never changes: full 440pt width, its
+  own drag handle (440–760pt, remembered), the toolbar toggle and ⌃⌘I (now our own View ▸ Inspector
+  command) work as beside the list, and a personal best opens there. The statistics take what's left
+  and scroll sideways below 480pt. The window's real inspector stays shut over the statistics.
+  8c (the sheet's header) is moot — the sheet is gone. UI test mutation-checked.
 - **8b. The statistics didn't adapt to a narrow window.** Every section now reflows to a 480pt
   minimum (controls stack, totals tighten, the heat map shows as many weeks as fit, best cards go
   to one column).
@@ -122,9 +108,9 @@ setting.
   once brings the rest back, and the width sticks.
 - **Column widths are tuned for this Mac's content.** Longer place or activity names will
   truncate. Retuning means bumping `workoutTableColumns.v6`.
-- **No inspector over the statistics** (from issue 8a). SwiftUI pins a SwiftUI column's width when
-  the inspector opens beside it, so the inspector is kept shut there and a personal best opens in a
-  sheet instead.
+- **Over the statistics the inspector is our own panel**, not the system inspector (from issue 8d):
+  SwiftUI can't lay the system one out beside SwiftUI content. It behaves the same, but its width is
+  remembered separately and it doesn't take part in window state restoration.
 - **Performance tests have loose thresholds.** They catch 10× regressions; the printed figures are
   the real measurements.
 - **`Spikes/` stays** as the quickest way to inspect a stored series file. It's excluded from every

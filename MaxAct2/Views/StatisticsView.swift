@@ -20,8 +20,6 @@ struct StatisticsView: View {
     @AppStorage("statistics.period") private var period: StatisticsPeriod = .week
     @AppStorage("statistics.metric") private var metric: StatisticsMetric = .distance
 
-    /// A personal best's workout, shown in a sheet over the statistics (issue 8a).
-    @State private var shownBest: ShownBest?
 
     private var workouts: [Workout] {
         model.visibleItems.map(\.workout).filter { kindKey == nil || $0.kind.storageKey == kindKey }
@@ -37,7 +35,9 @@ struct StatisticsView: View {
             : [.duration, .energy, .count]
         let shownMetric = metrics.contains(metric) ? metric : .duration
 
-        ScrollView {
+        // Both axes: below `minimumWidth` — beside the inspector in a narrow window — the
+        // statistics keep that width and scroll sideways rather than squeezing further.
+        ScrollView([.vertical, .horizontal]) {
             VStack(alignment: .leading, spacing: 32) {
                 controls(metrics: metrics, shownMetric: shownMetric)
 
@@ -55,15 +55,15 @@ struct StatisticsView: View {
                         today: WorkoutStatistics.referenceDate(for: now, calendar: calendar)
                     )
                     ConsistencySection(workouts: workouts, now: now, calendar: calendar)
-                    BestsSection(workouts: workouts, kinds: model.presentKinds.map(\.kind)) { best, kind in
-                        shownBest = model.items.first { $0.id == best.workoutID }
-                            .map { ShownBest(item: $0, best: best, kind: kind) }
+                    BestsSection(workouts: workouts, kinds: model.presentKinds.map(\.kind)) { best, _ in
+                        model.selection = [best.workoutID]
+                        model.showsDetail = true
                     }
                 }
             }
             .padding(24)
             .frame(maxWidth: 960, alignment: .leading)
-            .frame(maxWidth: .infinity)
+            .containerRelativeFrame(.horizontal) { length, _ in max(length, Self.minimumWidth) }
         }
         // An explicit *ideal* width, so the split view sizes this pane from the space it's given
         // rather than from what the content would like. The content's ideal is its widest
@@ -71,11 +71,8 @@ struct StatisticsView: View {
         // view handed the statistics that (~920pt, capped by the 960 above) and the inspector
         // whatever was left: 40pt at first, and the three panes then overflowed the window, so
         // SwiftUI shifted them left and cut the sidebar off.
-        .frame(minWidth: Self.minimumWidth, idealWidth: Self.minimumWidth, maxWidth: .infinity)
+        .frame(minWidth: 0, idealWidth: Self.minimumWidth, maxWidth: .infinity)
         .accessibilityIdentifier("StatisticsScroll")
-        .sheet(item: $shownBest) { shown in
-            WorkoutSheet(model: model, shown: shown)
-        }
         .navigationTitle("Statistics")
         .navigationSubtitle(subtitle(count: workouts.count))
     }
@@ -606,7 +603,7 @@ struct BestsSection: View {
                 cards(shown, byKind: byKind, perRow: 1)
             }
 
-            Footnote(text: "Click a best to see that workout. Fastest is average speed over 1 km or more.")
+            Footnote(text: "Click a best to show that workout. Fastest is average speed over 1 km or more.")
         }
     }
 
@@ -678,42 +675,61 @@ extension PersonalBest {
 
 // MARK: - A workout from the statistics
 
-/// A personal best's workout, as the sheet needs it: the workout, and which record it holds.
-struct ShownBest: Identifiable {
-    let item: WorkoutListItem
-    let best: PersonalBest
-    let kind: ActivityKind
+// MARK: - The inspector over the statistics
 
-    var id: String { "\(item.id)/\(best.category.rawValue)" }
-}
-
-/// The workout detail — the same view as the inspector's — in a sheet over the statistics, so a
-/// personal best can be looked at without leaving them. Escape or Done closes it.
+/// The statistics with the workout inspector drawn **over** their trailing edge, not beside them as
+/// a split-view pane (issue 8d).
 ///
-/// **Headed by the record, not the workout:** the detail view's own header already names the
-/// activity and date, and the user found the sheet repeating them; what the sheet adds is *why*
-/// it opened (issue 8c).
-private struct WorkoutSheet: View {
-    let model: AppModel
-    let shown: ShownBest
-    @Environment(\.dismiss) private var dismiss
+/// The window's real `.inspector` can't sit beside the statistics: when it opens, SwiftUI pins the
+/// statistics column's minimum to its current width, and the panes overflow the window. This keeps
+/// the inspector inside the statistics' own column, so the split view never changes and nothing is
+/// pinned. The statistics take what's left and scroll sideways below their minimum width.
+/// Same `showsDetail`, so the toolbar toggle and ⌃⌘I work as they do beside the list.
+struct StatisticsWithInspector: View {
+    @Bindable var model: AppModel
+
+    @AppStorage("statisticsInspectorWidth") private var width: Double = 440
+    @State private var dragStart: Double?
+
+    /// The inspector's own range beside the list — see `DetailPane`.
+    private static let widths = 440.0...760.0
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .firstTextBaseline) {
-                Label("\(shown.best.title) — \(shown.best.formattedValue(for: shown.kind))", systemImage: "trophy")
-                    .font(.headline)
-                    .accessibilityIdentifier("PersonalBestSheetTitle")
-                Text("Personal best")
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button("Done") { dismiss() }
-                    .keyboardShortcut(.defaultAction)
+        HStack(spacing: 0) {
+            StatisticsView(model: model)
+            if model.showsDetail {
+                handle
+                DetailPane(model: model)
+                    .frame(width: width)
+                    .background(.background)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("StatisticsInspector")
+                    .transition(.move(edge: .trailing))
             }
-            .padding(12)
-            Divider()
-            WorkoutDetailView(model: model, item: shown.item)
         }
-        .frame(minWidth: 560, idealWidth: 720, minHeight: 560, idealHeight: 820)
+        .animation(.snappy(duration: 0.2), value: model.showsDetail)
+    }
+
+    /// A divider that resizes the inspector when dragged, like the system inspector's.
+    private var handle: some View {
+        Divider()
+            .overlay {
+                Color.clear
+                    .frame(width: 8)
+                    .contentShape(Rectangle())
+                    .onHover { inside in
+                        if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
+                    }
+                    .gesture(
+                        DragGesture(minimumDistance: 1)
+                            .onChanged { drag in
+                                let start = dragStart ?? width
+                                dragStart = start
+                                width = min(max(start - drag.translation.width, Self.widths.lowerBound),
+                                            Self.widths.upperBound)
+                            }
+                            .onEnded { _ in dragStart = nil }
+                    )
+            }
     }
 }
