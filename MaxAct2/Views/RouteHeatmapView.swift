@@ -20,6 +20,8 @@ struct RouteHeatmapSection: View {
     @State private var position: MapCameraPosition = .automatic
     @AppStorage("heatmapShowsSquares") private var showsSquares = false
 
+    static let mapHeight: CGFloat = 380
+
     private var routeColor: Color { Color(model.settings.routeColor) }
 
     var body: some View {
@@ -45,13 +47,20 @@ struct RouteHeatmapSection: View {
             }
 
             if let progress = model.routeSketchProgress {
-                HStack(spacing: 8) {
-                    ProgressView().controlSize(.small)
-                    Text(progress.total == 0 ? "Preparing routes…"
-                         : "Preparing routes — \(progress.done) of \(progress.total). Only needed once.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
+                // The map's own size, so the page doesn't jump when it arrives — it did, and a
+                // click aimed below landed on the wrong thing.
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(.quaternary.opacity(0.5))
+                    .frame(height: Self.mapHeight)
+                    .overlay {
+                        HStack(spacing: 8) {
+                            ProgressView().controlSize(.small)
+                            Text(progress.total == 0 ? "Preparing routes…"
+                                 : "Preparing routes — \(progress.done) of \(progress.total). Only needed once.")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
             } else if sketches.isEmpty {
                 Text("No routes yet — routes come with each workout's detail, from the Sync panel.")
                     .foregroundStyle(.secondary)
@@ -94,7 +103,7 @@ struct RouteHeatmapSection: View {
             }
         }
         .mapStyle(.standard(emphasis: .muted))
-        .frame(height: 380)
+        .frame(height: Self.mapHeight)
         .clipShape(.rect(cornerRadius: 8))
         .accessibilityLabel("Map of \(sketches.count) routes")
     }

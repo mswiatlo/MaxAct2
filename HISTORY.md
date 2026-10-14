@@ -1059,6 +1059,11 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-14** — The full suite caught two personal-best tests clicking a moving target: the
+  Routes section first showed a one-line "Preparing routes…", then grew 380pt when the map arrived,
+  pushing the cards below it down mid-click. Routes now sits last in Statistics and reserves the
+  map's height while preparing. 326 package tests, 55 app and UI tests (2 real-content skipped).
+
 - **2026-10-14** — **Issue 15: route heat map built.** Measured first on a copy of the series
   (418 routes, 926k points): 7.4 s to load, 1.7 s to simplify to 72k points, 83 explorer squares;
   half of all workouts start within 70 m of home but 10% more than 1,600 km away. So sketches are

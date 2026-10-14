@@ -747,3 +747,6 @@ the content's identifier) — relative widths alone hid the overflow.
   automation switch (sometimes an unanswered authorization prompt), not the app; retry.
 - **Running UI tests quits a running MaxAct** (they launch it by bundle identifier). Check the user
   isn't mid-sync or mid-download first.
+- **Content that arrives late must not move what's below it.** A section that grows when its
+  data loads shifts everything under it mid-click (two UI tests failed on exactly that). Reserve
+  its final size while loading, and put late sections last.
