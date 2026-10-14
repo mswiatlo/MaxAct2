@@ -734,3 +734,9 @@ the content's identifier) — relative widths alone hid the overflow.
 - **`KeyPathComparator` needs `Sendable` key paths.** Computed properties in the app target are
   main-actor-isolated by default, which makes key paths to them non-`Sendable`; mark such
   properties `nonisolated` when they only read the value.
+- **A `Picker` outside a `Form` exposes its title as separate text**; the pop-up itself is
+  unnamed (VoiceOver says only its value, e.g. "Choose…"). Add `.accessibilityLabel` to the picker.
+- **Don't nest a `Form` inside a `ScrollView`** for a few inline fields: it's its own scroll view and
+  clipped them out of reach. Plain rows of `LabeledContent` work.
+- **A number `TextField` bound to an `Int` that uses 0 for "unset" shows "0"**, not its prompt.
+  Bind through an `Int?` that maps 0 to `nil`.

@@ -8,10 +8,17 @@ struct HeartRateProfileFields: View {
     @Bindable var settings: AppSettings
     let suggestedMaximum: Int?
 
+    /// Zero means "not set" in storage, but a number field would show it as "0" — which reads as a
+    /// value — so the fields see `nil` instead, and show their prompt.
+    private func unsetIsEmpty(_ value: Binding<Int>) -> Binding<Int?> {
+        Binding(get: { value.wrappedValue > 0 ? value.wrappedValue : nil },
+                set: { value.wrappedValue = $0 ?? 0 })
+    }
+
     var body: some View {
         LabeledContent("Resting heart rate") {
             HStack(spacing: 4) {
-                TextField("", value: $settings.restingHeartRate, format: .number, prompt: Text("required"))
+                TextField("", value: unsetIsEmpty($settings.restingHeartRate), format: .number, prompt: Text("required"))
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 70)
                 Text("bpm").foregroundStyle(.secondary)
@@ -19,7 +26,7 @@ struct HeartRateProfileFields: View {
         }
         LabeledContent("Maximum heart rate") {
             HStack(spacing: 4) {
-                TextField("", value: $settings.maximumHeartRate, format: .number, prompt: Text("required"))
+                TextField("", value: unsetIsEmpty($settings.maximumHeartRate), format: .number, prompt: Text("required"))
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 70)
                 Text("bpm").foregroundStyle(.secondary)
@@ -38,6 +45,9 @@ struct HeartRateProfileFields: View {
             Text("Male (1.92)").tag(HeartRateProfile.Curve?.some(.male))
             Text("Female (1.67)").tag(HeartRateProfile.Curve?.some(.female))
         }
+        // Outside a `Form` the picker's title renders as separate text and the pop-up itself was
+        // unnamed — VoiceOver announced a bare "Choose…".
+        .accessibilityLabel("Effort curve")
         Text("Training load uses Banister's TRIMP, which weights effort by how close your heart rate "
              + "gets to maximum. Its two published curves were fitted separately for men and women.")
             .font(.caption)
@@ -74,10 +84,12 @@ struct TrainingLoadSection: View {
                 // Asked here, on first use, rather than buried in Settings.
                 Text("Set your heart-rate details to see Fitness, Fatigue and Form.")
                     .foregroundStyle(.secondary)
-                Form { HeartRateProfileFields(settings: settings, suggestedMaximum: suggestedMaximum) }
-                    .formStyle(.grouped)
-                    .scrollDisabled(true)
-                    .frame(maxWidth: 520, minHeight: 230)
+                // Plain rows, not a `Form`: a form is its own scroll view, and nested in the
+                // statistics' it clipped the fields out of reach.
+                VStack(alignment: .leading, spacing: 8) {
+                    HeartRateProfileFields(settings: settings, suggestedMaximum: suggestedMaximum)
+                }
+                .frame(maxWidth: 520, alignment: .leading)
             }
         }
     }
@@ -91,7 +103,7 @@ struct TrainingLoadSection: View {
             HStack(spacing: 32) {
                 stat("Fitness", today.fitness, color: .blue)
                 stat("Fatigue", today.fatigue, color: .pink)
-                stat("Form", today.form, color: .secondary)
+                stat("Form", today.form, color: .gray)
             }
 
             Chart {
@@ -130,12 +142,14 @@ struct TrainingLoadSection: View {
 
     private func stat(_ title: String, _ value: Double, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Label(title, systemImage: "circle.fill")
-                .labelStyle(.titleAndIcon)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .symbolRenderingMode(.palette)
-                .tint(color)
+            // A drawn dot, not a tinted symbol: the tint didn't reach the symbol, and all three
+            // came out grey against a chart whose legend is blue, pink and grey.
+            HStack(spacing: 4) {
+                Circle().fill(color).frame(width: 8, height: 8)
+                Text(title)
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
             Text("\(Int(value.rounded()))").font(.title3.monospacedDigit())
         }
         .accessibilityElement(children: .combine)

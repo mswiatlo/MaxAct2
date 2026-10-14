@@ -1013,17 +1013,26 @@ final class SeededTableUITests: XCTestCase {
         let prompt = app.staticTexts["Set your heart-rate details to see Fitness, Fatigue and Form."]
         XCTAssertTrue(prompt.waitForExistence(timeout: 10), "Training Load should ask first.")
         let scroll = app.scrollViews["StatisticsScroll"]
-        for _ in 0..<10 where !prompt.isHittable { scroll.scroll(byDeltaX: 0, deltaY: -300) }
-
         let fields = app.textFields.matching(NSPredicate(format: "placeholderValue == 'required'"))
         let resting = fields.element(boundBy: 0), maximum = fields.element(boundBy: 1)
+        XCTAssertEqual(resting.value as? String ?? "", "", "An unset rate shows its prompt, not \"0\".")
+        for _ in 0..<12 where !(maximum.exists && maximum.isHittable) {
+            scroll.scroll(byDeltaX: 0, deltaY: -250)
+        }
         resting.click(); resting.typeText("55\t")
         maximum.click(); maximum.typeText("190\t")
-        app.popUpButtons["Effort curve"].click()
+        let curve = app.popUpButtons["Effort curve"]
+        XCTAssertTrue(curve.waitForExistence(timeout: 5), "The curve picker should be labelled for VoiceOver.")
+        curve.click()
         app.menuItems["Male (1.92)"].click()
 
-        XCTAssertTrue(app.staticTexts["Fitness"].waitForExistence(timeout: 5), "Fitness should appear once set.")
-        XCTAssertTrue(app.staticTexts["Fatigue"].exists)
+        // Each reading is one combined element: "Fitness, 12".
+        func reading(_ name: String) -> XCUIElement {
+            app.staticTexts.containing(NSPredicate(format: "value BEGINSWITH %@", "\(name), ")).firstMatch
+        }
+        XCTAssertTrue(reading("Fitness").waitForExistence(timeout: 5), "Fitness should appear once set.")
+        XCTAssertTrue(reading("Fatigue").exists)
+        XCTAssertTrue(reading("Form").exists)
         XCTAssertFalse(prompt.exists, "The prompt goes once the details are set.")
         let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
         attachment.name = "15-training-load"
@@ -1354,6 +1363,25 @@ final class RealContentUITests: XCTestCase {
         sidebar.staticTexts.containing(NSPredicate(format: "value == 'Statistics' OR label == 'Statistics'"))
             .firstMatch.click()
         XCTAssertTrue(app.staticTexts["HistoryFocus"].waitForExistence(timeout: 10))
+
+        // Issue 15: give Training Load a profile so it draws over real data. The values only need
+        // to be plausible — this checks the layout, not anyone's physiology.
+        let scroll = app.scrollViews["StatisticsScroll"]
+        let fields = app.textFields.matching(NSPredicate(format: "placeholderValue == 'required'"))
+        let resting = fields.element(boundBy: 0), maximum = fields.element(boundBy: 1)
+        for _ in 0..<12 where !(maximum.exists && maximum.isHittable) { scroll.scroll(byDeltaX: 0, deltaY: -250) }
+        if maximum.isHittable {
+            resting.click(); resting.typeText("55\t")
+            maximum.click(); maximum.typeText("182\t")
+            app.popUpButtons["Effort curve"].click()
+            app.menuItems["Male (1.92)"].click()
+            Thread.sleep(forTimeInterval: 1)
+            let attachment = XCTAttachment(screenshot: window.screenshot())
+            attachment.name = "s0-training-load"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+        scroll.scroll(byDeltaX: 0, deltaY: 3000)   // back to the top for the tour below
 
         for index in 1...4 {
             Thread.sleep(forTimeInterval: 1)

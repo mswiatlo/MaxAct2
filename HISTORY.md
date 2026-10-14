@@ -1040,6 +1040,13 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-14** — **Issue 15: training load built.** Measured first: all 49 workouts have an
+  average HR, highest max 182, history only seven weeks (Fitness is still ramping — the view says
+  so). The user chose to be offered both TRIMP curves and asked on first use. UI-testing found three
+  real bugs: unset rates displayed as "0" rather than the prompt; the inline fields wrapped in a
+  nested `Form` scrolled out of reach; and the curve picker had no accessibility label (VoiceOver
+  heard a bare "Choose…"). The reading dots' tint didn't apply (all grey) — now drawn circles.
+
 - **2026-10-14** — **Issue 7 closed**: TrainingPeaks' API isn't available for personal use
   (confirmed on its Partner API FAQ). The user chose to drop it rather than add Export TCX…;
   findings in §2. Next: issue 15.

@@ -26,8 +26,8 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ## 1. Where things stand — 2026-10-12
 
-All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 304 in
-`MaxActCore` (`swift test`), 52 app and UI tests (`RunAllTests` — ask first, then leave the Mac
+All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 312 in
+`MaxActCore` (`swift test`), 53 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~5 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
 
@@ -46,11 +46,16 @@ Numbered independently of the phases: "known issue 8" (summary stats) is not "Ph
 Fixed or closed issues — 1–14 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
-**15. Deeper statistics.** *(deferred from issue 8, not started)*
+**15. Deeper statistics.** *(deferred from issue 8; training load built)*
 The HealthFit-style analyses left out of issue 8's first cut, as separate pieces:
-- **Training load** — Fitness/Fatigue/Form (CTL/ATL/TSB) from TRIMP, using each workout's average
-  heart rate. Needs resting and maximum heart rate as settings; an approximation without beat-level
-  data. Works from summary data, so covers every workout.
+- **Training load** *(built 2026-10-14, awaiting the user's check)* — Fitness/Fatigue/Form
+  (CTL 42 days, ATL 7 days, TSB = yesterday's difference) from Banister's TRIMP on each workout's
+  average heart rate, in the package (`TrainingLoad`, 8 tests against independently computed
+  values, mutation-checked). Statistics gets a Training Load section (last 90 days) that asks for
+  resting HR, maximum HR (suggesting the highest recorded, 182) and the TRIMP curve on first use;
+  the same fields are in Settings. The curve (male 1.92 / female 1.67) is the user's choice, never
+  defaulted. Workouts without heart rate are counted and reported. Checked on a copy of the real
+  library with placeholder rates.
 - **Heart-rate zones** — time in zones per period. Needs the HR series, so it only covers workouts
   whose detail has been downloaded; say how many weren't counted.
 - **Route heat map** — every route on one map, plus an Explorer-style count of map tiles visited.
