@@ -718,3 +718,19 @@ Measuring tools that worked: `NSHostingController(rootView:).sizeThatFits(in: 1�
 narrowest width and `NSHostingView(rootView:).fittingSize` for its ideal, in a hosted unit test (no
 window, no mouse); a UI test printing absolute pane frames (`window`, `app.outlines["Sidebar"]`,
 the content's identifier) — relative widths alone hid the overflow.
+
+## Phase 8 notes *(2026-10-14)*
+
+- **URLError codes for a sync's network failures, measured:** closed port on a reachable host →
+  `cannotConnectToHost` (-1004); an address nobody answers → `timedOut` (-1001, after the request
+  timeout); unresolvable name → `cannotFindHost` (-1003). `SyncProblem` maps on these.
+- **`MCPTransport`'s request timeout defaults to 600 s** (a sync can wait on a slow phone). Anything
+  interactive must pass its own — `ConnectionCheck.timeout` is 15 s.
+- **An `accessibilityIdentifier` on the text inside a `Label` isn't exposed** to XCUITest; find
+  such text by its value (`staticTexts.containing(NSPredicate(format: "value CONTAINS %@", …))`).
+- **Sheets shown on first launch must not appear under UI tests** — every test launches with
+  fresh settings. `MaxActApp.showsWelcomeOnFirstLaunch` is false under `--ui-testing` unless
+  `--ui-testing-welcome` is passed.
+- **`KeyPathComparator` needs `Sendable` key paths.** Computed properties in the app target are
+  main-actor-isolated by default, which makes key paths to them non-`Sendable`; mark such
+  properties `nonisolated` when they only read the value.

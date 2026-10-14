@@ -1028,6 +1028,17 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-14** — **Phase 8 built.** Surveyed first: much existed (a one-screen setup guide, a
+  token-vs-network split), but every empty filter said "No Results for ''", an empty sync said "No
+  new workouts", unreadable workouts vanished, raw errors leaked ("MCP error -32600"), load errors
+  were never shown, and nothing was remembered across launches. The user chose a welcome sheet with
+  Test Connection and remembering sidebar + sort. `SyncProblem` and `ConnectionCheck` in the package
+  (9 tests); the URLError mapping was measured with `URLSession` (closed port → cannotConnectToHost,
+  silent address → timedOut, bad name → cannotFindHost). The test connection's timeout is 15 s —
+  the transport's default is 600 s, which would have left an absent phone "checking" for ten
+  minutes. Sort-key properties made `nonisolated` so `KeyPathComparator` accepts them. New hosted
+  unit tests (7) and UI tests (4), all mutation-checked. 303 package tests, 52 app and UI tests.
+
 - **2026-10-14** — **Issue 8 closed**: the user confirmed the inspector over the statistics (8a/8d).
   Diagnosis moved to §2. Next: Phase 8.
 

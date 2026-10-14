@@ -3,7 +3,7 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**
 (HAE), with batch upload to Strava.
 
-**Status:** Phases 0–7 complete and verified live. Next: known issues, then Phase 8.
+**Status:** Phases 0–7 complete and verified live; Phase 8 built 2026-10-14, awaiting the user's check.
 **Last updated:** 2026-10-14.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first: the HAE data
@@ -20,21 +20,21 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 | 5 — Detail view | Complete |
 | 6 — Approximate location | Complete |
 | 7 — TCX + Strava | Complete, verified live |
-| 8 — Polish | Not started |
+| 8 — Polish | Built, awaiting the user's check |
 
 ---
 
 ## 1. Where things stand — 2026-10-12
 
-All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 294 in
-`MaxActCore` (`swift test`), 41 app and UI tests (`RunAllTests` — ask first, then leave the Mac
+All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 303 in
+`MaxActCore` (`swift test`), 52 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~5 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
 
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** Phase 8 (polish). Issue 7 (TrainingPeaks) starts with
+**Next:** the user's check of Phase 8. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -85,6 +85,10 @@ setting.
 - **Over the statistics the inspector is our own panel**, not the system inspector (from issue 8d):
   SwiftUI can't lay the system one out beside SwiftUI content. It behaves the same, but its width is
   remembered separately and it doesn't take part in window state restoration.
+- **The load-error banner has no test** (Phase 8): there's no reliable way to make the store fail
+  inside a UI test. Checked by build and by reading only.
+- **Whether HAE rejects a bad token at the handshake is unmeasured.** Test Connection doesn't
+  depend on it — it also lists workouts — but a sync's first failure point might differ.
 - **Performance tests have loose thresholds.** They catch 10× regressions; the printed figures are
   the real measurements.
 - **`Spikes/` stays** as the quickest way to inspect a stored series file. It's excluded from every
@@ -144,12 +148,24 @@ leaves without an explicit action on an explicit selection. UI tests run fully i
 
 ---
 
-## 5. Phase 8 — Polish
+## 5. Phase 8 — Polish *(built 2026-10-14, awaiting the user's check)*
 
-First-run onboarding that walks through the HAE sync setup; `@SceneStorage` for selection and sort;
-empty states for every list; an error banner that distinguishes "phone not reachable" from "auth
-rejected" from "HAE returned nothing" (which, per HAE's docs, is indistinguishable from a
-permissions problem — say so, and point at Health → Sharing → Apps).
+Scope chosen with the user: a welcome sheet with a connection test, and remembering the sidebar
+choice and sort (not the selection or search).
+- **Welcome sheet** on a first launch with nothing configured (never to existing users), and from
+  Help ▸ Getting Started with MaxAct…: what's needed (HAE Premium, same Wi-Fi), where the address and
+  token come from, the fields, **Test Connection**, and how long a year's sync takes.
+- **Test Connection** (welcome sheet and sync panel): handshake, tool list and a two-week listing
+  with a 15 s timeout; reports the recent-workout count, so "connected, but Health isn't sharing
+  workouts" shows up before a long sync.
+- **Sync errors name their cause** (`SyncProblem`): server not running (refused) vs phone
+  unreachable (time-out, unknown host) vs token rejected vs server error vs unexpected reply —
+  mapping measured. A sync that returns nothing warns and points at Health ▸ Sharing ▸ Apps;
+  workouts that can't be read are counted and logged rather than silently dropped.
+- **Empty states** say what they mean per filter ("No Failed Uploads", "Everything's on Strava"…);
+  only a real search gets "No Results".
+- **Remembered** between launches: sidebar choice and table sort.
+- **Library load errors** are shown in a banner (they were recorded and never displayed).
 
 ---
 
