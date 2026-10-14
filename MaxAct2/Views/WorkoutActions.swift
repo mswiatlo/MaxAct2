@@ -92,6 +92,24 @@ final class AppSettings {
         didSet { defaults.set(muteStravaUploads, forKey: "muteStravaUploads") }
     }
 
+    /// Training load's heart-rate profile (issue 15). Zero, or `nil` for the curve, means not set:
+    /// there are no safe defaults — resting heart rate isn't in the data at all, and the curve is
+    /// the user's choice, never inferred.
+    var restingHeartRate: Int {
+        didSet { defaults.set(restingHeartRate, forKey: "restingHeartRate") }
+    }
+    var maximumHeartRate: Int {
+        didSet { defaults.set(maximumHeartRate, forKey: "maximumHeartRate") }
+    }
+    var trimpCurve: HeartRateProfile.Curve? {
+        didSet { defaults.set(trimpCurve?.rawValue, forKey: "trimpCurve") }
+    }
+
+    var heartRateProfile: HeartRateProfile? {
+        guard let trimpCurve else { return nil }
+        return HeartRateProfile(resting: Double(restingHeartRate), maximum: Double(maximumHeartRate), curve: trimpCurve)
+    }
+
     /// Whether the welcome sheet has been seen (or dismissed). Set on its first close.
     var hasSeenWelcome: Bool {
         didSet { defaults.set(hasSeenWelcome, forKey: "hasSeenWelcome") }
@@ -118,6 +136,9 @@ final class AppSettings {
         routeColor = RouteColor(storageKey: defaults.string(forKey: "routeColor"))
         muteStravaUploads = defaults.object(forKey: "muteStravaUploads") as? Bool ?? true
         hasSeenWelcome = defaults.bool(forKey: "hasSeenWelcome")
+        restingHeartRate = defaults.integer(forKey: "restingHeartRate")
+        maximumHeartRate = defaults.integer(forKey: "maximumHeartRate")
+        trimpCurve = defaults.string(forKey: "trimpCurve").flatMap(HeartRateProfile.Curve.init(rawValue:))
         sidebarSelectionKey = defaults.string(forKey: "sidebarSelection")
         tableSortKey = defaults.string(forKey: "tableSort")
     }
@@ -176,6 +197,16 @@ struct SettingsView: View {
             }
 
             appearanceSection
+
+            Section {
+                HeartRateProfileFields(settings: settings, suggestedMaximum: model?.suggestedMaximumHeartRate)
+            } header: {
+                Text("Training load")
+            } footer: {
+                Text("Used for Fitness, Fatigue and Form in Statistics.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
 
             if let model {
                 dataSection(model)

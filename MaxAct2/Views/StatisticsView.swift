@@ -54,6 +54,9 @@ struct StatisticsView: View {
                         metric: shownMetric,
                         today: WorkoutStatistics.referenceDate(for: now, calendar: calendar)
                     )
+                    TrainingLoadSection(settings: model.settings, workouts: workouts,
+                                        suggestedMaximum: model.suggestedMaximumHeartRate,
+                                        now: now, calendar: calendar)
                     ConsistencySection(workouts: workouts, now: now, calendar: calendar)
                     BestsSection(workouts: workouts, kinds: model.presentKinds.map(\.kind)) { best, _ in
                         model.selection = [best.workoutID]

@@ -1000,6 +1000,37 @@ final class SeededTableUITests: XCTestCase {
         )
     }
 
+    /// Issue 15: Training Load asks for the heart-rate details on first use, then shows Fitness,
+    /// Fatigue and Form. The test's curve choice is arbitrary — it only exercises the layout.
+    @MainActor
+    func testTrainingLoadAsksForHeartRateThenShowsFitness() throws {
+        let app = launchSeeded()
+        let sidebar = app.outlines["Sidebar"]
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 15))
+        sidebar.staticTexts.containing(NSPredicate(format: "value == 'Statistics' OR label == 'Statistics'"))
+            .firstMatch.click()
+
+        let prompt = app.staticTexts["Set your heart-rate details to see Fitness, Fatigue and Form."]
+        XCTAssertTrue(prompt.waitForExistence(timeout: 10), "Training Load should ask first.")
+        let scroll = app.scrollViews["StatisticsScroll"]
+        for _ in 0..<10 where !prompt.isHittable { scroll.scroll(byDeltaX: 0, deltaY: -300) }
+
+        let fields = app.textFields.matching(NSPredicate(format: "placeholderValue == 'required'"))
+        let resting = fields.element(boundBy: 0), maximum = fields.element(boundBy: 1)
+        resting.click(); resting.typeText("55\t")
+        maximum.click(); maximum.typeText("190\t")
+        app.popUpButtons["Effort curve"].click()
+        app.menuItems["Male (1.92)"].click()
+
+        XCTAssertTrue(app.staticTexts["Fitness"].waitForExistence(timeout: 5), "Fitness should appear once set.")
+        XCTAssertTrue(app.staticTexts["Fatigue"].exists)
+        XCTAssertFalse(prompt.exists, "The prompt goes once the details are set.")
+        let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        attachment.name = "15-training-load"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     /// Phase 8: an empty filter says what it means; only an actual search gets "No Results".
     /// The seed has no failed uploads, so Upload Failed is empty.
     @MainActor

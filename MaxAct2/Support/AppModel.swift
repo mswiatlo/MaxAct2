@@ -384,6 +384,11 @@ final class AppModel {
         WorkoutTag.sorted(Array(Set(items.flatMap(\.tags)).union(WorkoutTag.stravaBacked)))
     }
 
+    /// The highest heart rate any workout recorded — a starting point for the maximum.
+    var suggestedMaximumHeartRate: Int? {
+        TrainingLoad.suggestedMaximum(from: items.map(\.workout)).map { Int($0.rounded()) }
+    }
+
     func count(for selection: SidebarSelection) -> Int {
         items.count(where: selection.matches)
     }
