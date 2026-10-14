@@ -322,6 +322,29 @@ final class MaxAct2UITests: XCTestCase {
         )
     }
 
+    /// Phase 8: a refused connection names its cause.
+    @MainActor
+    func testARefusedConnectionSaysTheServerIsntRunning() throws {
+        let app = launchApp()
+        app.buttons["Sync"].click()
+
+        let address = app.textFields.element(boundBy: 0)
+        XCTAssertTrue(address.waitForExistence(timeout: 5))
+        address.click()
+        address.typeText("127.0.0.1")     // this Mac, where nothing listens on 9000: refused at once
+        let token = app.textFields.element(boundBy: 1)
+        token.click()
+        token.typeText("irrelevant")
+        app.buttons["Start Sync"].click()
+
+        // Phase 8: a refused connection is "the server isn't running", not a generic network error.
+        let banner = app.staticTexts["SyncBannerMessage"]
+        XCTAssertTrue(banner.waitForExistence(timeout: 15), "No sync banner appeared.")
+        let refused = NSPredicate(format: "value CONTAINS %@", "server isn't running")
+        XCTAssertEqual(XCTWaiter().wait(for: [XCTNSPredicateExpectation(predicate: refused, object: banner)], timeout: 15),
+                       .completed, "The banner should say the server isn't running; it says '\(banner.value ?? "")'.")
+    }
+
     /// Smoke test for the Start Sync path: enter a connection, start a sync, and keep poking the
     /// window while it runs.
     ///

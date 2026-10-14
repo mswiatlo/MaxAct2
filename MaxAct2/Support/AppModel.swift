@@ -1,4 +1,5 @@
 import Foundation
+import os
 import Observation
 import MaxActCore
 import SwiftUI
@@ -77,6 +78,10 @@ final class AppModel {
         case waiting(SyncActivity, until: Date)
         /// The sync-status check, which reports two counts rather than one.
         case checkedStrava(StravaCheckResult)
+        /// A list sync that ran to the end: how many workouts arrived, and how many of those
+        /// couldn't be read. Its own case because both "nothing arrived" and "some couldn't be
+        /// read" are worth a warning rather than a quiet success.
+        case listed(found: Int, unreadable: Int)
         case failed(String)
 
         /// "Found 2 workouts already on Strava · 1 was deleted there", or either half alone.
@@ -96,8 +101,14 @@ final class AppModel {
         var isRunning: Bool {
             switch self {
             case .running, .waiting: true
-            case .idle, .finished, .checkedStrava, .failed: false
+            case .idle, .finished, .checkedStrava, .listed, .failed: false
             }
+        }
+
+        /// Finished, but with something the user should look at.
+        var isWarning: Bool {
+            if case .listed(let found, let unreadable) = self { return found == 0 || unreadable > 0 }
+            return false
         }
 
         var message: String? {
@@ -126,6 +137,15 @@ final class AppModel {
             case .waiting(_, let until):
                 "Paused for Strava's rate limit — resumes at "
                     + until.formatted(date: .omitted, time: .shortened)
+            case .listed(0, 0):
+                SyncProblem.nothingReturned.message
+            case .listed(0, let unreadable):
+                "None of the \(unreadable) workouts Health Auto Export sent could be read. It may be "
+                    + "a newer version than MaxAct knows."
+            case .listed(let found, 0):
+                "Synced \(found) workouts"
+            case .listed(let found, let unreadable):
+                "Synced \(found) workouts · \(unreadable) couldn't be read and were skipped"
             case .failed(let reason):
                 reason
             }
@@ -741,16 +761,21 @@ final class AppModel {
 
         do {
             try await source.connect()
-            var found = 0
+            var found = 0, unreadable = 0
             for (index, window) in windows.enumerated() {
                 if Task.isCancelled { break }
                 let result = try await source.listWorkouts(in: window)
                 try await store.upsert(result.workouts)
                 found += result.workouts.count
+                // Counted and logged rather than dropped: these used to vanish without a trace.
+                unreadable += result.failures.count
+                for failure in result.failures {
+                    Self.log.error("Unreadable workout \(failure.workoutID ?? "?", privacy: .public): \(String(describing: failure.underlying), privacy: .public)")
+                }
                 syncStatus = .running(.listing, completed: index + 1, total: windows.count, found: found)
                 await load()
             }
-            syncStatus = .finished(.listing, found: found)
+            syncStatus = .listed(found: found, unreadable: unreadable)
         } catch {
             // Partial progress is kept: every completed chunk is already committed.
             syncStatus = .failed(Self.describe(error))
@@ -851,22 +876,11 @@ final class AppModel {
         if syncStatus.isRunning { syncStatus = .idle }
     }
 
-    /// Network failures here almost always mean one thing, so say that rather than surfacing
-    /// "Could not connect to the server", which sends people looking at their Mac.
+    /// A Health Auto Export failure in terms the user can act on — see `SyncProblem`, which tells
+    /// "the server isn't running" from "the phone can't be reached" from "the token was rejected".
     private static func describe(_ error: any Error) -> String {
-        if let mcp = error as? MCPError {
-            switch mcp {
-            case .http(401, _), .http(403, _):
-                return "Health Auto Export rejected the token. Re-read it from the Server screen."
-            default:
-                return mcp.description
-            }
-        }
-        let message = error.localizedDescription
-        if (error as NSError).domain == NSURLErrorDomain {
-            return "Can't reach Health Auto Export. Open it on your iPhone, start the server, "
-                 + "and keep the app in the foreground. (\(message))"
-        }
-        return message
+        SyncProblem(error: error).message
     }
+
+    private static let log = Logger(subsystem: "com.swiatlowski.MaxAct", category: "sync")
 }

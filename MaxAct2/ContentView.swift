@@ -181,11 +181,15 @@ struct ContentView: View {
                     ProgressView().controlSize(.small)
                 } else if case .failed = model.syncStatus {
                     Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                } else if model.syncStatus.isWarning {
+                    Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.yellow)
                 } else {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
                 }
 
-                Text(message).font(.callout).lineLimit(2)
+                // Three lines: a problem's title plus its advice runs to two at typical widths.
+                Text(message).font(.callout).lineLimit(3)
+                    .accessibilityIdentifier("SyncBannerMessage")
                 Spacer()
 
                 if model.syncStatus.isRunning {
