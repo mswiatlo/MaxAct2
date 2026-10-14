@@ -862,6 +862,10 @@ final class AppModel {
         }
     }
 
+    func dismissLoadError() {
+        loadError = nil
+    }
+
     func dismissSyncStatus() {
         syncStatus = .idle
     }

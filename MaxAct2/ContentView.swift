@@ -90,7 +90,12 @@ struct ContentView: View {
         }
 
         .toolbar { toolbarContent }
-        .safeAreaInset(edge: .bottom) { syncBanner }
+        .safeAreaInset(edge: .bottom) {
+            VStack(spacing: 0) {
+                loadErrorBanner
+                syncBanner
+            }
+        }
         .task {
             // A first launch with nothing set up: say what MaxAct needs before anything else. Not
             // shown to anyone already configured, so an update doesn't greet existing users.
@@ -216,6 +221,26 @@ struct ContentView: View {
                 Label("Inspector", systemImage: "sidebar.trailing")
             }
             .help(model.showsDetail ? "Hide the workout details" : "Show the workout details")
+        }
+    }
+
+    /// A failure to read or change the library itself. It used to be recorded and never shown, so
+    /// a broken database looked like an empty one (Phase 8).
+    @ViewBuilder
+    private var loadErrorBanner: some View {
+        if let error = model.loadError {
+            HStack(spacing: 10) {
+                Image(systemName: "xmark.octagon.fill").foregroundStyle(.red)
+                Text(error).font(.callout).lineLimit(3)
+                    .accessibilityIdentifier("LoadErrorMessage")
+                Spacer()
+                Button("Dismiss") { model.dismissLoadError() }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+            .frame(maxWidth: .infinity)
+            .background(.bar)
+            .overlay(alignment: .top) { Divider() }
         }
     }
 
