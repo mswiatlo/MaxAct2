@@ -126,11 +126,49 @@ struct ContentView: View {
         } else if model.sidebarSelection == .statistics {
             StatisticsWithInspector(model: model)
         } else if model.visibleItems.isEmpty {
-            ContentUnavailableView.search(text: model.searchText)
+            emptyList
+                .navigationTitle(model.sidebarSelection?.title ?? "Workouts")
         } else {
             WorkoutTable(model: model)
                 .navigationTitle(model.sidebarSelection?.title ?? "Workouts")
                 .navigationSubtitle("\(model.visibleItems.count) workouts")
+        }
+    }
+
+    /// An empty list that says what it means. Every empty filter used to show the system's search
+    /// placeholder — "No Results for ''" under Upload Failed, with nothing searched — which reads
+    /// as a broken search rather than good news.
+    @ViewBuilder
+    private var emptyList: some View {
+        if !model.searchText.isEmpty {
+            ContentUnavailableView.search(text: model.searchText)
+        } else {
+            switch model.sidebarSelection {
+            case .filter(.notOnStrava):
+                ContentUnavailableView("Everything's on Strava", systemImage: "checkmark.circle",
+                    description: Text("Every workout has been uploaded or found already on Strava."))
+            case .filter(.uploadFailed):
+                ContentUnavailableView("No Failed Uploads", systemImage: "checkmark.circle",
+                    description: Text("An upload that fails is listed here with the reason, ready to retry."))
+            case .filter(.withRoute):
+                ContentUnavailableView {
+                    Label("No Routes Yet", systemImage: "map")
+                } description: {
+                    Text("Routes arrive with each workout's detail. Download it from the Sync panel.")
+                } actions: {
+                    Button("Open Sync…") { model.isSyncPanelPresented = true }
+                }
+            case .filter(.indoor):
+                ContentUnavailableView("No Indoor Workouts", systemImage: "house",
+                    description: Text("Workouts recorded indoors — on a treadmill or trainer, or strength "
+                                      + "training — are listed here."))
+            case .tag(let name):
+                ContentUnavailableView("Nothing Tagged “\(name)”", systemImage: "tag",
+                    description: Text("Tag workouts from the Tags menu or by right-clicking them."))
+            default:
+                ContentUnavailableView("No Workouts", systemImage: "figure.run",
+                    description: Text("Nothing here yet."))
+            }
         }
     }
 

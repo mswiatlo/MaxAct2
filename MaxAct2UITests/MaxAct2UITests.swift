@@ -959,6 +959,27 @@ final class SeededTableUITests: XCTestCase {
         )
     }
 
+    /// Phase 8: an empty filter says what it means; only an actual search gets "No Results".
+    /// The seed has no failed uploads, so Upload Failed is empty.
+    @MainActor
+    func testEmptyFiltersSayWhatTheyMean() throws {
+        let app = launchSeeded()
+        let sidebar = app.outlines["Sidebar"]
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 15))
+
+        sidebar.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Upload Failed'")).firstMatch.click()
+        XCTAssertTrue(app.staticTexts["No Failed Uploads"].waitForExistence(timeout: 5),
+                      "An empty Upload Failed should say there are none.")
+        XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "value BEGINSWITH 'No Results'")).firstMatch.exists,
+                       "Nothing was searched, so it mustn't say 'No Results'.")
+
+        let search = app.searchFields.firstMatch
+        search.click()
+        search.typeText("zzzz")
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "value BEGINSWITH 'No Results'"))
+            .firstMatch.waitForExistence(timeout: 5), "A search with no matches says so.")
+    }
+
     @MainActor
     func testSidebarFiltersNarrowTheTable() throws {
         let app = launchSeeded()
