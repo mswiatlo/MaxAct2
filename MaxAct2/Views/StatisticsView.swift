@@ -62,8 +62,10 @@ struct StatisticsView: View {
                         model.selection = [best.workoutID]
                         model.showsDetail = true
                     }
-                    // Last: it's the one section whose content arrives late (route sketches are built
-                    // on first visit), so nothing below it can be shifted when it does.
+                    // Last, these two: their data arrives late (read from the series on first visit),
+                    // so nothing below can shift when it does. Both reserve their height meanwhile.
+                    HeartRateZonesSection(model: model, workouts: workouts, period: period,
+                                          now: now, calendar: calendar)
                     RouteHeatmapSection(model: model, workouts: workouts)
                 }
             }

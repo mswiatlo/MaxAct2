@@ -246,7 +246,9 @@ Two things that make this hard to find, worth remembering:
   15 s.
 
 The general rule: any launch argument that carries a *value* should be a single `--key=value`
-token. To diagnose this class of thing, probe whether `WindowGroup`'s content closure runs at all
+token. **Settings as `-key value` defaults** (e.g. a heart-rate profile, which sits over the
+throwaway settings domain) must come *before* `--ui-testing`, or `-ui-testing` swallows the key and
+the value is stray — same symptom, hit again 2026-10-14. `launchMaxAct(defaults:)` places them. To diagnose this class of thing, probe whether `WindowGroup`'s content closure runs at all
 — and write the probe to `NSTemporaryDirectory()`, because the sandbox blocks `/tmp`.
 
 ## UI tests must be launched with `--ui-testing`
@@ -298,6 +300,10 @@ Two things that cost a debugging round each, both found by printing `app.debugDe
   in the *first* row, so clicking it never changes the selection — a test comparing two rows'
   detail silently compared the same row twice. Click one cell to focus the table, then move with
   `app.typeKey(.downArrow, modifierFlags: [])`.
+
+- **Modifiers on a `GridRow` apply to each cell, not the row.** `.accessibilityElement` plus an
+  identifier on a five-cell row gave 30 matches for 6 rows. Put the row's label and identifier on
+  its first cell and `.accessibilityHidden(true)` the rest (the zones breakdown does this).
 
 When a query doesn't match, dump the hierarchy instead of guessing — a throwaway test that prints
 `app.debugDescription` answers it in one run.

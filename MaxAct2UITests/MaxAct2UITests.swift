@@ -26,9 +26,14 @@ extension XCTestCase {
     /// in-memory database and separate Keychain service. These tests type into the connection
     /// fields, and without it a test run once overwrote the user's real token.
     @MainActor
-    func launchMaxAct(seed: Int? = nil, extraArguments: [String] = []) -> XCUIApplication {
+    /// `defaults` become `-key value` pairs, placed *before* `--ui-testing`: after it, AppKit pairs
+    /// `-ui-testing` with the next token and the stray value is opened as a document — no window.
+    func launchMaxAct(seed: Int? = nil, defaults: KeyValuePairs<String, String> = [:],
+                      extraArguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication(bundleIdentifier: "com.swiatlowski.MaxAct")
-        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES", "--ui-testing"] + extraArguments
+        app.launchArguments = ["-ApplePersistenceIgnoreState", "YES"]
+            + defaults.flatMap { ["-\($0.key)", $0.value] }
+            + ["--ui-testing"] + extraArguments
         // `=` joined, never two tokens — see `MaxActApp.uiTestingSeedCount` for why.
         if let seed { app.launchArguments.append("--ui-testing-seed=\(seed)") }
         app.launch()
@@ -1094,6 +1099,39 @@ final class SeededTableUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Map of '")).firstMatch.exists)
     }
 
+    /// Issue 15: with a heart-rate profile set, Statistics shows time in each zone. The profile is
+    /// passed as launch-argument defaults, which sit over the throwaway settings.
+    @MainActor
+    func testHeartRateZonesShowTimeInEachZone() throws {
+        let app = launchMaxAct(seed: 40, defaults: [
+            "restingHeartRate": "55", "maximumHeartRate": "190", "trimpCurve": "male",
+        ])
+        let sidebar = app.outlines["Sidebar"]
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 15))
+        sidebar.staticTexts.containing(NSPredicate(format: "value == 'Statistics' OR label == 'Statistics'"))
+            .firstMatch.click()
+        let scroll = app.scrollViews["StatisticsScroll"]
+        XCTAssertTrue(scroll.waitForExistence(timeout: 10))
+
+        let rows = app.descendants(matching: .any).matching(identifier: "ZoneRow")
+        let top = rows.element(boundBy: 0)
+        for _ in 0..<15 where !(top.exists && top.isHittable) { scroll.scroll(byDeltaX: 0, deltaY: -300) }
+        XCTAssertTrue(top.waitForExistence(timeout: 10), "The zones section should list its zones.")
+        XCTAssertEqual(rows.count, 6, "Five zones and Below Z1.")
+        // Resting 55, maximum 190: Zone 5 starts at 55 + 0.9 × 135 = 176.5, rounded up.
+        let label = top.label.isEmpty ? (top.value as? String ?? "") : top.label
+        XCTAssertTrue(label.contains("Zone 5") && label.contains("177+ bpm"), "Got \(label)")
+
+        let source = app.staticTexts.containing(NSPredicate(format: "value BEGINSWITH 'From '")).firstMatch
+        XCTAssertTrue(source.waitForExistence(timeout: 20))
+        let measured = Int((source.value as? String ?? "").split(separator: " ").dropFirst().first ?? "") ?? 0
+        XCTAssertGreaterThan(measured, 0, "Seeded detail carries heart rate, so some workouts count.")
+        let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        attachment.name = "15-heart-rate-zones"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     /// Phase 8: an empty filter says what it means; only an actual search gets "No Results".
     /// The seed has no failed uploads, so Upload Failed is empty.
     @MainActor
@@ -1447,6 +1485,15 @@ final class RealContentUITests: XCTestCase {
             let squares = XCTAttachment(screenshot: window.screenshot())
             squares.name = "s0-routes-squares"; squares.lifetime = .keepAlways; add(squares)
             squaresToggle.click()
+        }
+        // Issue 15: heart-rate zones, just above the routes, once the histograms are read.
+        let zones = app.staticTexts["Heart-Rate Zones"]
+        if zones.exists {
+            window.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5)).scroll(byDeltaX: 0, deltaY: 300)
+            for _ in 0..<6 where !zones.isHittable { scroll.scroll(byDeltaX: 0, deltaY: 150) }
+            Thread.sleep(forTimeInterval: 1)
+            let attachment = XCTAttachment(screenshot: window.screenshot())
+            attachment.name = "s0-zones"; attachment.lifetime = .keepAlways; add(attachment)
         }
         scroll.scroll(byDeltaX: 0, deltaY: 6000)   // back to the top for the tour below
 

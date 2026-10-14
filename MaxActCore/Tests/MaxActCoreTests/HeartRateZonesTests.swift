@@ -46,4 +46,21 @@ import Testing
         combined.add(HeartRateHistogram(seconds: [100: 30]))
         #expect(combined.seconds[100] == 630)
     }
+
+    @Test("zone times group into periods, empty ones included")
+    func byPeriod() {
+        var calendar = WorkoutStatistics.trainingCalendar(timeZone: TimeZone(identifier: "America/Vancouver")!)
+        calendar.locale = Locale(identifier: "en_US")
+        func at(_ m: Int, _ d: Int) -> Date { calendar.date(from: DateComponents(year: 2026, month: m, day: d, hour: 12))! }
+        let workouts: [(start: Date, histogram: HeartRateHistogram)] = [
+            (at(9, 1), HeartRateHistogram(seconds: [150: 600])),
+            (at(9, 2), HeartRateHistogram(seconds: [150: 300, 100: 60])),
+            (at(9, 23), HeartRateHistogram(seconds: [180: 120])),
+        ]
+        let weeks = HeartRateZone.byPeriod(workouts, profile: profile, period: .week, through: at(10, 1), calendar: calendar)
+        #expect(weeks.count == 5)
+        #expect(weeks[0].times == [.z3: 900, .below: 60])
+        #expect(weeks[1].times.isEmpty && weeks[2].times.isEmpty)
+        #expect(weeks[3].times == [.z5: 120])
+    }
 }

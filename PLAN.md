@@ -26,15 +26,15 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ## 1. Where things stand — 2026-10-12
 
-All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 326 in
-`MaxActCore` (`swift test`), 55 app and UI tests (`RunAllTests` — ask first, then leave the Mac
+All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 330 in
+`MaxActCore` (`swift test`), 56 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~5 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
 
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** the user's check of the route heat map, then heart-rate zones (the last of 15). Issue 7 (TrainingPeaks) starts with
+**Next:** the user's check of issue 15 (training load, route heat map, heart-rate zones). Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -46,7 +46,7 @@ Numbered independently of the phases: "known issue 8" (summary stats) is not "Ph
 Fixed or closed issues — 1–14, 16 and 17 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
-**15. Deeper statistics.** *(deferred from issue 8; training load and route heat map built)*
+**15. Deeper statistics.** *(deferred from issue 8; all three parts built, awaiting the user's check)*
 The HealthFit-style analyses left out of issue 8's first cut, as separate pieces:
 - **Training load** *(built 2026-10-14, awaiting the user's check)* — Fitness/Fatigue/Form
   (CTL 42 days, ATL 7 days, TSB = yesterday's difference) from Banister's TRIMP on each workout's
@@ -56,8 +56,14 @@ The HealthFit-style analyses left out of issue 8's first cut, as separate pieces
   the same fields are in Settings. The curve (male 1.92 / female 1.67) is the user's choice, never
   defaulted. Workouts without heart rate are counted and reported. Checked on a copy of the real
   library with placeholder rates.
-- **Heart-rate zones** — time in zones per period. Needs the HR series, so it only covers workouts
-  whose detail has been downloaded; say how many weren't counted.
+- **Heart-rate zones** *(built 2026-10-14, awaiting the user's check)* — five zones by heart-rate
+  reserve (Karvonen: Z1 50–60% … Z5 90%+, plus Below Z1) from the Training Load profile. A
+  Statistics section above Routes: the current period's time per zone with bpm ranges, and
+  stacked bars per period, following the period, activity picker and search. Each workout's time
+  at each bpm is a histogram read in the same cached pass as the route sketches (each reading
+  counts until the next; gaps over 30 s count nothing — measured, 30.7 h of 275 h are such gaps),
+  so changing the profile is instant. Says how many workouts counted. Checked on a copy of the
+  real library: all 418 counted.
 - **Route heat map** *(built 2026-10-14, awaiting the user's check)* — a Routes section in
   Statistics: every route on one map, faint so overlaps build up, following the activity picker
   and search. Routes are grouped into places by where they start (25 km), named from place labels;

@@ -1059,6 +1059,17 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-14** — **Issue 15: heart-rate zones built** (the user chose zones by heart-rate
+  reserve). Measured first on a copy of the series: all 418 workouts carry heart rate (174,683
+  readings, median gap 5 s, 99th percentile 13 s; gaps over 30 s total 30.7 h of 275 h, so they
+  count nothing). `SeriesDigest` (cache version 2) now holds each workout's sketch *and* a
+  bpm histogram, read in one pass; `HeartRateZone.byPeriod` buckets them like the history chart.
+  Two test-tooling findings: `-key value` defaults passed after `--ui-testing` are swallowed
+  (AppKit pairs `-ui-testing` with the next token and opens the stray value — no window), so
+  `launchMaxAct` now takes `defaults:` placed before it; and modifiers on a `GridRow` apply to
+  every cell, so a row's accessibility element goes on its first cell. UI test mutation-checked.
+  330 package tests, 56 app and UI tests (2 real-content skipped).
+
 - **2026-10-14** — The full suite caught two personal-best tests clicking a moving target: the
   Routes section first showed a one-line "Preparing routes…", then grew 380pt when the map arrived,
   pushing the cards below it down mid-click. Routes now sits last in Statistics and reserves the
