@@ -159,7 +159,7 @@ choice and sort (not the selection or search).
   deadline (they take ≤0.6 s on a real phone), then a one-week listing with up to 90 s and a
   progress line (it takes 11–16 s); reports the recent-workout count, so "connected, but Health
   isn't sharing workouts" shows up before a long sync. The first version's single 15 s limit cut
-  off a healthy phone mid-listing — the user saw HAE answer just after.
+  off a healthy phone mid-listing — the user saw HAE answer just after. Confirmed working by the user.
 - **Sync errors name their cause** (`SyncProblem`): server not running (refused) vs phone
   unreachable (time-out, unknown host) vs token rejected vs server error vs unexpected reply —
   mapping measured. A sync that returns nothing warns and points at Health ▸ Sharing ▸ Apps;

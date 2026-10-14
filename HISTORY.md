@@ -1028,6 +1028,9 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-14** — The user confirmed Test Connection works against their phone after the timeout
+  fix.
+
 - **2026-10-14** — **Test Connection timeout fixed.** The user saw HAE's log answer a few seconds
   after MaxAct declared a connection problem. Measured on the real phone: handshake 0.05–0.6 s;
   listing 1 day ~3 s, 7 days 11–16 s, 14 days 19–21 s — past the single 15 s limit, which was a
