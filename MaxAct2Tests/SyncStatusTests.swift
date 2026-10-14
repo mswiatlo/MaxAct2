@@ -5,7 +5,7 @@ import Testing
 @testable import MaxAct2
 
 /// Phase 8: what the sync banner says when a list sync finishes.
-@Suite struct SyncStatusTests {
+@MainActor @Suite struct SyncStatusTests {
     typealias Status = AppModel.SyncStatus
 
     @Test("a sync that returns nothing warns and points at Health's sharing settings")
