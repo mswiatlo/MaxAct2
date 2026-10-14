@@ -342,10 +342,12 @@ final class MaxAct2UITests: XCTestCase {
         XCTAssertTrue(test.isEnabled)
         test.click()
 
-        let result = sheet.staticTexts["ConnectionCheckResult"]
-        XCTAssertTrue(result.waitForExistence(timeout: 20), "Test Connection should report a result.")
-        XCTAssertTrue((result.value as? String ?? "").contains("server isn't running"),
-                      "Got '\(result.value ?? "")'.")
+        // Found by its text: inside a `Label`, the identifier on the text isn't exposed.
+        let result = sheet.staticTexts.containing(NSPredicate(format: "value CONTAINS %@", "server isn't running")).firstMatch
+        if !result.waitForExistence(timeout: 20) {
+            print("WELCOME SHEET:\n\(sheet.debugDescription)")
+            XCTFail("Test Connection should report that the server isn't running.")
+        }
 
         sheet.buttons["Later"].click()
         XCTAssertTrue(sheet.waitForNonExistence(timeout: 5))

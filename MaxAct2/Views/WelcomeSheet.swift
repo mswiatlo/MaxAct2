@@ -52,7 +52,6 @@ struct ConnectionFields: View {
                 Label {
                     Text(check.summary)
                         .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("ConnectionCheckResult")
                 } icon: {
                     Image(systemName: check.succeeded ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                         .foregroundStyle(check.succeeded ? .green : .orange)
