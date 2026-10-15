@@ -1117,6 +1117,10 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-15** — The user confirmed the Strava check filled the September routes. Planned: 22
+  (flag repaired data, for re-doing once HAE fixes 21), 23 (similar routes in the inspector), 24
+  ("Everything" is capped at 7 years — make it unbounded), 25 (app icon). Issue 21 stays open.
+
 - **2026-10-14** — The user sent the HAE bug report (issue 21). Paused; next is ⌥⌘U to fill the 9
   September routes, then issue 20.
 

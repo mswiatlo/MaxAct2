@@ -4,7 +4,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 (HAE), with batch upload to Strava.
 
 **Status:** Phases 0–8 complete and checked by the user. Next: issue 20 (missing descent).
-**Last updated:** 2026-10-14.
+**Last updated:** 2026-10-15.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first: the HAE data
 > contract, the Xcode tooling limits, and the Strava API facts. **`HISTORY.md`** holds how we got
@@ -24,7 +24,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ---
 
-## 1. Where things stand — 2026-10-14 (paused)
+## 1. Where things stand — 2026-10-15
 
 All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 338 in
 `MaxActCore` (`swift test`), 57 app and UI tests (`RunAllTests` — ask first, then leave the Mac
@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** ⌥⌘U to link and fill the 9 September runs (issue 19's fill), then 20 (missing descent). Issue 7 (TrainingPeaks) starts with
+**Next:** issue 20 (missing descent), then 22–25. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -50,12 +50,32 @@ from them is under "Known limitations" below.
 defects behind 18 and 19, on every HAE path (MCP, manual JSON and GPX): Workout-app heart rate comes
 as one average per series sample, and interval workouts' routes as one interval's piece (the Sept
 17 2025 run: interval 3 of 28, 27 s of 42 min — identical in the manual GPX/JSON export). Until
-HAE fixes it, MaxAct fills heart rate from `get_health_metrics` and routes from Strava. If HAE
-ships a fix, re-download the affected workouts and consider retiring the Strava route fallback.
+HAE fixes it, MaxAct fills heart rate from `get_health_metrics` and routes from Strava. **Keep open until HAE fixes it.** Then: re-download the
+affected workouts — the ones issue 22 flags, plus the 17+ with heart rate from `get_health_metrics` —
+check the export's routes and heart rate are whole, and consider retiring the Strava route fallback.
 
 **20. Some workouts show no descent** *(open, reported 2026-10-14, not investigated)* — e.g. the
 Oct 12 2025 marathon. Check what the summary's `elevationDescendedMeters` holds and where the
 detail view takes descent from.
+
+**22. Flag data that was repaired** *(requested 2026-10-15)* — the inspector should say when a
+workout's route came from Strava because Health Auto Export sent only part of it ("Route from
+Strava — Health Auto Export sent 27 s of 42 min"), and likewise heart rate filled from
+`get_health_metrics`. Needs the series to remember where each part came from (a source field,
+saved with the fill), so the flagged ones can be found and re-downloaded once 21 is fixed.
+
+**23. Similar routes in the inspector** *(requested 2026-10-15)* — for the selected workout, find
+other workouts over the same route and show how many times it's been done, the fastest (and where
+this one ranks), and a trend over time. Matching to be designed and measured on the real library
+(start/end proximity plus path overlap, e.g. shared explorer tiles; same activity kind).
+
+**24. "Everything" should mean everything** *(requested 2026-10-15)* — the sync panel's
+"Everything (7 years)" asks Health Auto Export for seven years back (`SyncPanel.swift`), so older
+workouts are never imported. Make it unbounded: find the oldest workout (HealthKit dates from
+2014) rather than a fixed span, and measure what empty months cost before choosing how to search.
+
+**25. App icon** *(requested 2026-10-15)* — the user has a candidate image to supply. Fill the
+asset catalog's AppIcon at every macOS size.
 
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.
