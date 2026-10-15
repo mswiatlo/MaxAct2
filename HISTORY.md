@@ -1117,6 +1117,15 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-15** — **Issue 20 built: estimated ascent/descent.** Measured on a copy (464
+  workouts): descent missing on all 36 Workout-app recordings and 59 WorkOutDoors ones. Two
+  estimators against the 347 reporting both: route-summed descent (median |error| 5 m, p90 17 m,
+  p99 83 m) and recorded ascent + net drop (2 m, 6 m, 15 m) — the second used where an ascent
+  exists. `ElevationEstimate` in the package (3 tests; the formula mutation-checked); the inspector
+  shows "≈" values with an explanation. Marathon: ≈ 269 m (real copy). A synthetic-route test first
+  failed because 61-point smoothing rounds a sharp peak (72 m for 80) — a test tolerance issue, not
+  a code one. 341 package tests, 57 app and UI tests (2 real-content skipped).
+
 - **2026-10-15** — The user confirmed the Strava check filled the September routes. Planned: 22
   (flag repaired data, for re-doing once HAE fixes 21), 23 (similar routes in the inspector), 24
   ("Everything" is capped at 7 years — make it unbounded), 25 (app icon). Issue 21 stays open.

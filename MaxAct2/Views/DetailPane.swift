@@ -83,6 +83,9 @@ struct WorkoutDetailView: View {
         /// then demonstrably not the raw recording.
         let discardedFixes: Int
         let movingSpeedMetersPerSecond: Double?
+        /// Ascent and descent from the route, where the summary has none (issue 20).
+        let estimatedAscent: Double?
+        let estimatedDescent: Double?
         let splits: [Split]
         let heartRate: [ChartSegment]
         /// Time at each heart rate, for the zones — kept rather than the zone times, so a change
@@ -160,6 +163,9 @@ struct WorkoutDetailView: View {
             },
             discardedFixes: series.route.count - route.count,
             movingSpeedMetersPerSecond: workout.movingSpeedMetersPerSecond(using: series),
+            estimatedAscent: workout.elevationAscendedMeters == nil ? ElevationEstimate.ascent(route: route) : nil,
+            estimatedDescent: workout.elevationDescendedMeters == nil
+                ? ElevationEstimate.descent(reportedAscent: workout.elevationAscendedMeters, route: route) : nil,
             // Splits and chart series are derived once here rather than in `body`. Each walks
             // thousands of points, and body runs on every hover, resize and scroll.
             splits: WorkoutSplits.splits(for: workout, series: series),
@@ -403,8 +409,12 @@ struct WorkoutDetailView: View {
                     stat("Max HR", WorkoutFormatting.heartRate(workout.maximumHeartRate))
                 }
                 GridRow {
-                    stat("Ascent", WorkoutFormatting.elevation(meters: workout.elevationAscendedMeters))
-                    stat("Descent", WorkoutFormatting.elevation(meters: workout.elevationDescendedMeters))
+                    elevationStat("Ascent", reported: workout.elevationAscendedMeters, estimated: series?.estimatedAscent,
+                                  how: "summed from the route's heights")
+                    elevationStat("Descent", reported: workout.elevationDescendedMeters, estimated: series?.estimatedDescent,
+                                  how: workout.elevationAscendedMeters == nil
+                                      ? "summed from the route's heights"
+                                      : "the recorded ascent plus the height lost from start to finish")
                     if let series {
                         stat(
                             "Samples",
@@ -430,6 +440,21 @@ struct WorkoutDetailView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label).font(.caption).foregroundStyle(.secondary)
             Text(value).font(.title3.monospacedDigit())
+        }
+    }
+
+    /// Health's figure when it has one; otherwise an estimate, marked "≈" and explained — Health
+    /// has no descent for any Apple Workout-app recording (issue 20).
+    @ViewBuilder
+    private func elevationStat(_ label: String, reported: Double?, estimated: Double?, how: String) -> some View {
+        if reported == nil, let estimated {
+            stat(label, "≈ " + WorkoutFormatting.elevation(meters: estimated))
+                .help("Estimated: Health didn't record this, so it's \(how).")
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(label), about \(WorkoutFormatting.elevation(meters: estimated)), estimated")
+                .accessibilityIdentifier("Estimated\(label)")
+        } else {
+            stat(label, WorkoutFormatting.elevation(meters: reported))
         }
     }
 }

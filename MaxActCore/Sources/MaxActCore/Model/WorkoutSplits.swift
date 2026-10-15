@@ -250,3 +250,39 @@ extension WorkoutSeries {
         return count > 0 ? total / Double(count) : nil
     }
 }
+
+/// Ascent and descent for workouts whose summary lacks them (issue 20). Health has no descent for
+/// any Apple Workout-app recording (measured: 36 of 36) nor for 59 of 428 WorkOutDoors ones.
+///
+/// **Descent from the reported ascent** where there is one: what goes up and doesn't come back
+/// down is the net change in height, so descent = ascent + (start height − end height). Checked
+/// against the 347 workouts reporting both: median error 2 m, 90th percentile 6 m. Summing drops
+/// along the route (``WorkoutSplits/elevationGains(_:threshold:)`` on inverted heights) does
+/// worse — 5 m and 17 m — and on the Oct 12 2025 marathon under-read its own reported 268 m ascent
+/// by 28%, so it is only the fallback, for workouts with neither figure.
+public enum ElevationEstimate {
+    /// Smoothed start height minus smoothed end height; `nil` without altitudes.
+    public static func netDrop(_ route: [RoutePoint]) -> Double? {
+        let heights = WorkoutSplits.smoothedAltitudes(route).compactMap { $0 }
+        guard let first = heights.first, let last = heights.last else { return nil }
+        return first - last
+    }
+
+    /// Descent: from `reportedAscent` and the route's net drop when there is an ascent, otherwise
+    /// summed along the route. `nil` without altitudes.
+    public static func descent(reportedAscent: Double?, route: [RoutePoint]) -> Double? {
+        if let reportedAscent, let drop = netDrop(route) { return max(0, reportedAscent + drop) }
+        return summed(route, inverted: true)
+    }
+
+    /// Ascent summed along the route, for workouts that report none. `nil` without altitudes.
+    public static func ascent(route: [RoutePoint]) -> Double? {
+        summed(route, inverted: false)
+    }
+
+    private static func summed(_ route: [RoutePoint], inverted: Bool) -> Double? {
+        let heights = WorkoutSplits.smoothedAltitudes(route)
+        guard heights.contains(where: { $0 != nil }) else { return nil }
+        return WorkoutSplits.elevationGains(inverted ? heights.map { $0.map { -$0 } } : heights).reduce(0, +)
+    }
+}
