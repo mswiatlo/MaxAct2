@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** Download Detail for the 36 Workout-app workouts and the user's check of 22, then 23–25. Issue 7 (TrainingPeaks) starts with
+**Next:** 26 (small text fix), then 23–25. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -43,7 +43,7 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–20 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–20 and 22 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
 **21. Health Auto Export bug report** *(sent by the user 2026-10-14; awaiting HAE's reply)* — two export
@@ -57,16 +57,6 @@ check the export's routes and heart rate are whole, and consider retiring the St
 **Follow-up:** XCTest reads an empty label for the inspector's "≈" estimates and the
 incomplete-route note, despite explicit accessibility labels — check with VoiceOver /
 `debugDescription` which element the identifier lands on.
-
-**22. Flag data that was repaired** *(built 2026-10-15, awaiting the user's check)* — each saved
-series now records its repairs (`SeriesProvenance`: route from which Strava activity and what the
-export had sent; heart rate from `get_health_metrics` and how many readings the export had), and
-the inspector shows them ("Route from Strava — Health Auto Export sent only 27 secs. of 42 mins").
-Repairs made before this left no record, so on first launch the 36 Workout-app workouts (picked
-as the source of the Strava-filled routes, recognisable by their missing GPS accuracy — measured
-exactly 36 of 464) go back to needing detail; **Download Detail** (phone in front, Strava
-connected) re-fetches them and records the repairs. Not yet a sidebar filter — add one with 21 if
-finding them by eye proves tedious.
 
 **23. Similar routes in the inspector** *(requested 2026-10-15)* — for the selected workout, find
 other workouts over the same route and show how many times it's been done, the fastest (and where
@@ -83,6 +73,10 @@ workouts are never imported. Make it unbounded: find the oldest workout (HealthK
 
 **25. App icon** *(requested 2026-10-15)* — the user has a candidate image to supply. Fill the
 asset catalog's AppIcon at every macOS size.
+
+**26. Simpler "already on Strava" text** *(requested 2026-10-15)* — the inspector says "Already on
+Strava — uploaded from another app, most likely the watch." (`DetailPane.swift`); drop the guess
+about the watch and just say it's already uploaded.
 
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.

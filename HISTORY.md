@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed or closed known issues (1–20)
+## 2. Fixed or closed known issues (1–20, 22)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -498,6 +498,16 @@ against the 347 workouts reporting both: the first rule's typical error is 2 m (
 route sum's 5 m (p90 17 m; it under-read the marathon's ascent by 28%). The Oct 12 2025 marathon
 shows ≈ 269 m beside its 268 m ascent (checked on a real copy). Only the inspector; statistics
 still total recorded ascent.
+
+**22. ~~Flag data that was repaired.~~ — done 2026-10-15, confirmed by the user.** — each saved
+series now records its repairs (`SeriesProvenance`: route from which Strava activity and what the
+export had sent; heart rate from `get_health_metrics` and how many readings the export had), and
+the inspector shows them ("Route from Strava — Health Auto Export sent only 27 secs. of 42 mins").
+Repairs made before this left no record, so on first launch the 36 Workout-app workouts (picked
+as the source of the Strava-filled routes, recognisable by their missing GPS accuracy — measured
+exactly 36 of 464) go back to needing detail; **Download Detail** (phone in front, Strava
+connected) re-fetches them and records the repairs. Not yet a sidebar filter — add one with 21 if
+finding them by eye proves tedious.
 
 **16. ~~Mark races on Strava.~~ — done 2026-10-14, confirmed by the user.**
 
@@ -1125,6 +1135,9 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-15** — **Issue 22 closed**, confirmed by the user. Planned 26: drop "most likely the
+  watch" from the inspector's already-on-Strava text.
 
 - **2026-10-15** — **Issue 20 closed**, confirmed by the user. **Issue 22 built: repairs recorded
   and flagged.** `SeriesProvenance` (optional in the blob, so old series decode — tested) is set by
