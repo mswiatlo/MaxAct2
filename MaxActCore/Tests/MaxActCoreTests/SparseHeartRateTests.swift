@@ -67,6 +67,7 @@ import Testing
         #expect(!detail.series.heartRate.contains { $0.average == 60 }, "another device's reading")
         #expect(detail.series.heartRate.allSatisfy { $0.date <= Self.workout.end }, "a reading after the workout")
         #expect(HeartRateHistogram(detail.series.heartRate).total > 1700)
+        #expect(detail.series.provenance.heartRateFromMetrics?.exportedReadings == 3, "the repair is recorded")
 
         let call = try #require(await transport.exchanges.last).params()
         #expect(call["name"] as? String == "get_health_metrics")

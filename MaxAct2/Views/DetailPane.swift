@@ -111,6 +111,10 @@ struct WorkoutDetailView: View {
                     if series.series.routeIsIncomplete(duration: workout.duration) {
                         incompleteRouteNote(series.series)
                     }
+                    if let fill = series.series.provenance.routeFromStrava {
+                        repairNote("Route from Strava — Health Auto Export sent only "
+                                   + Self.span(fill.exportedSeconds) + " of " + Self.span(workout.duration) + ".")
+                    }
                 } else if workout.hasRoute && !item.hasDetail {
                     notDownloadedNotice
                 }
@@ -118,6 +122,10 @@ struct WorkoutDetailView: View {
                 statsGrid(series)
 
                 if let series {
+                    if let fill = series.series.provenance.heartRateFromMetrics {
+                        repairNote("Heart rate from Health's samples — Health Auto Export's workout export had "
+                                   + "\(fill.exportedReadings) \(fill.exportedReadings == 1 ? "reading" : "readings").")
+                    }
                     charts(series)
                     if series.heartRateHistogram.total > 0 {
                         zones(series.heartRateHistogram)
@@ -344,6 +352,27 @@ struct WorkoutDetailView: View {
             highlighted: $highlighted,
             timeDomain: series.timeDomain
         )
+    }
+
+    /// Data MaxAct filled in around Health Auto Export's export bugs (issue 22) — shown so it's
+    /// clear what isn't the export's, and which workouts to re-download once it's fixed.
+    private func repairNote(_ text: String) -> some View {
+        Label {
+            Text(verbatim: text)
+        } icon: {
+            Image(systemName: "bandage")
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .help("Re-download this workout once Health Auto Export fixes its export.")
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("RepairNote")
+    }
+
+    /// "27 secs.", "42 mins", "1 hr, 30 mins".
+    private static func span(_ seconds: TimeInterval) -> String {
+        Duration.seconds(seconds.rounded())
+            .formatted(.units(allowed: [.hours, .minutes, .seconds], width: .abbreviated, maximumUnitCount: 2))
     }
 
     /// Health Auto Export sent only part of this route (issue 19). Linked workouts are filled from

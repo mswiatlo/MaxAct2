@@ -171,7 +171,15 @@ public enum SampleData {
                 isIndoor: workout.isIndoor, sourceName: workout.sourceName,
                 hasRoute: true
             )
-            return IngestedWorkout(workout: withRoute, series: series(for: withRoute))
+            // The first carries both repairs (issue 22), so the inspector's notes can be tested.
+            let detail = series(for: withRoute)
+            guard index == 0 else { return IngestedWorkout(workout: withRoute, series: detail) }
+            let repaired = WorkoutSeries(
+                workoutID: detail.workoutID, route: detail.route, heartRate: detail.heartRate,
+                provenance: SeriesProvenance(
+                    routeFromStrava: .init(activityID: 1, exportedSeconds: 27, exportedPoints: 28),
+                    heartRateFromMetrics: .init(exportedReadings: 3)))
+            return IngestedWorkout(workout: withRoute, series: repaired)
         }
     }
 }

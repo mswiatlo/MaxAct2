@@ -26,15 +26,15 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ## 1. Where things stand — 2026-10-15
 
-All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 341 in
-`MaxActCore` (`swift test`), 57 app and UI tests (`RunAllTests` — ask first, then leave the Mac
+All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 344 in
+`MaxActCore` (`swift test`), 58 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~5 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
 
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** the user's check of 20, then 22–25. Issue 7 (TrainingPeaks) starts with
+**Next:** Download Detail for the 36 Workout-app workouts and the user's check of 22, then 23–25. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -43,7 +43,7 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–19 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–20 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
 **21. Health Auto Export bug report** *(sent by the user 2026-10-14; awaiting HAE's reply)* — two export
@@ -54,24 +54,19 @@ HAE fixes it, MaxAct fills heart rate from `get_health_metrics` and routes from 
 affected workouts — the ones issue 22 flags, plus the 17+ with heart rate from `get_health_metrics` —
 check the export's routes and heart rate are whole, and consider retiring the Strava route fallback.
 
-**20. Missing descent** *(fix built 2026-10-15, awaiting the user's check)* — Health has no
-descent for any Apple Workout-app recording (36 of 36) nor for 59 of 428 WorkOutDoors ones; 20 lack
-ascent too. The inspector now estimates what's missing, marked "≈" with a tooltip: descent =
-recorded ascent + (start height − end height), else both summed from the route's heights. Measured
-against the 347 workouts reporting both: the first rule's typical error is 2 m (p90 6 m), the
-route sum's 5 m (p90 17 m; it under-read the marathon's ascent by 28%). The Oct 12 2025 marathon
-shows ≈ 269 m beside its 268 m ascent (checked on a real copy). Only the inspector; statistics
-still total recorded ascent.
-
 **Follow-up:** XCTest reads an empty label for the inspector's "≈" estimates and the
 incomplete-route note, despite explicit accessibility labels — check with VoiceOver /
 `debugDescription` which element the identifier lands on.
 
-**22. Flag data that was repaired** *(requested 2026-10-15)* — the inspector should say when a
-workout's route came from Strava because Health Auto Export sent only part of it ("Route from
-Strava — Health Auto Export sent 27 s of 42 min"), and likewise heart rate filled from
-`get_health_metrics`. Needs the series to remember where each part came from (a source field,
-saved with the fill), so the flagged ones can be found and re-downloaded once 21 is fixed.
+**22. Flag data that was repaired** *(built 2026-10-15, awaiting the user's check)* — each saved
+series now records its repairs (`SeriesProvenance`: route from which Strava activity and what the
+export had sent; heart rate from `get_health_metrics` and how many readings the export had), and
+the inspector shows them ("Route from Strava — Health Auto Export sent only 27 secs. of 42 mins").
+Repairs made before this left no record, so on first launch the 36 Workout-app workouts (picked
+as the source of the Strava-filled routes, recognisable by their missing GPS accuracy — measured
+exactly 36 of 464) go back to needing detail; **Download Detail** (phone in front, Strava
+connected) re-fetches them and records the repairs. Not yet a sidebar filter — add one with 21 if
+finding them by eye proves tedious.
 
 **23. Similar routes in the inspector** *(requested 2026-10-15)* — for the selected workout, find
 other workouts over the same route and show how many times it's been done, the fastest (and where

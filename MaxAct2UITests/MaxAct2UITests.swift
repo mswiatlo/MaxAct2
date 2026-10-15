@@ -1160,6 +1160,27 @@ final class SeededTableUITests: XCTestCase {
         add(attachment)
     }
 
+    /// Issue 22: repaired data is flagged in the inspector. The first seeded workout carries a
+    /// Strava-filled route and heart rate from Health's samples.
+    @MainActor
+    func testInspectorFlagsRepairedData() throws {
+        let app = launchSeeded()
+        let table = app.outlines["WorkoutTable"]
+        XCTAssertTrue(table.waitForExistence(timeout: 15))
+        let notes = app.descendants(matching: .any).matching(identifier: "RepairNote")
+        table.cells.element(boundBy: 0).click()
+        // `cells` counts every column, so step through rows with the arrow key.
+        for _ in 0..<8 where !notes.firstMatch.waitForExistence(timeout: 3) {
+            app.typeKey(.downArrow, modifierFlags: [])
+        }
+        XCTAssertTrue(notes.firstMatch.exists, "The repaired workout should be flagged.")
+        let texts = (0..<notes.count).map { notes.element(boundBy: $0) }.map { $0.label + ($0.value as? String ?? "") }
+        print("NOTES: \(texts)")
+        XCTAssertEqual(notes.count, 2, "Route and heart rate: \(texts)")
+        let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        attachment.name = "22-repair-notes"; attachment.lifetime = .keepAlways; add(attachment)
+    }
+
     /// Phase 8: an empty filter says what it means; only an actual search gets "No Results".
     /// The seed has no failed uploads, so Upload Failed is empty.
     @MainActor

@@ -136,6 +136,12 @@ final class AppSettings {
         didSet { defaults.set(hasFilledIncompleteRoutes, forKey: "hasFilledIncompleteRoutes") }
     }
 
+    /// Whether workouts repaired before repairs were recorded have been marked for re-download,
+    /// so the re-download records them (issue 22). Once per library.
+    var hasMarkedRepairsForRedownload: Bool {
+        didSet { defaults.set(hasMarkedRepairsForRedownload, forKey: "hasMarkedRepairsForRedownload") }
+    }
+
     /// Colour of route tracks on thumbnails and the detail map.
     var routeColor: RouteColor {
         didSet { defaults.set(routeColor.rawValue, forKey: "routeColor") }
@@ -155,6 +161,7 @@ final class AppSettings {
         tableSortKey = defaults.string(forKey: "tableSort")
         hasRepairedSparseHeartRate = defaults.bool(forKey: "hasRepairedSparseHeartRate")
         hasFilledIncompleteRoutes = defaults.bool(forKey: "hasFilledIncompleteRoutes")
+        hasMarkedRepairsForRedownload = defaults.bool(forKey: "hasMarkedRepairsForRedownload")
     }
 
     /// The address as actually parsed, or `nil` if it can't be. Shown in the UI so there is no

@@ -435,6 +435,31 @@ public actor WorkoutStore {
         return marked
     }
 
+    /// Marks for re-download every workout recorded by the same source as a route that came from
+    /// Strava — once, so the re-download records which parts were repaired (issue 22). Repairs
+    /// made before provenance existed left no record; heart rate filled from Health's samples is
+    /// indistinguishable afterwards. A Strava-filled route is recognisable (Strava's points carry
+    /// no GPS accuracy, the export's always do), and only the Apple Workout app's recordings need
+    /// repairs, so its source name picks out that app's workouts: measured, 36 of 464, exactly the
+    /// user's Workout-app recordings. Returns their ids.
+    @discardableResult
+    public func markRepairedSourcesForRedownload(seriesStore: SeriesStore) async throws -> [String] {
+        let withDetail = try modelContext.fetch(FetchDescriptor<WorkoutRecord>(predicate: #Predicate { $0.hasDetail == true }))
+        var sources: Set<String> = []
+        for record in withDetail {
+            guard let source = record.sourceName, !sources.contains(source),
+                  let series = await seriesStore.loadIfAvailable(record.id), !series.route.isEmpty,
+                  series.provenance.isEmpty,
+                  series.route.allSatisfy({ $0.horizontalAccuracyMeters == nil })
+            else { continue }
+            sources.insert(source)
+        }
+        let marked = withDetail.filter { $0.sourceName.map(sources.contains) == true }
+        for record in marked { record.hasDetail = false }
+        if !marked.isEmpty { try modelContext.save() }
+        return marked.map(\.id)
+    }
+
     /// Reconciles the `hasDetail` flags against what is actually on disk. Cheap insurance against
     /// the database and the blob directory drifting apart — a blob deleted outside the app, or a
     /// database restored from backup.

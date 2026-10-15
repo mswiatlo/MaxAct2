@@ -77,6 +77,9 @@ public struct WorkoutSeries: Hashable, Sendable, Codable {
     public let heartRateRecovery: [HeartRateSample]
     public let activeEnergyKilocalories: [SeriesSample]
     public let stepCount: [SeriesSample]
+    /// Which parts didn't come from Health Auto Export's workout export (issue 22). Optional so
+    /// series saved before it existed still decode; read ``provenance``.
+    private let repairs: SeriesProvenance?
 
     public init(
         workoutID: String,
@@ -84,7 +87,8 @@ public struct WorkoutSeries: Hashable, Sendable, Codable {
         heartRate: [HeartRateSample] = [],
         heartRateRecovery: [HeartRateSample] = [],
         activeEnergyKilocalories: [SeriesSample] = [],
-        stepCount: [SeriesSample] = []
+        stepCount: [SeriesSample] = [],
+        provenance: SeriesProvenance = SeriesProvenance()
     ) {
         self.workoutID = workoutID
         self.route = route
@@ -92,7 +96,10 @@ public struct WorkoutSeries: Hashable, Sendable, Codable {
         self.heartRateRecovery = heartRateRecovery
         self.activeEnergyKilocalories = activeEnergyKilocalories
         self.stepCount = stepCount
+        self.repairs = provenance.isEmpty ? nil : provenance
     }
+
+    public var provenance: SeriesProvenance { repairs ?? SeriesProvenance() }
 
     public var isEmpty: Bool {
         route.isEmpty && heartRate.isEmpty && heartRateRecovery.isEmpty
@@ -124,10 +131,13 @@ extension WorkoutSeries {
         duration >= 120 && Double(samples.count) < duration / 60
     }
 
-    /// The same series with its heart rate replaced.
+    /// The same series with its heart rate replaced from Health's samples, recording how many
+    /// readings the export had.
     public func replacingHeartRate(_ heartRate: [HeartRateSample]) -> WorkoutSeries {
-        WorkoutSeries(workoutID: workoutID, route: route, heartRate: heartRate, heartRateRecovery: heartRateRecovery,
-                      activeEnergyKilocalories: activeEnergyKilocalories, stepCount: stepCount)
+        var provenance = provenance
+        provenance.heartRateFromMetrics = .init(exportedReadings: self.heartRate.count)
+        return WorkoutSeries(workoutID: workoutID, route: route, heartRate: heartRate, heartRateRecovery: heartRateRecovery,
+                             activeEnergyKilocalories: activeEnergyKilocalories, stepCount: stepCount, provenance: provenance)
     }
 }
 
@@ -147,9 +157,39 @@ extension WorkoutSeries {
         return last.timestamp.timeIntervalSince(first.timestamp)
     }
 
-    /// The same series with its route replaced.
-    public func replacingRoute(_ route: [RoutePoint]) -> WorkoutSeries {
-        WorkoutSeries(workoutID: workoutID, route: route, heartRate: heartRate, heartRateRecovery: heartRateRecovery,
-                      activeEnergyKilocalories: activeEnergyKilocalories, stepCount: stepCount)
+    /// The same series with its route replaced by the Strava activity's, recording what the
+    /// export had sent.
+    public func replacingRoute(_ route: [RoutePoint], fromStravaActivity activityID: Int) -> WorkoutSeries {
+        var provenance = provenance
+        provenance.routeFromStrava = .init(activityID: activityID, exportedSeconds: routeSpan, exportedPoints: self.route.count)
+        return WorkoutSeries(workoutID: workoutID, route: route, heartRate: heartRate, heartRateRecovery: heartRateRecovery,
+                             activeEnergyKilocalories: activeEnergyKilocalories, stepCount: stepCount, provenance: provenance)
     }
+}
+
+/// Where a series' parts came from, when not from Health Auto Export's workout export — the
+/// workarounds for issue 21's export bugs, recorded so the workouts can be found and re-downloaded
+/// once Health Auto Export fixes them.
+public struct SeriesProvenance: Hashable, Sendable, Codable {
+    /// The route came from the linked Strava activity; the export had sent only part of it.
+    public struct StravaRoute: Hashable, Sendable, Codable {
+        public let activityID: Int
+        public let exportedSeconds: TimeInterval
+        public let exportedPoints: Int
+    }
+
+    /// The heart rate came from `get_health_metrics`; the export had averaged it into a few readings.
+    public struct MetricsHeartRate: Hashable, Sendable, Codable {
+        public let exportedReadings: Int
+    }
+
+    public var routeFromStrava: StravaRoute?
+    public var heartRateFromMetrics: MetricsHeartRate?
+
+    public init(routeFromStrava: StravaRoute? = nil, heartRateFromMetrics: MetricsHeartRate? = nil) {
+        self.routeFromStrava = routeFromStrava
+        self.heartRateFromMetrics = heartRateFromMetrics
+    }
+
+    public var isEmpty: Bool { routeFromStrava == nil && heartRateFromMetrics == nil }
 }

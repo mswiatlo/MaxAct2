@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed or closed known issues (1–19)
+## 2. Fixed or closed known issues (1–20)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -489,6 +489,15 @@ whole-day window (no neighbouring workouts to stitch), and HAE's manual JSON and
 points, 17:45:13–17:45:40, exactly interval 3 of the run's 28). All 9 are on Strava (with maps) but
 weren't linked, since no Strava check had run since September was imported; the Strava check now
 fills partial routes on workouts it newly links. Reported to HAE as issue 21.
+
+**20. ~~Missing descent.~~ — done 2026-10-15, confirmed by the user.** — Health has no
+descent for any Apple Workout-app recording (36 of 36) nor for 59 of 428 WorkOutDoors ones; 20 lack
+ascent too. The inspector now estimates what's missing, marked "≈" with a tooltip: descent =
+recorded ascent + (start height − end height), else both summed from the route's heights. Measured
+against the 347 workouts reporting both: the first rule's typical error is 2 m (p90 6 m), the
+route sum's 5 m (p90 17 m; it under-read the marathon's ascent by 28%). The Oct 12 2025 marathon
+shows ≈ 269 m beside its 268 m ascent (checked on a real copy). Only the inspector; statistics
+still total recorded ascent.
 
 **16. ~~Mark races on Strava.~~ — done 2026-10-14, confirmed by the user.**
 
@@ -1116,6 +1125,15 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-15** — **Issue 20 closed**, confirmed by the user. **Issue 22 built: repairs recorded
+  and flagged.** `SeriesProvenance` (optional in the blob, so old series decode — tested) is set by
+  the heart-rate fallback and the Strava route fill; the inspector shows a note per repair. Past
+  repairs left no record: Strava-filled routes are recognisable (no GPS accuracy — exactly 12 on a
+  copy) but metrics-filled heart rate isn't, so the user chose a one-time re-download of the
+  workouts sharing those routes' source (36, all Workout-app recordings) to record them exactly.
+  Seeded workout 0 carries both repairs for a UI test (mutation-checked, as is the selection).
+  344 package tests, 58 app and UI tests (2 real-content skipped).
 
 - **2026-10-15** — **Issue 20 built: estimated ascent/descent.** Measured on a copy (464
   workouts): descent missing on all 36 Workout-app recordings and 59 WorkOutDoors ones. Two

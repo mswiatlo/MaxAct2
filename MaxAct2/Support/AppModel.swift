@@ -440,7 +440,20 @@ final class AppModel {
         await refreshStravaConnection()
         resumeStravaUploads()
         await repairSparseHeartRateIfNeeded()
+        await markRepairsForRedownloadIfNeeded()
         await fillIncompleteRoutesIfNeeded()
+    }
+
+    /// Once: workouts repaired before repairs were recorded go back to needing detail, so the next
+    /// Download Detail re-fetches them and records exactly what was repaired (issue 22).
+    private func markRepairsForRedownloadIfNeeded() async {
+        guard !settings.hasMarkedRepairsForRedownload, items.contains(where: \.hasDetail) else { return }
+        guard let marked = try? await store.markRepairedSourcesForRedownload(seriesStore: seriesStore) else { return }
+        settings.hasMarkedRepairsForRedownload = true
+        if !marked.isEmpty {
+            await routeSketchCache?.invalidate(marked)
+            items = (try? await store.allItems()) ?? items
+        }
     }
 
     /// Once (with Strava connected): routes Health Auto Export sent only part of — some
@@ -475,7 +488,7 @@ final class AppModel {
             guard let last = route.last, let first = route.first,
                   last.timestamp.timeIntervalSince(first.timestamp) > series.routeSpan
             else { continue }
-            try await seriesStore.save(series.replacingRoute(route))
+            try await seriesStore.save(series.replacingRoute(route, fromStravaActivity: activityID))
             await routeSketchCache?.invalidate([item.id])
             thumbnails.delete(workoutID: item.id)
             filled += 1
