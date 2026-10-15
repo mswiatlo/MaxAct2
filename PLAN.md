@@ -66,8 +66,11 @@ saved with the fill), so the flagged ones can be found and re-downloaded once 21
 
 **23. Similar routes in the inspector** *(requested 2026-10-15)* — for the selected workout, find
 other workouts over the same route and show how many times it's been done, the fastest (and where
-this one ranks), and a trend over time. Matching to be designed and measured on the real library
-(start/end proximity plus path overlap, e.g. shared explorer tiles; same activity kind).
+this one ranks), and a trend over time. **Decided (user, 2026-10-15):** the same route means the
+same activity kind and mostly the same path **in the same direction** (an out-and-back reversed is
+a different route). Show the count, the fastest time/pace with its date, this one's rank, and a
+chart of pace or time per attempt over the dates. No attempt list or map overlay. Matching
+thresholds to be measured on the real library.
 
 **24. "Everything" should mean everything** *(requested 2026-10-15)* — the sync panel's
 "Everything (7 years)" asks Health Auto Export for seven years back (`SyncPanel.swift`), so older
