@@ -1136,6 +1136,12 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-23** — **Issue 21: data for HAE.** Made a zip of three Workout-app interval runs (2025-09-17,
+  10-02, 10-08). Each run has HAE's `get_workouts` and `get_health_metrics` replies, unmodified, plus a Strava
+  GPX with a privacy zone removed, and a README. Measured: each exported route is exactly one `activities[]`
+  entry. Oct 5 and Sept 5 were rejected because their HAE route pieces show the finish or pass home. Found
+  for 28: the HAE token is stored in UserDefaults.
+
 - **2026-10-23** — Planned 27 (code quality audit) and 28 (security audit), each producing a
   findings list to triage before changes.
 

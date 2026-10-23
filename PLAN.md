@@ -46,13 +46,20 @@ Numbered independently of the phases: "known issue 8" (summary stats) is not "Ph
 Fixed or closed issues — 1–20 and 22 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
-**21. Health Auto Export bug report** *(sent by the user 2026-10-14; awaiting HAE's reply)* — two export
+**21. Health Auto Export bug report** *(sent by the user 2026-10-14; HAE acknowledged it and asked
+for data; package prepared 2026-10-23)* — two export
 defects behind 18 and 19, on every HAE path (MCP, manual JSON and GPX): Workout-app heart rate comes
 as one average per series sample, and interval workouts' routes as one interval's piece (the Sept
 17 2025 run: interval 3 of 28, 27 s of 42 min — identical in the manual GPX/JSON export). Until
 HAE fixes it, MaxAct fills heart rate from `get_health_metrics` and routes from Strava. **Keep open until HAE fixes it.** Then: re-download the
 affected workouts — the ones issue 22 flags, plus the 17+ with heart rate from `get_health_metrics` —
 check the export's routes and heart rate are whole, and consider retiring the Strava route fallback.
+
+The data sent (`~/Downloads/MaxAct-HAE-issue-data.zip`) covers the runs from 2025-09-17, 10-02 and 10-08. Each run has
+HAE's `get_workouts` and `get_health_metrics` replies, unmodified, and a GPX built from Strava's streams. Points inside a
+400 m zone, centred at a random offset of up to 150 m from home, were removed from the GPX. New finding: each
+exported route piece is exactly one entry of the workout's `activities` array, one work interval (index 3 of 28,
+2 of 20, 2 of 8).
 
 **Follow-up:** XCTest reads an empty label for the inspector's "≈" estimates and the
 incomplete-route note, despite explicit accessibility labels — check with VoiceOver /
@@ -89,7 +96,8 @@ secret and OAuth tokens: Keychain use, nothing in logs, defaults or crash output
 (plain HTTP on the LAN, token in transit), Strava OAuth (redirect handling, state check, token
 refresh), handling of untrusted input (HAE and Strava replies, stored series files), on-disk data
 and file protection, entitlements and sandboxing, and that the test isolation can't reach real data.
-Output as for 27.
+Output as for 27. Already found: the HAE bearer token sits in plain UserDefaults (`syncToken`, `WorkoutActions.swift`),
+not the Keychain.
 
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.
