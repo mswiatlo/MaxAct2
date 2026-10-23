@@ -1136,6 +1136,9 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-23** — Planned 29: click the route heatmap to open a workout in the inspector; then a
+  list when the click lands on many overlapping routes.
+
 - **2026-10-23** — **Issue 21: data for HAE.** Made a zip of three Workout-app interval runs (2025-09-17,
   10-02, 10-08). Each run has HAE's `get_workouts` and `get_health_metrics` replies, unmodified, plus a Strava
   GPX with a privacy zone removed, and a README. Measured: each exported route is exactly one `activities[]`

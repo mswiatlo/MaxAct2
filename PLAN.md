@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** 26 (small text fix), then 23–25; audits 27 (code quality) and 28 (security) queued. Issue 7 (TrainingPeaks) starts with
+**Next:** 26 (small text fix), then 23–25; audits 27 (code quality) and 28 (security) queued; 29 (clickable heatmap) planned. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -98,6 +98,14 @@ refresh), handling of untrusted input (HAE and Strava replies, stored series fil
 and file protection, entitlements and sandboxing, and that the test isolation can't reach real data.
 Output as for 27. Already found: the HAE bearer token sits in plain UserDefaults (`syncToken`, `WorkoutActions.swift`),
 not the Keychain.
+
+**29. Click the heatmap to open a workout** *(requested 2026-10-23)* — on the statistics page's route
+heatmap (`RouteHeatmapView.swift`), clicking a route opens that workout in the inspector (here, the
+statistics page's own inspector panel; see Known limitations). **Second step:** clicking where many
+routes overlap brings up a list of all the workouts there, to pick from. To work out: how close a
+click must be to count as a hit (in screen points, so it doesn't change with zoom), and what to
+show when the overlap runs to hundreds of workouts, as it will near home. Hit-test against the full
+routes, not the simplified lines drawn on the map (as `RouteLookup` does for the detail map).
 
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.
