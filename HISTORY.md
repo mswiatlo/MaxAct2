@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed or closed known issues (1–20, 22)
+## 2. Fixed or closed known issues (1–20, 22, 26)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -508,6 +508,11 @@ as the source of the Strava-filled routes, recognisable by their missing GPS acc
 exactly 36 of 464) go back to needing detail; **Download Detail** (phone in front, Strava
 connected) re-fetches them and records the repairs. Not yet a sidebar filter — add one with 21 if
 finding them by eye proves tedious.
+
+**26. ~~Simpler "already on Strava" text.~~ — done 2026-10-23, confirmed by the user.** — the
+inspector's note for a workout found already on Strava said "Already on Strava — uploaded from
+another app, most likely the watch." The guess about the watch was dropped; it now reads "Already
+uploaded to Strava." (`DetailPane.swift`).
 
 **16. ~~Mark races on Strava.~~ — done 2026-10-14, confirmed by the user.**
 
@@ -1135,6 +1140,8 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-23** — **Issue 26 closed**, confirmed by the user.
 
 - **2026-10-23** — **Issue 26 built:** the inspector's duplicate note now reads "Already uploaded to
   Strava." Build clean, 344 package tests pass. UI run: 55 passed, 2 skipped, 1 failed. The failure is

@@ -24,12 +24,12 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ---
 
-## 1. Where things stand — 2026-10-15
+## 1. Where things stand — 2026-10-23
 
-All work is on `main`, pushed; no open branches. Builds clean with **zero warnings**. Tests: 344 in
+All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 344 in
 `MaxActCore` (`swift test`), 58 app and UI tests (`RunAllTests` — ask first, then leave the Mac
-alone for ~5 minutes; the two real-content tests skip unless a library copy is in place). A full
-run makes no Keychain calls.
+alone for ~5 minutes; the two real-content tests skip unless a library copy is in place). One UI
+test currently fails (issue 30). A full run makes no Keychain calls.
 
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
@@ -43,7 +43,7 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–20 and 22 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–20, 22 and 26 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
 **21. Health Auto Export bug report** *(sent by the user 2026-10-14; HAE acknowledged it and asked
@@ -80,10 +80,6 @@ workouts are never imported. Make it unbounded: find the oldest workout (HealthK
 
 **25. App icon** *(requested 2026-10-15)* — the user has a candidate image to supply. Fill the
 asset catalog's AppIcon at every macOS size.
-
-**26. Simpler "already on Strava" text** *(requested 2026-10-15; built 2026-10-23, awaiting the
-user's check)* — the inspector said "Already on Strava — uploaded from another app, most likely the
-watch." (`DetailPane.swift`); it now says "Already uploaded to Strava."
 
 **30. `testPointingAtAChartHighlightsTheMap` fails** *(found 2026-10-23)* — "Pointing at a chart
 didn't put a marker on the map", in the full run and twice alone, **on `main` as well**, so it was
