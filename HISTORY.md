@@ -1136,6 +1136,9 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-23** — Planned 27 (code quality audit) and 28 (security audit), each producing a
+  findings list to triage before changes.
+
 - **2026-10-15** — **Issue 22 closed**, confirmed by the user. Planned 26: drop "most likely the
   watch" from the inspector's already-on-Strava text.
 

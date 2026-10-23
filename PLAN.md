@@ -3,8 +3,8 @@
 A fast, native macOS 26 app for browsing Apple Health workouts exported by **Health Auto Export**
 (HAE), with batch upload to Strava.
 
-**Status:** Phases 0–8 complete and checked by the user. Next: issue 20 (missing descent).
-**Last updated:** 2026-10-15.
+**Status:** Phases 0–8 complete and checked by the user. Next: see §1.
+**Last updated:** 2026-10-23.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first: the HAE data
 > contract, the Xcode tooling limits, and the Strava API facts. **`HISTORY.md`** holds how we got
@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** 26 (small text fix), then 23–25. Issue 7 (TrainingPeaks) starts with
+**Next:** 26 (small text fix), then 23–25; audits 27 (code quality) and 28 (security) queued. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -77,6 +77,19 @@ asset catalog's AppIcon at every macOS size.
 **26. Simpler "already on Strava" text** *(requested 2026-10-15)* — the inspector says "Already on
 Strava — uploaded from another app, most likely the watch." (`DetailPane.swift`); drop the guess
 about the watch and just say it's already uploaded.
+
+**27. Code quality audit** *(requested 2026-10-23)* — a review pass over the app and `MaxActCore`
+after eight phases and many fixes: dead or duplicated code, oversized types and files (`AppModel`,
+`DetailPane`), error handling that swallows failures, concurrency and isolation, naming, and gaps in
+test coverage. Output: a findings list, triaged with the user before anything is changed; fixes go
+in as their own issues.
+
+**28. Security audit** *(requested 2026-10-23; after 27)* — secrets (HAE token, Strava client
+secret and OAuth tokens: Keychain use, nothing in logs, defaults or crash output), the MCP link
+(plain HTTP on the LAN, token in transit), Strava OAuth (redirect handling, state check, token
+refresh), handling of untrusted input (HAE and Strava replies, stored series files), on-disk data
+and file protection, entitlements and sandboxing, and that the test isolation can't reach real data.
+Output as for 27.
 
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.
