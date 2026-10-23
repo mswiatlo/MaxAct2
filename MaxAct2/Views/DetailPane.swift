@@ -223,7 +223,7 @@ struct WorkoutDetailView: View {
             // Found rather than uploaded: say how it got there, so "synced" with no upload from
             // MaxAct doesn't look like something went missing.
             if item.stravaState == .duplicate {
-                Text("Already on Strava — uploaded from another app, most likely the watch.")
+                Text("Already uploaded to Strava.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }

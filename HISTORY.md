@@ -1136,6 +1136,10 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-23** — **Issue 26 built:** the inspector's duplicate note now reads "Already uploaded to
+  Strava." Build clean, 344 package tests pass. UI run: 55 passed, 2 skipped, 1 failed. The failure is
+  `testPointingAtAChartHighlightsTheMap`, which fails on `main` too and is filed as 30.
+
 - **2026-10-23** — Planned 29: click the route heatmap to open a workout in the inspector; then a
   list when the click lands on many overlapping routes.
 
