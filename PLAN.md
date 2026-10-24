@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** 23–25; audits 27 (code quality) and 28 (security) queued; 29 (clickable heatmap) and 31 (route gradients) planned. Issue 7 (TrainingPeaks) starts with
+**Next:** 23 (in progress), then 24, 25, 29 and 31. The audits, 27 (code quality) then 28 (security), come last, once the app is close to finished. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -81,7 +81,7 @@ workouts are never imported. Make it unbounded: find the oldest workout (HealthK
 **25. App icon** *(requested 2026-10-15)* — the user has a candidate image to supply. Fill the
 asset catalog's AppIcon at every macOS size.
 
-**27. Code quality audit** *(requested 2026-10-23)* — a review pass over the app and `MaxActCore`
+**27. Code quality audit** *(requested 2026-10-23; after 29 and 31, near the finish)* — a review pass over the app and `MaxActCore`
 after eight phases and many fixes: dead or duplicated code, oversized types and files (`AppModel`,
 `DetailPane`), error handling that swallows failures, concurrency and isolation, naming, and gaps in
 test coverage. Output: a findings list, triaged with the user before anything is changed; fixes go
@@ -89,7 +89,7 @@ in as their own issues. Include: "a seven-year library summarises quickly" (200 
 once in a full `swift test` run under load and took ~75 ms alone. Its limit is tighter than the
 "catch 10× regressions" rule for performance tests.
 
-**28. Security audit** *(requested 2026-10-23; after 27)* — secrets (HAE token, Strava client
+**28. Security audit** *(requested 2026-10-23; after 27, near the finish)* — secrets (HAE token, Strava client
 secret and OAuth tokens: Keychain use, nothing in logs, defaults or crash output), the MCP link
 (plain HTTP on the LAN, token in transit), Strava OAuth (redirect handling, state check, token
 refresh), handling of untrusted input (HAE and Strava replies, stored series files), on-disk data

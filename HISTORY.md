@@ -1149,6 +1149,9 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-23** — Order set by the user: 23, then 24, 25, 29 and 31; the audits (27, 28) last, when
+  the app is close to finished.
+
 - **2026-10-23** — **Issue 30 fixed** (in the test: the hover pointed below a too-short window).
   How to avoid it is recorded in the Xcode conventions reference.
 
