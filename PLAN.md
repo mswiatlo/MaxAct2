@@ -28,13 +28,13 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 344 in
 `MaxActCore` (`swift test`), 58 app and UI tests (`RunAllTests` — ask first, then leave the Mac
-alone for ~5 minutes; the two real-content tests skip unless a library copy is in place). One UI
-test currently fails (issue 30). A full run makes no Keychain calls.
+alone for ~5 minutes; the two real-content tests skip unless a library copy is in place). A full
+run makes no Keychain calls.
 
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** 30 (failing UI test), then 23–25; audits 27 (code quality) and 28 (security) queued; 29 (clickable heatmap) and 31 (route gradients) planned. Issue 7 (TrainingPeaks) starts with
+**Next:** 23–25; audits 27 (code quality) and 28 (security) queued; 29 (clickable heatmap) and 31 (route gradients) planned. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -43,7 +43,7 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–20, 22 and 26 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–20, 22, 26 and 30 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
 **21. Health Auto Export bug report** *(sent by the user 2026-10-14; HAE acknowledged it and asked
@@ -80,13 +80,6 @@ workouts are never imported. Make it unbounded: find the oldest workout (HealthK
 
 **25. App icon** *(requested 2026-10-15)* — the user has a candidate image to supply. Fill the
 asset catalog's AppIcon at every macOS size.
-
-**30. `testPointingAtAChartHighlightsTheMap` fails** *(found 2026-10-23)* — "Pointing at a chart
-didn't put a marker on the map", in the full run and twice alone, **on `main` as well**, so it was
-already broken before 26. This isn't the earlier flake (an XCTest snapshot error that passed on rerun).
-Not yet diagnosed. First suspects: the hover landing off the chart (the shared window geometry; the
-real app was opened today) or a real regression in the chart-to-map link. Check by hand in the app
-too.
 
 **27. Code quality audit** *(requested 2026-10-23)* — a review pass over the app and `MaxActCore`
 after eight phases and many fixes: dead or duplicated code, oversized types and files (`AppModel`,

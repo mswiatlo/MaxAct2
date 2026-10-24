@@ -266,6 +266,14 @@ The full UI suite is mildly flaky when several tests launch the same app at once
 every test fail on "no window appeared" and passed unchanged on a retry. Re-run before believing a
 sweeping UI-test failure.
 
+**A UI test can't assume an element is inside the window** *(measured, issue 30)*. The window's
+height is whatever the last run or the real app left. The inspector scrolls, and XCUI reports
+frames for elements below the window's bottom edge. At 780 pt tall, the heart-rate chart's centre
+was 4 pt below the window, so `hover()` pointed outside the app and the test failed while the app
+worked. `scroll(byDeltaX:deltaY:)` on the inspector's scroll view didn't move it (frames unchanged
+both ways). The fix is to drag the window's bottom edge down by the shortfall, then assert the
+element is inside `window.frame` before pointing at it.
+
 ## Detached presentations lose `.environment(...)`
 
 A `.popover` is a separate `NSWindow`, and its content does **not** reliably inherit environment

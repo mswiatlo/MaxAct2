@@ -888,6 +888,20 @@ final class SeededTableUITests: XCTestCase {
         let marker = app.descendants(matching: .any)["RouteHighlight"]
         XCTAssertFalse(marker.exists, "Nothing should be highlighted before pointing at anything.")
 
+        // The chart sits low in the inspector, and the window's height is whatever the last run
+        // (or the real app) left (issue 30): at 780 pt its centre was 4 pt below the window, so the
+        // hover pointed outside the app. Scrolling the inspector doesn't move it under XCTest
+        // (measured), so make the window tall enough instead.
+        let window = app.windows.firstMatch
+        if heartRate.frame.maxY > window.frame.maxY - 8 {
+            let bottomEdge = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1))
+                .withOffset(CGVector(dx: 0, dy: -1))
+            let shortfall = heartRate.frame.maxY - window.frame.maxY + 40
+            bottomEdge.press(forDuration: 0.3, thenDragTo: bottomEdge.withOffset(CGVector(dx: 0, dy: shortfall)))
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+        XCTAssertLessThan(heartRate.frame.maxY, window.frame.maxY,
+                          "The heart-rate chart is below the window, so pointing at it would miss the app.")
         heartRate.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).hover()
         XCTAssertTrue(marker.waitForExistence(timeout: 5),
                       "Pointing at a chart didn't put a marker on the map.")

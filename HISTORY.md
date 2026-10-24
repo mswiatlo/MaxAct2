@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed or closed known issues (1–20, 22, 26)
+## 2. Fixed or closed known issues (1–20, 22, 26, 30)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -508,6 +508,14 @@ as the source of the Strava-filled routes, recognisable by their missing GPS acc
 exactly 36 of 464) go back to needing detail; **Download Detail** (phone in front, Strava
 connected) re-fetches them and records the repairs. Not yet a sidebar filter — add one with 21 if
 finding them by eye proves tedious.
+
+**30. ~~`testPointingAtAChartHighlightsTheMap` failed.~~ — done 2026-10-23.** — "Pointing at a chart
+didn't put a marker on the map", every run, on `main` too. The app was fine: the user checked it by
+hand. Measured: the window was 780 pt tall (y 471–1251) and the heart-rate chart sat at y 1190–1320,
+so the hover at its centre (y 1255) landed 4 pt outside the window. Scrolling the inspector from the
+test didn't move the chart. Fixed in the test: if the chart reaches below the window, drag the
+bottom edge down by the shortfall (109 pt here), then assert the chart is inside before hovering.
+The fix passed. Disabling `.chartXSelection` in the app made it fail again, so it still checks the feature.
 
 **26. ~~Simpler "already on Strava" text.~~ — done 2026-10-23, confirmed by the user.** — the
 inspector's note for a workout found already on Strava said "Already on Strava — uploaded from
@@ -1140,6 +1148,9 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-23** — **Issue 30 fixed** (in the test: the hover pointed below a too-short window).
+  How to avoid it is recorded in the Xcode conventions reference.
 
 - **2026-10-23** — Planned 31: colour a workout's route by elevation, heart rate or pace, with the
   heatmap kept in the flat route colour.
