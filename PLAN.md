@@ -34,7 +34,7 @@ test currently fails (issue 30). A full run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** 30 (failing UI test), then 23–25; audits 27 (code quality) and 28 (security) queued; 29 (clickable heatmap) planned. Issue 7 (TrainingPeaks) starts with
+**Next:** 30 (failing UI test), then 23–25; audits 27 (code quality) and 28 (security) queued; 29 (clickable heatmap) and 31 (route gradients) planned. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -111,6 +111,20 @@ routes overlap brings up a list of all the workouts there, to pick from. To work
 click must be to count as a hit (in screen points, so it doesn't change with zoom), and what to
 show when the overlap runs to hundreds of workouts, as it will near home. Hit-test against the full
 routes, not the simplified lines drawn on the map (as `RouteLookup` does for the detail map).
+
+**31. Colour a workout's route by elevation, heart rate or pace** *(requested 2026-10-23)* —
+besides the flat route colours, offer gradients that colour each workout's route by its elevation,
+heart rate or pace. The heatmap always stays in the chosen flat colour. Proposed shape: keep the
+"Route colour" picker as it is and add a separate choice, "Colour routes by: Solid / Elevation /
+Heart Rate / Pace". The heatmap ignores that choice, so it always has a flat colour to use. To decide:
+- whether the choice is app-wide (like Route colour today) or set per workout;
+- whether thumbnails get the gradient too, or only the inspector map (thumbnails are cached per
+  colour, `RouteThumbnailRenderer`);
+- the scale: per-workout min–max, or fixed (heart-rate zones for HR, which already exist);
+- a legend on the map;
+- what to draw where the data is missing (no HR, or pauses).
+Gradients have to stay legible over the map, like the flat colours (`RouteColor`). Check on a
+real copy of the library.
 
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.

@@ -1141,6 +1141,9 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-23** — Planned 31: colour a workout's route by elevation, heart rate or pace, with the
+  heatmap kept in the flat route colour.
+
 - **2026-10-23** — **Issue 26 closed**, confirmed by the user.
 
 - **2026-10-23** — **Issue 26 built:** the inspector's duplicate note now reads "Already uploaded to
