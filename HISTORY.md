@@ -1166,7 +1166,9 @@ and remove over a selection; and that a workout with no flag changes issues no `
   applied per comparison (a per-point projection was off by up to ~80 m east–west and lost pairs),
   an outward search and an early exit. Sketches are prepared once per load. The inspector shows a
   progress line while sketches build. Under XCTest, building 479 took 4 min 20 s against ~16 s
-  without it. Seeded UI test, plus a real-content test (skipped without a copy).
+  without it. Seeded UI test, plus a real-content test (skipped without a copy). The section
+  pushed the charts below the window, so `testInspectorShowsTheWorkoutsHeartRateZones` lost the
+  chart it scrolled over. It now scrolls over a fixed point in the inspector.
 
 - **2026-10-23** — Order set by the user: 23, then 24, 25, 29 and 31; the audits (27, 28) last, when
   the app is close to finished.

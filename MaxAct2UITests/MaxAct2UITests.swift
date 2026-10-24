@@ -1160,8 +1160,10 @@ final class SeededTableUITests: XCTestCase {
         XCTAssertTrue(heartRate.waitForExistence(timeout: 15), "No heart-rate chart.")
         let rows = app.descendants(matching: .any).matching(identifier: "ZoneRow")
         let top = rows.element(boundBy: 0)
-        // Scrolling over the chart scrolls the detail pane that contains it.
-        for _ in 0..<8 where !(top.exists && top.isHittable) { heartRate.scroll(byDeltaX: 0, deltaY: -300) }
+        // Scroll over a point that's always in the inspector, not over the chart: since the Same
+        // Route section (issue 23) the chart can start below the window, with no hit point.
+        let inspector = app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5))
+        for _ in 0..<8 where !(top.exists && top.isHittable) { inspector.scroll(byDeltaX: 0, deltaY: -300) }
         XCTAssertTrue(top.waitForExistence(timeout: 5), "The inspector should list the workout's zones.")
         XCTAssertEqual(rows.count, 6, "Five zones and Below Z1.")
         XCTAssertTrue(top.label.contains("Zone 5") && top.label.contains("177+ bpm"), "Got \(top.label)")
