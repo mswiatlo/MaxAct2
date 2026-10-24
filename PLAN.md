@@ -26,15 +26,15 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ## 1. Where things stand — 2026-10-23
 
-All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 344 in
-`MaxActCore` (`swift test`), 58 app and UI tests (`RunAllTests` — ask first, then leave the Mac
+All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 354 in
+`MaxActCore` (`swift test`), 60 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~5 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
 
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** 23 (in progress), then 24, 25, 29 and 31. The audits, 27 (code quality) then 28 (security), come last, once the app is close to finished. Issue 7 (TrainingPeaks) starts with
+**Next:** 23 built, awaiting the user's check; then 24, 25, 29 and 31. The audits, 27 (code quality) then 28 (security), come last, once the app is close to finished. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -70,8 +70,16 @@ other workouts over the same route and show how many times it's been done, the f
 this one ranks), and a trend over time. **Decided (user, 2026-10-15):** the same route means the
 same activity kind and mostly the same path **in the same direction** (an out-and-back reversed is
 a different route). Show the count, the fastest time/pace with its date, this one's rank, and a
-chart of pace or time per attempt over the dates. No attempt list or map overlay. Matching
-thresholds to be measured on the real library.
+chart of pace or time per attempt over the dates. No attempt list or map overlay.
+**Built 2026-10-23, awaiting the user's check** — "Same Route" section under the inspector's
+stats. Matching was measured on the library (details in `HISTORY.md` §8). The rules: same kind,
+starts and finishes within 200 m, and at least 80% of each route within 50 m of the other at about
+the same point along it. Ranked by time, with pace shown alongside (user's choices). Checked on a copy:
+the newest commute ride shows 92 times, 69th; a run 4 times, 3rd; both agree with the measurement.
+**To check:** select a commute ride and a run. The first time, a progress line shows while the 79
+sketches cleared by issue 22 are rebuilt.
+**Follow-up:** after a detail re-download, the inspector uses the old sketch until the
+sketches are next loaded (a Statistics visit).
 
 **24. "Everything" should mean everything** *(requested 2026-10-15)* — the sync panel's
 "Everything (7 years)" asks Health Auto Export for seven years back (`SyncPanel.swift`), so older

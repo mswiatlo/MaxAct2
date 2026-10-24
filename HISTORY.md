@@ -1149,6 +1149,25 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-23** — **Issue 23 built: Same Route in the inspector.** Measured on a copy (479 routes,
+  12,290 same-kind pairs with ends within 500 m):
+  - **Fréchet distance was rejected.** It's a worst case, so GPS scribble at a walk's destination
+    pushed identical routes past 300 m while different loops sat at 420 m.
+  - **Ordered overlap was chosen**: the share of each route within 50 m of the other at about the
+    same share of the way along (±15%). It splits cleanly: 7,798 pairs ≥ 90%, a valley of 55–80%,
+    and drawings showed 80–90% to be the same commute with a different end block. The user picked
+    80%.
+  - **Direction:** 12 loop pairs match only when reversed, and the aligned window rejects them.
+  - **Ends:** 99% of matching pairs start within 98 m and finish within 73 m, so the limit is 200 m.
+
+  `RouteMatcher` and `RouteHistory` in `MaxActCore` (10 tests, three mutation-checked). They agree
+  with the Python measurement on 8,166 of its 8,184 pairs, with none extra. A lookup
+  against 226 rides went from 0.42 s to 0.07 s (debug): plain arrays, the latitude cosine
+  applied per comparison (a per-point projection was off by up to ~80 m east–west and lost pairs),
+  an outward search and an early exit. Sketches are prepared once per load. The inspector shows a
+  progress line while sketches build. Under XCTest, building 479 took 4 min 20 s against ~16 s
+  without it. Seeded UI test, plus a real-content test (skipped without a copy).
+
 - **2026-10-23** — Order set by the user: 23, then 24, 25, 29 and 31; the audits (27, 28) last, when
   the app is close to finished.
 

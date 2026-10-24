@@ -65,6 +65,9 @@ struct WorkoutDetailView: View {
     /// index, because the charts, the drawn line and the route all have different points.
     @State private var highlighted: Date?
 
+    /// Other times this route was done (issue 23), tagged with its workout like `loaded`.
+    @State private var routeHistory: (id: String, history: RouteHistory)?
+
     /// How close, on screen, a click must land to the route to count as a click *on* it. Judged
     /// in points because a fixed distance in metres means something different at every zoom.
     private static let routeClickTolerance: CGFloat = 20
@@ -121,6 +124,21 @@ struct WorkoutDetailView: View {
 
                 statsGrid(series)
 
+                if let routeHistory, routeHistory.id == item.id {
+                    RouteHistoryView(history: routeHistory.history, kind: workout.kind,
+                                     tint: Color(model.settings.routeColor))
+                } else if let progress = model.routeSketchProgress, workout.hasRoute, item.hasDetail {
+                    // The first time, every route is read; without this the section's absence
+                    // would look like "never done before" until it finishes.
+                    Label(progress.total > 0
+                          ? "Looking for other times on this route… \(progress.done) of \(progress.total)"
+                          : "Looking for other times on this route…",
+                          systemImage: "hourglass")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("RouteHistoryProgress")
+                }
+
                 if let series {
                     if let fill = series.series.provenance.heartRateFromMetrics {
                         repairNote("Heart rate from Health's samples — Health Auto Export's workout export had "
@@ -141,6 +159,16 @@ struct WorkoutDetailView: View {
         }
         .navigationTitle(workout.kind.displayName)
         .task(id: item.id) { await load() }
+        // Separate from `load`, so the route and charts don't wait on matching. Re-run when the
+        // sketches arrive, in case they were still being built when this workout was selected.
+        .task(id: "\(item.id)-\(model.preparedRoutes.count)") {
+            if routeHistory?.id != item.id { routeHistory = nil }
+            guard let history = await model.routeHistory(for: item) else {
+                routeHistory = nil
+                return
+            }
+            routeHistory = (item.id, history)
+        }
     }
 
     private func load() async {

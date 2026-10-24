@@ -274,6 +274,13 @@ worked. `scroll(byDeltaX:deltaY:)` on the inspector's scroll view didn't move it
 both ways). The fix is to drag the window's bottom edge down by the shortfall, then assert the
 element is inside `window.frame` before pointing at it.
 
+**Background work in the app is far slower while XCUI is polling it** *(measured, issue 23)*.
+Building route sketches for 479 workouts took 4 min 20 s inside a real-content UI test, against
+~16 s in a package test. Every `waitForExistence` poll snapshots the accessibility tree on the
+main thread, and the build reports progress there. A UI test waiting on such work should wait on
+a visible progress element going away (generous timeout), not on a fixed short timeout for the
+result.
+
 ## Detached presentations lose `.environment(...)`
 
 A `.popover` is a separate `NSWindow`, and its content does **not** reliably inherit environment

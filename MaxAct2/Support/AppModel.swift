@@ -210,6 +210,9 @@ final class AppModel {
     let routeSketchCache: RouteSketchCache?
     /// Built sketches by workout id, once `loadRouteSketches` has run.
     private(set) var routeSketches: [String: RouteSketch] = [:]
+    /// The same sketches prepared for matching routes (issue 23), built alongside them: preparing
+    /// the library takes longer than one lookup, so it isn't redone per selection.
+    private(set) var preparedRoutes: [String: RouteMatcher.Prepared] = [:]
     /// Time at each heart rate by workout id, read in the same pass as the sketches — the
     /// heart-rate zones' data (issue 15).
     private(set) var heartRateHistograms: [String: HeartRateHistogram] = [:]
@@ -990,7 +993,25 @@ final class AppModel {
         routeSketches = Dictionary(built.compactMap { digest in digest.sketch.map { (digest.workoutID, $0) } },
                                    uniquingKeysWith: { first, _ in first })
         heartRateHistograms = Dictionary(built.map { ($0.workoutID, $0.heartRate) }, uniquingKeysWith: { first, _ in first })
+        let sketches = routeSketches
+        preparedRoutes = await Task.detached(priority: .userInitiated) {
+            sketches.compactMapValues { RouteMatcher.Prepared($0.coordinates) }
+        }.value
         routeSketchProgress = nil
+    }
+
+    /// Every time `item`'s route has been done (issue 23), or `nil` if it hasn't been done before
+    /// or has no route. Loads the sketches first if this workout's isn't in hand — the first time
+    /// over a full library, that's the slow part. The matching itself runs off the main actor.
+    func routeHistory(for item: WorkoutListItem) async -> RouteHistory? {
+        guard item.hasDetail, item.workout.hasRoute else { return nil }
+        if preparedRoutes[item.id] == nil { await loadRouteSketches() }
+        let routes = preparedRoutes
+        let workout = item.workout
+        let candidates = items.filter { $0.workout.kind == workout.kind }.map(\.workout)
+        return await Task.detached(priority: .userInitiated) {
+            RouteHistory(for: workout, routes: routes, among: candidates)
+        }.value
     }
 
     func dismissLoadError() {
@@ -1026,6 +1047,7 @@ final class AppModel {
             try thumbnails.deleteAll()
             await routeSketchCache?.clear()
             routeSketches = [:]
+            preparedRoutes = [:]
             heartRateHistograms = [:]
             selection.removeAll()
             hasSeeded = true   // don't re-seed a store the user just asked to empty

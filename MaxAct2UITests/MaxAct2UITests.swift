@@ -1195,6 +1195,31 @@ final class SeededTableUITests: XCTestCase {
         attachment.name = "22-repair-notes"; attachment.lifetime = .keepAlways; add(attachment)
     }
 
+    /// Issue 23: a workout whose route was done before shows how often, the fastest and its rank.
+    /// The seed has exactly one shared route — two identical rides with equal times, the newer
+    /// being the newest workout — so the first row has it, and the tie makes this one the fastest.
+    @MainActor
+    func testInspectorShowsOtherTimesOnTheSameRoute() throws {
+        let app = launchSeeded()
+        let table = app.outlines["WorkoutTable"]
+        XCTAssertTrue(table.waitForExistence(timeout: 15))
+        table.cells.element(boundBy: 0).click()
+
+        let count = app.staticTexts["RouteHistoryCount"]
+        XCTAssertTrue(count.waitForExistence(timeout: 15), "The newest ride's route was done twice.")
+        let text = { (element: XCUIElement) in (element.value as? String ?? "") + element.label }
+        XCTAssertTrue(text(count).contains("2 times"), text(count))
+        XCTAssertTrue(text(app.staticTexts["RouteHistoryRank"]).contains("Fastest of 2"),
+                      text(app.staticTexts["RouteHistoryRank"]))
+
+        // And it doesn't linger: moving to the next workouts (no shared route) clears it.
+        for _ in 0..<12 where count.exists {
+            app.typeKey(.downArrow, modifierFlags: [])
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+        XCTAssertFalse(count.exists, "A workout done once shouldn't show a Same Route section.")
+    }
+
     /// Phase 8: an empty filter says what it means; only an actual search gets "No Results".
     /// The seed has no failed uploads, so Upload Failed is empty.
     @MainActor
@@ -1511,6 +1536,52 @@ final class RealContentUITests: XCTestCase {
             .withOffset(CGVector(dx: -1, dy: 0))
         edge.press(forDuration: 0.3, thenDragTo: edge.withOffset(CGVector(dx: 300, dy: 0)))
         capture("3-inspector-open-300pt-wider")
+    }
+
+    /// Issue 23: the Same Route section over the real library — the newest ride (a route done
+    /// hundreds of times stresses the chart) and the newest run — for checking by eye.
+    @MainActor
+    func testSameRouteWithRealContent() throws {
+        let app = launchMaxAct(extraArguments: ["--ui-testing-real-copy"])
+        let window = app.windows.firstMatch
+        let table = app.outlines["WorkoutTable"]
+        guard table.waitForExistence(timeout: 15) else {
+            throw XCTSkip("No real-library copy in place; nothing to measure.")
+        }
+        let count = app.staticTexts["RouteHistoryCount"]
+        let inspector = window.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5))
+        let search = app.searchFields.firstMatch
+        for kind in ["Cycling", "Running"] {
+            // Searching by activity puts that kind at the top; few runs repeat a route (the
+            // newest that does is 5th), so step down until one shows the section.
+            search.click()
+            search.typeKey("a", modifierFlags: .command)
+            search.typeText(kind)
+            table.cells.element(boundBy: 0).click()
+            // The first time, every sketch is built from its series. Under XCTest that took
+            // 4 min 20 s for 479 (measured), against ~16 s without it, so wait for it to finish.
+            let progress = app.descendants(matching: .any)["RouteHistoryProgress"]
+            if progress.waitForExistence(timeout: 5) {
+                XCTAssertTrue(progress.waitForNonExistence(timeout: 600), "Sketches never finished building.")
+            }
+            var found = count.waitForExistence(timeout: 10)
+            for _ in 0..<8 where !found {
+                app.typeKey(.downArrow, modifierFlags: [])
+                found = count.waitForExistence(timeout: 3)
+            }
+            guard found else {
+                print("REAL \(kind): no Same Route section")
+                continue
+            }
+            for _ in 0..<6 where !count.isHittable { inspector.scroll(byDeltaX: 0, deltaY: -200) }
+            let text = { (id: String) in (app.staticTexts[id].value as? String ?? "") + app.staticTexts[id].label }
+            print("REAL \(kind): \(text("RouteHistoryCount")) | \(text("RouteHistoryFastest")) | \(text("RouteHistoryRank"))")
+            Thread.sleep(forTimeInterval: 1)
+            let attachment = XCTAttachment(screenshot: window.screenshot())
+            attachment.name = "23-same-route-\(kind)"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
     }
 
     /// Issue 8: the statistics view over the real library, top to bottom, for checking by eye.
