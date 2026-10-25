@@ -1159,6 +1159,10 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-25** — Committed Xcode's recommended-settings update after the Xcode update
+  (`LastUpgradeCheck` 2710; the signing team moved to the project level; scheme rewritten,
+  still `keepNever` for test recordings). The last two full UI runs used these settings.
+
 - **2026-10-25** — **The Same Route jump's intermittent failure was the app, not the test.**
   It failed in 3 of 8 full runs. With evidence captured, the table had stopped about 15 rows
   short of the clicked ride, with no sideways shift, so yesterday's sidebar theory was wrong. The
