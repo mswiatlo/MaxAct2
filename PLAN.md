@@ -80,8 +80,8 @@ filter (restore them, or just the selection).
 launched in 2014, but a history imported from Strava can be older. Measured on the phone: an empty
 window costs 0.03–0.2 s and a workout ~2.1 s, so the empty weeks add a minute or two. The panel shows
 "Back to <month year> · N imported". **The live run waits for HAE's fix (21)**, by the user's choice, so
-the re-import gets whole routes and heart rate. Then: set the sync address to `10.0.0.158` (the
-phone's new address), run Everything with HAE in front (about 2 hours for ~2,867 workouts by Phase 1's
+the re-import gets whole routes and heart rate. Then: check the phone's current address on HAE's
+Server screen and set it in MaxAct (it changes between networks), run Everything with HAE in front (about 2 hours for ~2,867 workouts by Phase 1's
 count), and check the oldest workout and the count.
 
 **25. App icon** *(requested 2026-10-15; built 2026-10-25 — not yet showing in the Dock)* — the user's

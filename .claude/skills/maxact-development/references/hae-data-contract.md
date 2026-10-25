@@ -464,6 +464,11 @@ or two (issue 24). Interactive features must still budget for populated windows:
 short timeout over the whole exchange reported a healthy phone as unreachable. Time the handshake
 separately from the listing.
 
+**The phone's address changes with the network** *(user, 2026-10-25)*: 10.0.0.x at home,
+192.168.x.x at work. Never assume the last one. Ask, or read it from HAE's Server screen, before any
+live call. MaxAct's stored `syncHost` may be stale too. A timeout or "no route" to the old address
+usually means a different network, not a broken server.
+
 **Python scripts: macOS Local Network privacy applies per binary.** After a Homebrew update its
 `python3` got `[Errno 65] No route to host` to the phone while `curl` and `ping` worked. The system
 `/usr/bin/python3` (3.9) still had access, so the `Spikes/` scripts keep `from __future__ import

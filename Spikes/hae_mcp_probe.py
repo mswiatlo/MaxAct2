@@ -6,7 +6,7 @@ HTTP transport is real MCP Streamable HTTP: you must `initialize`, carry the ret
 `Mcp-Session-Id` on every later request, and use the standard `tools/list` / `tools/call` methods.
 `tools/list` works fine here, contrary to the docs.
 
-    python3 Spikes/hae_mcp_probe.py --host 10.0.0.158 --token <bearer> --days 7
+    python3 Spikes/hae_mcp_probe.py --host <phone-ip> --token <bearer> --days 7
     python3 Spikes/hae_mcp_probe.py --host ... --token ... --aggregation seconds
 
 Health Auto Export must be foregrounded on the phone: the server stops when it is backgrounded.

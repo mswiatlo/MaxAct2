@@ -1159,6 +1159,10 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-25** — The phone's address isn't fixed: it's 10.0.0.x at home and 192.168.x.x at
+  work, per the user. Read it from HAE's Server screen each session; earlier entries quoting one
+  address are only that day's.
+
 - **2026-10-25** — Paused. The user saw no icon in the Dock when running from Xcode, though Xcode
   shows it and the built bundle has it; to investigate (see PLAN 25). 24's live Everything run is
   deferred until HAE's fix (21).
