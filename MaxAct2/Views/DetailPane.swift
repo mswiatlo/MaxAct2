@@ -124,28 +124,28 @@ struct WorkoutDetailView: View {
 
                 statsGrid(series)
 
-                if let routeHistory, routeHistory.id == item.id {
-                    RouteHistoryView(history: routeHistory.history, kind: workout.kind,
-                                     tint: Color(model.settings.routeColor),
-                                     open: { model.reveal($0) })
-                } else if let progress = model.routeSketchProgress, workout.hasRoute, item.hasDetail {
-                    // The first time, every route is read; without this the section's absence
-                    // would look like "never done before" until it finishes.
-                    Label(progress.total > 0
-                          ? "Looking for other times on this route… \(progress.done) of \(progress.total)"
-                          : "Looking for other times on this route…",
-                          systemImage: "hourglass")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("RouteHistoryProgress")
-                }
-
                 if let series {
                     if let fill = series.series.provenance.heartRateFromMetrics {
                         repairNote("Heart rate from Health's samples — Health Auto Export's workout export had "
                                    + "\(fill.exportedReadings) \(fill.exportedReadings == 1 ? "reading" : "readings").")
                     }
                     charts(series)
+                    // Below the last chart, Elevation: this workout first, other times after.
+                    if let routeHistory, routeHistory.id == item.id {
+                        RouteHistoryView(history: routeHistory.history, kind: workout.kind,
+                                         tint: Color(model.settings.routeColor),
+                                         open: { model.reveal($0) })
+                    } else if let progress = model.routeSketchProgress, workout.hasRoute, item.hasDetail {
+                        // The first time, every route is read; without this the section's absence
+                        // would look like "never done before" until it finishes.
+                        Label(progress.total > 0
+                              ? "Looking for other times on this route… \(progress.done) of \(progress.total)"
+                              : "Looking for other times on this route…",
+                              systemImage: "hourglass")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("RouteHistoryProgress")
+                    }
                     if series.heartRateHistogram.total > 0 {
                         zones(series.heartRateHistogram)
                     }

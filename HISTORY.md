@@ -1159,6 +1159,13 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-24** — The Same Route section moved below the last chart, Elevation (user's choice).
+  A UI test checks the order. With the section lower, the chart in the click test was only
+  16 pt on screen yet "hittable", so the test now scrolls it fully into view
+  (`scrollFullyIntoView`). It also retries the laid-out-cell read. One unexplained x 466 reading
+  is logged in PLAN. Full suite 58 passed, 3 skipped. Planned 33: "Already uploaded to Strava by
+  another source."
+
 - **2026-10-24** — Same Route polish, from the user: the chart's tooltip now gives the attempt's
   rank ("3rd of 4", the section's wording; `RouteHistory.rank(of:)`, mutation-checked). A jump no
   longer scrolls the table sideways: `scrollTo(_:anchor: .center)` centred the row horizontally

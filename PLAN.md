@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** 24, 25, 29, 31 and 32. The audits, 27 (code quality) then 28 (security), come last, once the app is close to finished. Issue 7 (TrainingPeaks) starts with
+**Next:** 24, 25, 29, 31, 32 and 33 (one string). The audits, 27 (code quality) then 28 (security), come last, once the app is close to finished. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -67,6 +67,12 @@ incomplete-route note, despite explicit accessibility labels — check with Voic
 
 **Follow-up from 23:** after a detail re-download, the inspector uses the old sketch until the
 sketches are next loaded (a Statistics visit).
+
+**Follow-up from 23 (test):** `testClickingAnAttemptOpensThatWorkout` once read the clicked row
+at x 466 against the Date column's 1516, in a full run (2026-10-24). It passed alone, after the
+window-narrowing test, and in the next full run. The cause is unknown: a sideways jump or a
+recycled cell misread. If it fails again, the test attaches "sideways-jump" (a screenshot) and
+prints SIDEWAYS with every frame.
 
 **32. Back to the previous selection** *(requested 2026-10-24)* — now that the Same Route chart
 jumps to another workout (and the statistics' bests do too), offer a way back to what was
@@ -120,6 +126,11 @@ Heart Rate / Pace". The heatmap ignores that choice, so it always has a flat col
 - what to draw where the data is missing (no HR, or pauses).
 Gradients have to stay legible over the map, like the flat colours (`RouteColor`). Check on a
 real copy of the library.
+
+**33. Say who uploaded it** *(requested 2026-10-24)* — the inspector's "Already uploaded to
+Strava." (`DetailPane.swift`, for a workout found already on Strava) should read "Already uploaded
+to Strava by another source." As it stands it reads like the "Synced to Strava" status beside it.
+One string; check the status line and any test that reads it.
 
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.

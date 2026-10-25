@@ -1213,6 +1213,10 @@ final class SeededTableUITests: XCTestCase {
         XCTAssertTrue(text(count).contains("2 times"), text(count))
         XCTAssertTrue(text(app.staticTexts["RouteHistoryRank"]).contains("Fastest of 2"),
                       text(app.staticTexts["RouteHistoryRank"]))
+        // Placed below the last chart, Elevation (user's choice).
+        let elevation = app.otherElements.matching(NSPredicate(format: "label == 'Elevation'")).firstMatch
+        XCTAssertTrue(elevation.exists, "No elevation chart.")
+        XCTAssertGreaterThan(count.frame.minY, elevation.frame.maxY, "Same Route should sit below the Elevation chart.")
 
         // And it doesn't linger: moving to the next workouts (no shared route) clears it.
         for _ in 0..<12 where count.exists {
@@ -1245,7 +1249,7 @@ final class SeededTableUITests: XCTestCase {
         let chart = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label == 'Time on this route per attempt'")).firstMatch
         let inspector = app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5))
-        for _ in 0..<6 where !(chart.exists && chart.isHittable) { inspector.scroll(byDeltaX: 0, deltaY: -200) }
+        scrollFullyIntoView(chart, scrolling: inspector, in: app.windows.firstMatch)
         let opened = app.staticTexts.containing(NSPredicate(format: "value CONTAINS 'September 9, 2025'")).firstMatch
         var spot: CGVector?
         search: for dy in stride(from: 0.1, through: 0.9, by: 0.1) {
@@ -1258,13 +1262,21 @@ final class SeededTableUITests: XCTestCase {
         XCTAssertTrue(olderRow.waitForExistence(timeout: 5) && olderRow.isHittable,
                       "The table should scroll to the clicked ride.")
         Thread.sleep(forTimeInterval: 0.5)   // let the scroll animation finish
-        XCTAssertEqual(try XCTUnwrap(laidOutX(of: "Sep 9, 2025", in: table)), dateColumnX, accuracy: 1,
-                       "The jump scrolled the table sideways.")
+        let afterX = try XCTUnwrap(laidOutX(of: "Sep 9, 2025", in: table))
+        // Once in four full runs this read x 466 against 1516, and it hasn't recurred. Keep the
+        // evidence if it does: every copy's frame, the table and window, and the window itself.
+        if abs(afterX - dateColumnX) > 1 {
+            let all = table.staticTexts.matching(NSPredicate(format: "value == 'Sep 9, 2025'")).allElementsBoundByIndex.map { $0.frame }
+            print("SIDEWAYS before \(dateColumnX) after \(afterX) all \(all) table \(table.frame) window \(app.windows.firstMatch.frame)")
+            let evidence = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+            evidence.name = "sideways-jump"; evidence.lifetime = .keepAlways; add(evidence)
+        }
+        XCTAssertEqual(afterX, dateColumnX, accuracy: 1, "The jump scrolled the table sideways.")
 
         // For checking by eye: back on the newest ride, the tooltip over the same point.
         table.cells.element(boundBy: 0).click()
         XCTAssertTrue(app.staticTexts["RouteHistoryCount"].waitForExistence(timeout: 10))
-        for _ in 0..<6 where !(chart.exists && chart.isHittable) { inspector.scroll(byDeltaX: 0, deltaY: -200) }
+        scrollFullyIntoView(chart, scrolling: inspector, in: app.windows.firstMatch)
         chart.coordinate(withNormalizedOffset: found).hover()
         Thread.sleep(forTimeInterval: 1)
         let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
@@ -1273,13 +1285,29 @@ final class SeededTableUITests: XCTestCase {
         add(attachment)
     }
 
+    /// Scrolls until `element` is wholly inside the window. `isHittable` isn't enough: it was true
+    /// for a chart with only its top 16 of 120 pt on screen (measured), and clicks below that
+    /// missed the app.
+    @MainActor
+    private func scrollFullyIntoView(_ element: XCUIElement, scrolling area: XCUICoordinate, in window: XCUIElement) {
+        for _ in 0..<15 where !(element.exists && element.frame.maxY <= window.frame.maxY - 4) {
+            area.scroll(byDeltaX: 0, deltaY: -150)
+        }
+        XCTAssertLessThanOrEqual(element.frame.maxY, window.frame.maxY, "\(element) is still below the window.")
+    }
+
     /// Where a date cell starts, reading only a copy that's laid out. The table recycles cells,
     /// and `firstMatch` alternated between the visible cell (x 1516) and a recycled one with an
     /// empty frame (x 0) across two reads a moment apart (measured).
+    /// Retried briefly: once, every copy read as empty a moment after the row was hittable.
     @MainActor
     private func laidOutX(of date: String, in table: XCUIElement) -> CGFloat? {
-        table.staticTexts.matching(NSPredicate(format: "value == %@", date)).allElementsBoundByIndex
-            .map { $0.frame }.first { $0.width > 0 }?.minX
+        for _ in 0..<10 {
+            if let x = table.staticTexts.matching(NSPredicate(format: "value == %@", date)).allElementsBoundByIndex
+                .map({ $0.frame }).first(where: { $0.width > 0 })?.minX { return x }
+            Thread.sleep(forTimeInterval: 0.2)
+        }
+        return nil
     }
 
     /// Phase 8: an empty filter says what it means; only an actual search gets "No Results".
@@ -1635,7 +1663,7 @@ final class RealContentUITests: XCTestCase {
                 print("REAL \(kind): no Same Route section")
                 continue
             }
-            for _ in 0..<6 where !count.isHittable { inspector.scroll(byDeltaX: 0, deltaY: -200) }
+            for _ in 0..<12 where !count.isHittable { inspector.scroll(byDeltaX: 0, deltaY: -200) }
             let text = { (id: String) in (app.staticTexts[id].value as? String ?? "") + app.staticTexts[id].label }
             print("REAL \(kind): \(text("RouteHistoryCount")) | \(text("RouteHistoryFastest")) | \(text("RouteHistoryRank"))")
             Thread.sleep(forTimeInterval: 1)
