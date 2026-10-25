@@ -1159,7 +1159,7 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
-- **2026-10-24** — **Issue 23 closed**, confirmed by the user. Extended: the Same Route chart's
+- **2026-10-24** — **Issue 23 closed**, confirmed by the user. Extended (UI test, mutation-checked; full suite 58 passed, 3 skipped): the Same Route chart's
   points show their exact date and time on hover and open their workout on click. The table
   scrolls to the row (`ScrollViewReader` around the `Table`). Planned 32: Back to the previous
   selection.

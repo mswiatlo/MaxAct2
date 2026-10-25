@@ -1232,32 +1232,39 @@ final class SeededTableUITests: XCTestCase {
         XCTAssertTrue(table.waitForExistence(timeout: 15))
         table.cells.element(boundBy: 0).click()
         XCTAssertTrue(app.staticTexts["RouteHistoryCount"].waitForExistence(timeout: 15))
-        let olderRow = table.staticTexts["Sep 9, 2025"]
+        // Matched on value: a table cell's text is its value, with an empty label.
+        let olderRow = table.staticTexts.matching(NSPredicate(format: "value == 'Sep 9, 2025'")).firstMatch
         XCTAssertFalse(olderRow.exists && olderRow.isHittable, "The older ride should start off-screen.")
 
-        // The chart is one accessibility element, so find the older attempt's point by pointing:
-        // it's the leftmost, at whatever height an all-equal axis puts it.
+        // The chart is one accessibility element that hides its children — the tooltip drawn in it
+        // never reaches XCTest (measured) — so find the older attempt's point by clicking: it's
+        // the leftmost, at whatever height an all-equal axis puts it. Empty chart ignores clicks.
         let chart = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label == 'Time on this route per attempt'")).firstMatch
         let inspector = app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5))
         for _ in 0..<6 where !(chart.exists && chart.isHittable) { inspector.scroll(byDeltaX: 0, deltaY: -200) }
-        let tooltip = app.staticTexts.containing(NSPredicate(format: "value CONTAINS 'Click to open' OR label CONTAINS 'Click to open'"))
-            .firstMatch
-        var spot: XCUICoordinate?
+        let opened = app.staticTexts.containing(NSPredicate(format: "value CONTAINS 'September 9, 2025'")).firstMatch
+        var spot: CGVector?
         search: for dy in stride(from: 0.1, through: 0.9, by: 0.1) {
             for dx in stride(from: 0.0, through: 0.4, by: 0.025) {
-                let point = chart.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: dy))
-                point.hover()
-                if tooltip.waitForExistence(timeout: 0.3) { spot = point; break search }
+                chart.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: dy)).click()
+                if opened.waitForExistence(timeout: 0.3) { spot = CGVector(dx: dx, dy: dy); break search }
             }
         }
-        let point = try XCTUnwrap(spot, "Pointing along the chart never showed another attempt's time.")
-        point.click()
-
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "value CONTAINS 'September 9, 2025'"))
-            .firstMatch.waitForExistence(timeout: 5), "The inspector should show the clicked ride.")
+        let found = try XCTUnwrap(spot, "Clicking along the chart never opened the other attempt.")
         XCTAssertTrue(olderRow.waitForExistence(timeout: 5) && olderRow.isHittable,
                       "The table should scroll to the clicked ride.")
+
+        // For checking by eye: back on the newest ride, the tooltip over the same point.
+        table.cells.element(boundBy: 0).click()
+        XCTAssertTrue(app.staticTexts["RouteHistoryCount"].waitForExistence(timeout: 10))
+        for _ in 0..<6 where !(chart.exists && chart.isHittable) { inspector.scroll(byDeltaX: 0, deltaY: -200) }
+        chart.coordinate(withNormalizedOffset: found).hover()
+        Thread.sleep(forTimeInterval: 1)
+        let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        attachment.name = "23-same-route-tooltip"
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     /// Phase 8: an empty filter says what it means; only an actual search gets "No Results".

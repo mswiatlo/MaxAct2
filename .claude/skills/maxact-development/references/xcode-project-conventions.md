@@ -274,6 +274,16 @@ worked. `scroll(byDeltaX:deltaY:)` on the inspector's scroll view didn't move it
 both ways). The fix is to drag the window's bottom edge down by the shortfall, then assert the
 element is inside `window.frame` before pointing at it.
 
+**Two accessibility facts that cost a test run each** *(measured, issue 23)*:
+- A table cell's text is its **value**, with an empty label, so `staticTexts["Sep 9, 2025"]`
+  never matches. Use `matching(NSPredicate(format: "value == 'Sep 9, 2025'"))`. A query that
+  can't match also makes "it starts off-screen" assertions pass vacuously.
+- Anything drawn **inside** a chart marked `accessibilityElement(children: .ignore)`, such as
+  a hover annotation, never reaches XCTest. Test the chart's effect instead (click a point,
+  check what opened) and screenshot the window to check the drawing by eye.
+- `ScrollViewReader` + `proxy.scrollTo(id)` **does** scroll a macOS SwiftUI `Table` to a row
+  (mutation-checked).
+
 **Background work in the app is far slower while XCUI is polling it** *(measured, issue 23)*.
 Building route sketches for 479 workouts took 4 min 20 s inside a real-content UI test, against
 ~16 s in a package test. Every `waitForExistence` poll snapshots the accessibility tree on the
