@@ -1159,6 +1159,10 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-25** — Paused. The user saw no icon in the Dock when running from Xcode, though Xcode
+  shows it and the built bundle has it; to investigate (see PLAN 25). 24's live Everything run is
+  deferred until HAE's fix (21).
+
 - **2026-10-25** — **25 wired up.** The build-settings tool rejects `ASSETCATALOG_COMPILER_APPICON_NAME`
   as unknown, so, with the user's explicit one-off override of the no-hand-editing rule, it was
   added to the MaxAct2 target's Debug and Release configurations in `project.pbxproj` (two lines;

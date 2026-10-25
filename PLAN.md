@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** 24's live run (user); then 29, 31 and 32. The audits, 27 (code quality) then 28 (security), come last, once the app is close to finished. Issue 7 (TrainingPeaks) starts with
+**Next:** 25's Dock icon (see 25); then 29, 31 and 32. 24's live run waits for HAE's fix (21). The audits, 27 (code quality) then 28 (security), come last, once the app is close to finished. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -75,18 +75,25 @@ whether ordinary clicks in the table join the history or only jumps do, how far 
 whether Forward (⌘]) is wanted too, and what Back does if the jump also cleared a search or
 filter (restore them, or just the selection).
 
-**24. "Everything" should mean everything** *(requested 2026-10-15; built 2026-10-25, awaiting the
-user's live run)* — "Everything" (was "Everything (7 years)") now syncs weekly, newest first, back
-to 2000: Health launched in 2014, but a history imported from Strava can be older. Measured on the
-phone: an empty window costs 0.03–0.2 s, a workout ~2.1 s, so the empty weeks add a minute or two.
-The panel shows "Back to <month year> · N imported". **To check:** set the sync address to
-`10.0.0.158` (the phone's new address), run Everything with HAE in front (about 2 hours for
-~2,867 workouts by Phase 1's count), and check the oldest workout and the count.
+**24. "Everything" should mean everything** *(requested 2026-10-15; built 2026-10-25; live run deferred)* —
+"Everything" (was "Everything (7 years)") now syncs weekly, newest first, back to 2000. Health
+launched in 2014, but a history imported from Strava can be older. Measured on the phone: an empty
+window costs 0.03–0.2 s and a workout ~2.1 s, so the empty weeks add a minute or two. The panel shows
+"Back to <month year> · N imported". **The live run waits for HAE's fix (21)**, by the user's choice, so
+the re-import gets whole routes and heart rate. Then: set the sync address to `10.0.0.158` (the
+phone's new address), run Everything with HAE in front (about 2 hours for ~2,867 workouts by Phase 1's
+count), and check the oldest workout and the count.
 
-**25. App icon** *(requested 2026-10-15; built 2026-10-25, awaiting the user's check)* — the user's
-design, full-bleed version, at all ten macOS sizes in `Assets.xcassets/AppIcon.appiconset`. The
-system rounds it and adds the glass (checked via `NSWorkspace.icon(forFile:)` on the built app), so the
-pre-rounded version wasn't used. **To check:** the Dock and Finder icon after the next build.
+**25. App icon** *(requested 2026-10-15; built 2026-10-25 — not yet showing in the Dock)* — the user's
+design, full-bleed version, at all ten macOS sizes in `Assets.xcassets/AppIcon.appiconset`, wired up
+with `ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon`. The built app has `CFBundleIconName`, `AppIcon.icns`
+and `Assets.car`, and `NSWorkspace.icon(forFile:)` on it renders the icon correctly (rounded, glass), and
+Xcode shows it beside the project name. **But the user saw the generic icon in the Dock when running
+from Xcode** (2026-10-25). No code sets `applicationIconImage` or the dock tile. First suspect: the
+Dock and Launch Services icon caches, since the same bundle at the same DerivedData path ran many times
+without an icon. Next: check which app the Dock is showing (Debug build or another copy); re-register
+it (`lsregister -f`) or touch the bundle and relaunch; failing that, `killall Dock`. Measure before
+changing anything in the project.
 
 **27. Code quality audit** *(requested 2026-10-23; after 29 and 31, near the finish)* — a review pass over the app and `MaxActCore`
 after eight phases and many fixes: dead or duplicated code, oversized types and files (`AppModel`,
