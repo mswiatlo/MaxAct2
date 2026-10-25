@@ -112,6 +112,9 @@ final class AppModel {
     /// during a detail backfill, which counts workouts rather than weeks.
     enum SyncActivity: Equatable {
         case listing
+        /// "Everything" (issue 24): a list pass with no fixed start, reporting how far back it has
+        /// reached rather than "week n of m".
+        case listingEverything(reachedBack: Date)
         case fillingDetail
         case uploadingToStrava
         case checkingStrava
@@ -165,9 +168,11 @@ final class AppModel {
                 nil
             case .running(.listing, let done, let total, let found):
                 "Syncing week \(done + 1) of \(total) — \(found) workouts so far"
+            case .running(.listingEverything(let reachedBack), _, _, let found):
+                "Syncing everything — back to \(reachedBack.formatted(.dateTime.month(.wide).year())) — \(found) workouts so far"
             case .running(.fillingDetail, let done, let total, _):
                 "Downloading detail — \(done) of \(total)"
-            case .finished(.listing, let found):
+            case .finished(.listing, let found), .finished(.listingEverything, let found):
                 found == 0 ? "No new workouts" : "Synced \(found) workouts"
             case .finished(.fillingDetail, let found):
                 found == 0 ? "Nothing left to download" : "Downloaded detail for \(found) workouts"
@@ -968,6 +973,46 @@ final class AppModel {
         }
     }
 
+    /// The list pass with no fixed start (issue 24): back from now until there's nothing older.
+    /// `BackfillWalker` chooses the windows, weekly while workouts keep coming and wider probes
+    /// across gaps. Each window is committed as it lands, as in `sync`, so stopping keeps what
+    /// arrived. A probe that times out on a dense stretch is retried narrower, not reported.
+    func syncEverything(source: HAEWorkoutSource, end: Date = .now) async {
+        guard !syncStatus.isRunning else { return }
+        var walker = BackfillWalker(end: end)
+        syncStatus = .running(.listingEverything(reachedBack: end), completed: 0, total: 1000, found: 0)
+        do {
+            try await source.connect()
+            var found = 0, unreadable = 0
+            while let step = walker.next() {
+                if Task.isCancelled { break }
+                let result: HAEWorkoutDecoder.Result
+                do {
+                    result = try await source.listWorkouts(in: step.window)
+                } catch let error as URLError where error.code == .timedOut {
+                    guard walker.recordTimeout(step) else { throw error }
+                    Self.log.notice("Probe \(step.window, privacy: .public) timed out; narrowing")
+                    continue
+                }
+                try await store.upsert(result.workouts)
+                found += result.workouts.count
+                unreadable += result.failures.count
+                for failure in result.failures {
+                    Self.log.error("Unreadable workout \(failure.workoutID ?? "?", privacy: .public): \(String(describing: failure.underlying), privacy: .public)")
+                }
+                walker.record(step, found: result.workouts.count)
+                syncStatus = .running(.listingEverything(reachedBack: walker.cursor),
+                                      completed: Int(walker.progress * 1000), total: 1000, found: found)
+                if !result.workouts.isEmpty { await load() }
+            }
+            await load()
+            syncStatus = .listed(found: found, unreadable: unreadable)
+        } catch {
+            await load()
+            syncStatus = .failed(Self.describe(error))
+        }
+    }
+
     /// Fetches routes and second-resolution series for specific workouts.
     func fetchDetail(for workouts: [WorkoutListItem], source: HAEWorkoutSource) async {
         guard !syncStatus.isRunning else { return }
@@ -1091,6 +1136,11 @@ final class AppModel {
     func startSync(from start: Date, to end: Date = .now) {
         guard let source = settings.makeSource(), !syncStatus.isRunning else { return }
         syncTask = Task { await sync(source: source, from: start, to: end) }
+    }
+
+    func startSyncEverything() {
+        guard let source = settings.makeSource(), !syncStatus.isRunning else { return }
+        syncTask = Task { await syncEverything(source: source) }
     }
 
     /// Walks the whole backlog for a scope, newest first.

@@ -19,18 +19,20 @@ enum SyncRange: String, CaseIterable, Identifiable {
         case .month: "Last 30 days"
         case .threeMonths: "Last 3 months"
         case .year: "Last year"
-        case .everything: "Everything (7 years)"
+        case .everything: "Everything"
         case .specificMonth: "A specific month…"
         }
     }
 
+    /// How far back, for the estimate and the start date. "Everything" has no fixed span (issue
+    /// 24) and syncs through `startSyncEverything`, so its value here only sizes nothing.
     var years: Double {
         switch self {
         case .week: 7.0 / 365
         case .month: 30.0 / 365
         case .threeMonths: 0.25
         case .year: 1
-        case .everything: 7
+        case .everything: 0
         case .specificMonth: 31.0 / 365   // the picked month's own length is used where it matters
         }
     }
@@ -82,7 +84,12 @@ struct SyncPanel: View {
 
     /// What Start Sync will import, or `nil` if the choice can't be imported.
     private var importInterval: DateInterval? {
-        range == .specificMonth ? chosenInterval : DateInterval(start: range.startDate(), end: .now)
+        switch range {
+        case .specificMonth: chosenInterval
+        // No fixed start: the walk finds it (issue 24). The span is only a placeholder.
+        case .everything: DateInterval(start: BackfillWalker.floor, end: .now)
+        default: DateInterval(start: range.startDate(), end: .now)
+        }
     }
     @State private var backfillScope: AppModel.BackfillScope = .everything
 
@@ -144,9 +151,9 @@ struct SyncPanel: View {
                 }
                 .accessibilityLabel("Month")
                 Picker("Year", selection: $chosenYear) {
-                    // Back as far as "Everything" reaches.
+                    // Back to Health's launch. ("Everything" reaches further, for imported histories.)
                     let thisYear = Calendar.current.component(.year, from: .now)
-                    ForEach((thisYear - 7...thisYear).reversed(), id: \.self) { Text(String($0)).tag($0) }
+                    ForEach((2014...thisYear).reversed(), id: \.self) { Text(String($0)).tag($0) }
                 }
                 // `labelsHidden` keeps the title for accessibility; adding a label as well made
                 // VoiceOver say "Year, Year".
@@ -162,7 +169,7 @@ struct SyncPanel: View {
         }
 
         Text(isReady
-             ? "Takes \(estimate). Keep Health Auto Export open and in the foreground with "
+             ? "\(estimate). Keep Health Auto Export open and in the foreground with "
                + "the phone unlocked. You can stop at any point and resume later — finished weeks "
                + "are kept."
              : "Health Auto Export must stay open and in the foreground while syncing, with the "
@@ -176,7 +183,11 @@ struct SyncPanel: View {
             Spacer()
             Button("Start Sync") {
                 guard let interval = importInterval else { return }
-                model.startSync(from: interval.start, to: interval.end)
+                if range == .everything {
+                    model.startSyncEverything()
+                } else {
+                    model.startSync(from: interval.start, to: interval.end)
+                }
                 dismiss()
             }
             .keyboardShortcut(.defaultAction)
@@ -186,8 +197,14 @@ struct SyncPanel: View {
     }
 
     private var estimate: String {
-        guard let interval = importInterval else { return range.estimate }
-        return SyncEstimate.describe(SyncEstimate.seconds(forDays: interval.duration / 86_400))
+        if range == .everything {
+            // The length of a history isn't known until the walk finds its start.
+            return "Goes back until there's nothing older, at about "
+                + "\(SyncEstimate.secondsPerWorkout.formatted(.number.precision(.fractionLength(1)))) s per workout — "
+                + "hours for a long history"
+        }
+        guard let interval = importInterval else { return "Takes " + range.estimate }
+        return "Takes " + SyncEstimate.describe(SyncEstimate.seconds(forDays: interval.duration / 86_400))
     }
 
     // MARK: - Detail backfill
@@ -247,15 +264,24 @@ struct SyncPanel: View {
         if case .running(let activity, let completed, let total, let found) = model.syncStatus {
             VStack(alignment: .leading, spacing: 6) {
                 ProgressView(value: Double(completed), total: Double(max(total, 1)))
-                Text(activity == .listing
-                     ? "Week \(completed) of \(total) · \(found) workouts imported"
-                     : "Workout \(completed) of \(total) · \(found) downloaded")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                // The remaining cost, kept live, since a backfill can run for hours.
-                Text("\(SyncEstimate.describe(workoutCount: max(total - completed, 0))) remaining")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                if case .listingEverything(let reachedBack) = activity {
+                    // No "n of m" and no time left: how far back the history goes isn't known
+                    // until the walk gets there.
+                    Text("Back to \(reachedBack.formatted(.dateTime.month(.wide).year())) · \(found) workouts imported")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("SyncEverythingProgress")
+                } else {
+                    Text(activity == .listing
+                         ? "Week \(completed) of \(total) · \(found) workouts imported"
+                         : "Workout \(completed) of \(total) · \(found) downloaded")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    // The remaining cost, kept live, since a backfill can run for hours.
+                    Text("\(SyncEstimate.describe(workoutCount: max(total - completed, 0))) remaining")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
             }
             Text("Keep Health Auto Export in the foreground until this finishes.")
                 .font(.caption)

@@ -8,6 +8,7 @@ never compiled and never copied into the bundle. Verify with the recipe in
 | File | What it does |
 |---|---|
 | `hae_mcp_probe.py` | Queries the MCP server. Still the quickest way to regenerate a capture, and a known-good reference to check the Swift client against. |
+| `hae_empty_cost.py` | Times empty `get_workouts` windows (a week to a decade, before 2000) against a recent week — the measurement issue 24's `BackfillWalker.emptyWeeksBeforeProbing` waits on. |
 | `hae_analyze.py` | Reports route and heart-rate sample counts and intervals for a payload — the Phase 1 measurement. |
 | `make_fixture.py` | Anonymises and truncates a capture into `MaxActCore/Tests/Fixtures/`. |
 | `hae_capture.py` | Probe B's REST receiver. Never used: probe B was not run. |

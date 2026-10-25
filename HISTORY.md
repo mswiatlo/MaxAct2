@@ -1159,6 +1159,19 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-25** — **Issue 24 built: "Everything" with no fixed start.** The phone was
+  unreachable (the user was away), so empty-window cost is still unmeasured. Phase 1 timed only
+  populated windows (1 day ~3 s, 7 days 11–16 s), and `get_workouts` has no limit or count to ask
+  "anything older?" cheaply. So the design holds either way: `BackfillWalker` (MaxActCore) goes
+  weekly while workouts come, probes a quarter, a year, then back to 2000 after 8 empty weeks, and
+  narrows after a probe times out (600 s ≈ 250 workouts). Found while testing: once a timeout
+  capped probes at a year, the first version stopped probing entirely past the cap and went
+  weekly from 2009 to 2000. 7 package tests (pretend library, windows tile the span exactly, three
+  mutation checks). 2 app tests drive `AppModel.syncEverything` through the real MCP client and
+  decoder against a pretend phone; one confirms a timeout arrives as `URLError.timedOut`
+  (mutation-checked: without the handling the sync stops at 100 of 160). The Import Month year
+  picker now goes back to 2014. `Spikes/hae_empty_cost.py` takes the measurement.
+
 - **2026-10-24** — The Same Route section moved below the last chart, Elevation (user's choice).
   A UI test checks the order. With the section lower, the chart in the click test was only
   16 pt on screen yet "hittable", so the test now scrolls it fully into view
