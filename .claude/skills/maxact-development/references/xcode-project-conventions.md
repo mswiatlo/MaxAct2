@@ -283,7 +283,9 @@ element is inside `window.frame` before pointing at it.
   check what opened) and screenshot the window to check the drawing by eye.
 - `ScrollViewReader` + `proxy.scrollTo(id)` **does** scroll a macOS SwiftUI `Table` to a row
   (mutation-checked). Don't anchor it at `.center`: that centres the row **horizontally** too, and a
-  table wider than its view (inspector open) jumped 95 pt sideways. Use `UnitPoint(x: 0, y: 0.5)`.
+  table wider than its view (inspector open) jumped 95 pt sideways. Use `UnitPoint(x: 0, y: 0.5)`. And don't wrap it in
+  `withAnimation`: an animated scroll stopped ~15 rows short in about one full run in three,
+  presumably interrupted by the table's own scroll to the new selection.
 - Table cells are recycled, so a query for a cell's text can match a recycled copy with an
   empty frame. `firstMatch` alternated between x 1516 and x 0 across two reads. Read only a
   match whose frame has width.

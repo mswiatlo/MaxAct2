@@ -1,9 +1,8 @@
 """Issue 24: what does an *empty* `get_workouts` window cost?
 
-The "Everything" sync walks back weekly and, after `BackfillWalker.emptyWeeksBeforeProbing` empty
-weeks, probes wider windows. Whether that threshold should be small (empty weeks are expensive) or
-generous (they're nearly free) depends on the per-request cost when nothing is found, which Phase 1
-never measured. This times it.
+Measured 2026-10-25: 0.03–0.2 s (the first call ~1 s), against ~2.1 s per workout found. That
+is why "Everything" simply walks weekly back to 2000 instead of probing wider windows across gaps.
+Rerun it if Health Auto Export changes how it answers.
 
 Needs Health Auto Export's server open and in the foreground on the phone. Read-only.
 
@@ -13,6 +12,8 @@ The token defaults to MaxAct's stored one (`syncToken` in its settings). Windows
 certainly empty; one recent populated week is timed for comparison.
 """
 
+
+from __future__ import annotations
 import argparse
 import os
 import subprocess

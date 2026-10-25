@@ -24,8 +24,8 @@ enum SyncRange: String, CaseIterable, Identifiable {
         }
     }
 
-    /// How far back, for the estimate and the start date. "Everything" has no fixed span (issue
-    /// 24) and syncs through `startSyncEverything`, so its value here only sizes nothing.
+    /// How far back, for the estimate and the start date. "Everything" goes back to
+    /// `SyncPlanner.everythingStart` (issue 24) through `startSyncEverything`, so it has none.
     var years: Double {
         switch self {
         case .week: 7.0 / 365
@@ -86,8 +86,7 @@ struct SyncPanel: View {
     private var importInterval: DateInterval? {
         switch range {
         case .specificMonth: chosenInterval
-        // No fixed start: the walk finds it (issue 24). The span is only a placeholder.
-        case .everything: DateInterval(start: BackfillWalker.floor, end: .now)
+        case .everything: DateInterval(start: SyncPlanner.everythingStart, end: .now)
         default: DateInterval(start: range.startDate(), end: .now)
         }
     }
@@ -198,8 +197,8 @@ struct SyncPanel: View {
 
     private var estimate: String {
         if range == .everything {
-            // The length of a history isn't known until the walk finds its start.
-            return "Goes back until there's nothing older, at about "
+            // The length of a history isn't known until the sync has been through it.
+            return "Goes back to 2000, at about "
                 + "\(SyncEstimate.secondsPerWorkout.formatted(.number.precision(.fractionLength(1)))) s per workout — "
                 + "hours for a long history"
         }

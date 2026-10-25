@@ -1159,6 +1159,24 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-25** — **The Same Route jump's intermittent failure was the app, not the test.**
+  It failed in 3 of 8 full runs. With evidence captured, the table had stopped about 15 rows
+  short of the clicked ride, with no sideways shift, so yesterday's sidebar theory was wrong. The
+  scroll was animated (`withAnimation`) and something, presumably the table's own scroll to the new
+  selection, cut it off part-way. Now it scrolls immediately: two full runs in a row passed,
+  after two consecutive failures. The test keeps saving a screenshot and frames if it fails again.
+
+- **2026-10-25** — **Issue 24 measured and simplified.** On the phone (`Spikes/hae_empty_cost.py`):
+  empty week 0.17–0.18 s (the first call 1.0 s), month, year and decade 0.02–0.05 s. A recent week
+  with 11 workouts took 23–26 s, ~2.1 s each. So the empty weeks back to 2000 cost a minute or two,
+  and the probes saved only that, at the risk of a 600 s timeout. `BackfillWalker` was removed
+  with the user's agreement: "Everything" is a plain weekly sync from
+  `SyncPlanner.everythingStart` (2000-01-01), keeping the "Back to <month year>" progress. The
+  user asked to reach back to at least 2010 for Strava imports; 2000 covers it. Found on the way:
+  Homebrew's Python lost macOS Local Network access ("No route to host", while curl worked), so
+  the Spikes scripts now also run under `/usr/bin/python3` (3.9). The phone's address is now
+  10.0.0.158.
+
 - **2026-10-25** — **Issue 24 built: "Everything" with no fixed start.** The phone was
   unreachable (the user was away), so empty-window cost is still unmeasured. Phase 1 timed only
   populated windows (1 day ~3 s, 7 days 11–16 s), and `get_workouts` has no limit or count to ask

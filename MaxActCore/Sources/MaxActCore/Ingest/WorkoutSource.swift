@@ -39,6 +39,16 @@ public protocol WorkoutSource: Sendable {
 /// rather than minutes, and the phone builds each response in memory, so peak usage stays a few MB
 /// instead of tens.
 public enum SyncPlanner {
+    /// Where "Everything" starts (issue 24). Health launched in 2014, but other apps can write
+    /// older workouts — a history imported from Strava, say — so it goes well before that. GPS
+    /// fitness recordings older than 2000 are implausible.
+    ///
+    /// Walked weekly like any sync: empty windows measured 0.03–0.2 s each (against ~2.1 s per
+    /// workout found), so the ~700 empty weeks back from 2014 add a minute or two to a sync of
+    /// hours. Wider "probe" windows across gaps were built and dropped: they saved that minute or
+    /// two at the risk of a 600 s timeout on a dense stretch.
+    public static let everythingStart = Date(timeIntervalSince1970: 946_684_800)   // 2000-01-01 00:00 UTC
+
     public static func windows(
         from start: Date,
         to end: Date,

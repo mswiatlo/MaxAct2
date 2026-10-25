@@ -973,41 +973,35 @@ final class AppModel {
         }
     }
 
-    /// The list pass with no fixed start (issue 24): back from now until there's nothing older.
-    /// `BackfillWalker` chooses the windows, weekly while workouts keep coming and wider probes
-    /// across gaps. Each window is committed as it lands, as in `sync`, so stopping keeps what
-    /// arrived. A probe that times out on a dense stretch is retried narrower, not reported.
+    /// "Everything" (issue 24): the list pass back to `SyncPlanner.everythingStart`, weekly and
+    /// newest first like any sync, reporting how far back it has reached rather than "week n of
+    /// m" with a time estimate — most of those weeks are empty and nearly free, so a count of
+    /// weeks says nothing about the time left.
     func syncEverything(source: HAEWorkoutSource, end: Date = .now) async {
         guard !syncStatus.isRunning else { return }
-        var walker = BackfillWalker(end: end)
-        syncStatus = .running(.listingEverything(reachedBack: end), completed: 0, total: 1000, found: 0)
+        let windows = SyncPlanner.windowsNewestFirst(from: SyncPlanner.everythingStart, to: end)
+        syncStatus = .running(.listingEverything(reachedBack: end), completed: 0, total: windows.count, found: 0)
         do {
             try await source.connect()
             var found = 0, unreadable = 0
-            while let step = walker.next() {
+            for (index, window) in windows.enumerated() {
                 if Task.isCancelled { break }
-                let result: HAEWorkoutDecoder.Result
-                do {
-                    result = try await source.listWorkouts(in: step.window)
-                } catch let error as URLError where error.code == .timedOut {
-                    guard walker.recordTimeout(step) else { throw error }
-                    Self.log.notice("Probe \(step.window, privacy: .public) timed out; narrowing")
-                    continue
-                }
+                let result = try await source.listWorkouts(in: window)
                 try await store.upsert(result.workouts)
                 found += result.workouts.count
                 unreadable += result.failures.count
                 for failure in result.failures {
                     Self.log.error("Unreadable workout \(failure.workoutID ?? "?", privacy: .public): \(String(describing: failure.underlying), privacy: .public)")
                 }
-                walker.record(step, found: result.workouts.count)
-                syncStatus = .running(.listingEverything(reachedBack: walker.cursor),
-                                      completed: Int(walker.progress * 1000), total: 1000, found: found)
+                syncStatus = .running(.listingEverything(reachedBack: window.start),
+                                      completed: index + 1, total: windows.count, found: found)
+                // Empty weeks are most of the walk; reloading the table for them is wasted work.
                 if !result.workouts.isEmpty { await load() }
             }
             await load()
             syncStatus = .listed(found: found, unreadable: unreadable)
         } catch {
+            // As for any sync: every finished week is already committed.
             await load()
             syncStatus = .failed(Self.describe(error))
         }

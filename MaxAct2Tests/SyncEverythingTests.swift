@@ -4,9 +4,8 @@ import Testing
 
 @testable import MaxAct2
 
-/// Issue 24: "Everything" goes back until there's nothing older, through the real MCP client and
-/// decoder, against a pretend phone. Checks what the walker's own tests can't: that a timeout
-/// arrives as `URLError.timedOut` and is retried narrower, and that every workout is stored.
+/// Issue 24: "Everything" goes back to 2000, weekly, through the real MCP client and decoder,
+/// against a pretend phone.
 @MainActor @Suite struct SyncEverythingTests {
     /// Answers the MCP handshake and `get_workouts` from a list of workout dates, and times out
     /// on a window holding more than `timeoutAbove` — the phone at ~2.4 s each against 600 s.
@@ -74,12 +73,12 @@ import Testing
     static let end = Date(timeIntervalSince1970: 1_761_350_400)   // 2025-10-25
     static let day: TimeInterval = 86_400
 
-    /// A run every other day for the last 200 days; nothing for years; then 60 imported runs
-    /// over four months of 2012, too many for one probe under the pretend phone's limit of 40.
+    /// A run every other day for the last 200 days; nothing for years; then 20 runs from 2011,
+    /// before Health existed — a history imported from Strava, the case the user asked about.
     static let history: [Date] = {
         let recent = (0..<100).map { end.addingTimeInterval(-Double($0) * 2 * day - 3600) }
-        let importedEnd = Date(timeIntervalSince1970: 1_335_830_400)   // 2012-05-01
-        let imported = (0..<60).map { importedEnd.addingTimeInterval(-Double($0) * 2 * day) }
+        let importedEnd = Date(timeIntervalSince1970: 1_304_208_000)   // 2011-05-01
+        let imported = (0..<20).map { importedEnd.addingTimeInterval(-Double($0) * 3 * day) }
         return recent + imported
     }()
 
@@ -91,20 +90,19 @@ import Testing
                                          stravaSecrets: InMemorySecretStore())
     }
 
-    @Test func everythingFindsTheWholeHistoryAndRidesOutTimeouts() async throws {
+    @Test func everythingFindsTheWholeHistoryBackTo2000() async throws {
         let phone = PretendPhone(dates: Self.history, timeoutAbove: 40)
         let model = model()
         await model.syncEverything(source: HAEWorkoutSource(client: MCPClient(transport: phone, token: "t")), end: Self.end)
 
         #expect(model.syncStatus == .listed(found: Self.history.count, unreadable: 0), "\(model.syncStatus)")
         #expect(model.items.count == Self.history.count)
-        #expect(await phone.timeouts >= 1, "the 2012 cluster should time out a wide probe")
-        let weeklyToFloor = Int(Self.end.timeIntervalSince(BackfillWalker.floor) / (7 * Self.day))
-        let calls = await phone.listCalls
-        #expect(calls < weeklyToFloor / 4, "\(calls) requests against \(weeklyToFloor) weekly")
+        // Every week back to 2000, each asked once.
+        let weeks = SyncPlanner.windows(from: SyncPlanner.everythingStart, to: Self.end).count
+        #expect(await phone.listCalls == weeks)
     }
 
-    /// A week too dense to answer is a real failure, reported — not retried forever.
+    /// A week that times out fails the sync, reported like any other failure.
     @Test func aWeekThatTimesOutFailsTheSync() async {
         let dense = (0..<50).map { Self.end.addingTimeInterval(-Double($0) * 3600 - 60) }
         let phone = PretendPhone(dates: dense, timeoutAbove: 40)

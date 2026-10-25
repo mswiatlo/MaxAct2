@@ -454,7 +454,17 @@ Files app. This is how years of history get imported in one pass, whichever live
 | `get_workouts`, 1 day, no routes | ~3 s |
 | `get_workouts`, 7 days, no routes | 11–16 s |
 | `get_workouts`, 14 days, no routes | 19–21 s |
+| `get_workouts`, **empty** week *(2026-10-25)* | 0.17–0.18 s (the first call of a session 1.0 s) |
+| `get_workouts`, **empty** month, year or decade *(2026-10-25)* | 0.02–0.05 s |
+| `get_workouts`, 7 days with 11 workouts *(2026-10-25)* | 23–26 s, ~2.1 s per workout |
 
-Listing time grows with the span, not just the workout count. Interactive features must budget for
-it: a check that put one short timeout over the whole exchange reported a healthy phone as
-unreachable. Time the handshake separately from the listing.
+**Listing time comes from the workouts in the window, not its length.** An empty decade answers in
+0.03 s, so empty windows are nearly free and a weekly walk through years of nothing costs a minute
+or two (issue 24). Interactive features must still budget for populated windows: a check that put one
+short timeout over the whole exchange reported a healthy phone as unreachable. Time the handshake
+separately from the listing.
+
+**Python scripts: macOS Local Network privacy applies per binary.** After a Homebrew update its
+`python3` got `[Errno 65] No route to host` to the phone while `curl` and `ping` worked. The system
+`/usr/bin/python3` (3.9) still had access, so the `Spikes/` scripts keep `from __future__ import
+annotations` to run under it.

@@ -1259,15 +1259,21 @@ final class SeededTableUITests: XCTestCase {
             }
         }
         let found = try XCTUnwrap(spot, "Clicking along the chart never opened the other attempt.")
-        XCTAssertTrue(olderRow.waitForExistence(timeout: 5) && olderRow.isHittable,
-                      "The table should scroll to the clicked ride.")
-        Thread.sleep(forTimeInterval: 0.5)   // let the scroll animation finish
+        let scrolledTo = olderRow.waitForExistence(timeout: 5) && olderRow.isHittable
+        if !scrolledTo {   // keep the evidence: this has failed intermittently in full runs
+            let all = table.staticTexts.matching(NSPredicate(format: "value == 'Sep 9, 2025'")).allElementsBoundByIndex.map { $0.frame }
+            print("NOT-SCROLLED all \(all) table \(table.frame) window \(app.windows.firstMatch.frame) sidebar \(app.outlines["Sidebar"].frame)")
+            let evidence = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+            evidence.name = "not-scrolled"; evidence.lifetime = .keepAlways; add(evidence)
+        }
+        XCTAssertTrue(scrolledTo, "The table should scroll to the clicked ride.")
+        Thread.sleep(forTimeInterval: 0.5)   // let the table settle
         let afterX = try XCTUnwrap(laidOutX(of: "Sep 9, 2025", in: table))
         // Once in four full runs this read x 466 against 1516, and it hasn't recurred. Keep the
         // evidence if it does: every copy's frame, the table and window, and the window itself.
         if abs(afterX - dateColumnX) > 1 {
             let all = table.staticTexts.matching(NSPredicate(format: "value == 'Sep 9, 2025'")).allElementsBoundByIndex.map { $0.frame }
-            print("SIDEWAYS before \(dateColumnX) after \(afterX) all \(all) table \(table.frame) window \(app.windows.firstMatch.frame)")
+            print("SIDEWAYS before \(dateColumnX) after \(afterX) all \(all) table \(table.frame) window \(app.windows.firstMatch.frame) sidebar \(app.outlines["Sidebar"].frame)")
             let evidence = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
             evidence.name = "sideways-jump"; evidence.lifetime = .keepAlways; add(evidence)
         }

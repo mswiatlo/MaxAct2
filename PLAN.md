@@ -26,7 +26,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ## 1. Where things stand — 2026-10-24
 
-All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 361 in
+All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 354 in
 `MaxActCore` (`swift test`), 63 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~5 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** 24's live measurement and run (phone in front); then 25, 29, 31, 32 and 33 (one string). The audits, 27 (code quality) then 28 (security), come last, once the app is close to finished. Issue 7 (TrainingPeaks) starts with
+**Next:** 24's live run (user); then 25, 29, 31, 32 and 33 (one string). The audits, 27 (code quality) then 28 (security), come last, once the app is close to finished. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -68,12 +68,6 @@ incomplete-route note, despite explicit accessibility labels — check with Voic
 **Follow-up from 23:** after a detail re-download, the inspector uses the old sketch until the
 sketches are next loaded (a Statistics visit).
 
-**Follow-up from 23 (test):** `testClickingAnAttemptOpensThatWorkout` once read the clicked row
-at x 466 against the Date column's 1516, in a full run (2026-10-24). It passed alone, after the
-window-narrowing test, and in the next full run. The cause is unknown: a sideways jump or a
-recycled cell misread. If it fails again, the test attaches "sideways-jump" (a screenshot) and
-prints SIDEWAYS with every frame.
-
 **32. Back to the previous selection** *(requested 2026-10-24)* — now that the Same Route chart
 jumps to another workout (and the statistics' bests do too), offer a way back to what was
 selected before: a Back command (⌘[) and a toolbar button, like a browser's history. To decide:
@@ -81,18 +75,13 @@ whether ordinary clicks in the table join the history or only jumps do, how far 
 whether Forward (⌘]) is wanted too, and what Back does if the jump also cleared a search or
 filter (restore them, or just the selection).
 
-**24. "Everything" should mean everything** *(requested 2026-10-15; built 2026-10-25, awaiting a live
-measurement and run)* — "Everything" (was "Everything (7 years)") now goes back until there's
-nothing older: `BackfillWalker` takes weekly windows newest first, as before. After 8 empty weeks
-it probes a quarter, then a year, then all the way back to 2000; an empty probe skips its span in
-one request. A probe that times out on a dense stretch is retried narrower, and nothing that wide
-is tried again. The panel shows "Back to <month year>" instead of "week n of m". **Still to do,
-phone in front:**
-1. Run `python3 Spikes/hae_empty_cost.py --host <ip>` and set
-   `BackfillWalker.emptyWeeksBeforeProbing` from what an empty week costs: if it's nearly free,
-   the 8 can stay or grow; if it's seconds, shrink it.
-2. Run "Everything" for real. The full history is ~2,867 workouts by Phase 1's count, about
-   2 hours of phone time. Check where it says it reached, and that the count is right.
+**24. "Everything" should mean everything** *(requested 2026-10-15; built 2026-10-25, awaiting the
+user's live run)* — "Everything" (was "Everything (7 years)") now syncs weekly, newest first, back
+to 2000: Health launched in 2014, but a history imported from Strava can be older. Measured on the
+phone: an empty window costs 0.03–0.2 s, a workout ~2.1 s, so the empty weeks add a minute or two.
+The panel shows "Back to <month year> · N imported". **To check:** set the sync address to
+`10.0.0.158` (the phone's new address), run Everything with HAE in front (about 2 hours for
+~2,867 workouts by Phase 1's count), and check the oldest workout and the count.
 
 **25. App icon** *(requested 2026-10-15)* — the user has a candidate image to supply. Fill the
 asset catalog's AppIcon at every macOS size.

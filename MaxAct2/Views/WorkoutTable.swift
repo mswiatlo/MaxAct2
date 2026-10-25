@@ -171,7 +171,12 @@ struct WorkoutTable: View {
                 // Leading, not `.center`: with the inspector open the columns are wider than the
                 // view, and centring the row centred it sideways too — 95 pt left (measured),
                 // putting the route thumbnails under the sidebar.
-                withAnimation { proxy.scrollTo(request.workoutID, anchor: UnitPoint(x: 0, y: 0.5)) }
+                //
+                // Not animated: an animated scroll sometimes stopped part-way (the row ended about
+                // 15 rows short, in roughly one full UI-test run in three), presumably cut off
+                // by the table's own scrolling as the selection changed. An immediate scroll
+                // completes before anything can interrupt it.
+                proxy.scrollTo(request.workoutID, anchor: UnitPoint(x: 0, y: 0.5))
             }
         }
     }
