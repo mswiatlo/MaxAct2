@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed or closed known issues (1–20, 22, 26, 30)
+## 2. Fixed or closed known issues (1–20, 22, 23, 26, 30)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -508,6 +508,16 @@ as the source of the Strava-filled routes, recognisable by their missing GPS acc
 exactly 36 of 464) go back to needing detail; **Download Detail** (phone in front, Strava
 connected) re-fetches them and records the repairs. Not yet a sidebar filter — add one with 21 if
 finding them by eye proves tedious.
+
+**23. ~~Similar routes in the inspector.~~ — done 2026-10-24, confirmed by the user.** — a "Same
+Route" section under the inspector's stats gives how often the route was done, the fastest (time,
+pace, date), this one's rank by time, and time per attempt over the dates. Decided with the user:
+the same route means the same kind and mostly the same path in the same direction. Matching is
+measured (see §8, 2026-10-23): ends within 200 m, at least 80% of each route within 50 m of the
+other in order, and ranking by time. Checked on a copy: the newest commute 92 times, 69th; a run 4
+times, 3rd. Extended the next day: pointing at an attempt shows its exact date, time and
+duration, and clicking it opens that workout and scrolls the table to it (`AppModel.reveal`). If
+a search or filter hides it, the table goes back to All Workouts. Going back is issue 32.
 
 **30. ~~`testPointingAtAChartHighlightsTheMap` failed.~~ — done 2026-10-23.** — "Pointing at a chart
 didn't put a marker on the map", every run, on `main` too. The app was fine: the user checked it by
@@ -1148,6 +1158,11 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-24** — **Issue 23 closed**, confirmed by the user. Extended: the Same Route chart's
+  points show their exact date and time on hover and open their workout on click. The table
+  scrolls to the row (`ScrollViewReader` around the `Table`). Planned 32: Back to the previous
+  selection.
 
 - **2026-10-23** — **Issue 23 built: Same Route in the inspector.** Measured on a copy (479 routes,
   12,290 same-kind pairs with ends within 500 m):

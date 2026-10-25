@@ -27,141 +27,149 @@ struct WorkoutTable: View {
     @State private var columnCustomization = TableColumnCustomization<WorkoutListItem>()
 
     var body: some View {
-        Table(
-            model.visibleItems,
-            selection: $model.selection,
-            sortOrder: $model.sortOrder,
-            columnCustomization: $columnCustomization
-        ) {
-            TableColumn("Route") { item in
-                RouteThumbnailView(
-                    renderer: model.thumbnails,
-                    workoutID: item.id,
-                    hasRoute: item.workout.hasRoute,
-                    hasDetail: item.hasDetail,
-                    isIndoor: item.workout.isIndoor,
-                    routeColor: model.settings.routeColor
-                )
-            }
-            .width(104)
-            .customizationID("route")
-            .disabledCustomizationBehavior(.resize)
-
-            TableColumn("Date", value: \.workout.start) { item in
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(item.workout.start, format: .dateTime.year().month(.abbreviated).day())
-                    Text(item.workout.start, format: .dateTime.hour().minute())
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .width(min: 96, ideal: 100, max: 110)
-            .customizationID("date")
-
-            // Third, right after the date: what this app is for, so it must survive the inspector
-            // opening. Measured against a copy of the real library, at the default 1,398pt window
-            // with the inspector open the table shows only through Pace — when Strava was last,
-            // it was cut off at both that width and 160pt wider. Here it costs ~50pt and stays.
-            TableColumn("Strava") { item in
-                // Centred: a lone glyph pinned to the leading edge of its column reads as
-                // misaligned rather than as a column of status marks.
-                StravaStateBadge(state: item.stravaState, showsLabel: false)
-                    .frame(maxWidth: .infinity, alignment: .center)
-            }
-            // Symbol alone, so the column is barely wider than its own header. The floor is the
-            // word "Strava", not the content.
-            .width(min: 44, ideal: 50, max: 58)
-            .customizationID("strava")
-
-            // Next to when and whether-it's-synced: where a workout happened is part of
-            // identifying it, and it reads better there than stranded past the numbers. A saved
-            // column arrangement wins over this order, since `customizationID` is what
-            // restoration keys on — hence the storage key's version.
-            TableColumn("Place") { item in
-                PlaceCell(item: item)
-            }
-            .width(min: 110, ideal: 124, max: 160)
-            .customizationID("place")
-
-            TableColumn("Activity", value: \.workout.kind.displayName) { item in
-                Label(item.workout.kind.displayName, systemImage: item.workout.kind.symbolName)
-            }
-            .width(min: 128, ideal: 134, max: 156)
-            .customizationID("activity")
-
-            // Grouped only because a `Table`'s column builder accepts at most ten columns per
-            // block, and the Tags column made eleven. A `Group` counts as one.
-            Group {
-                TableColumn("Duration", value: \WorkoutListItem.workout.duration) { item in
-                    Text(WorkoutFormatting.duration(item.workout.duration))
-                        .monospacedDigit()
-                }
-                .width(min: 68, ideal: 72, max: 78)
-                .customizationID("duration")
-
-                TableColumn("Distance", value: \WorkoutListItem.sortDistance) { item in
-                    Text(WorkoutFormatting.distance(item.workout.distanceMeters))
-                        .monospacedDigit()
-                }
-                .width(min: 70, ideal: 76, max: 82)
-                .customizationID("distance")
-
-                TableColumn("Pace", value: \WorkoutListItem.sortPace) { item in
-                    Text(WorkoutFormatting.paceOrSpeed(
-                        metersPerSecond: item.workout.effectiveSpeedMetersPerSecond,
-                        for: item.workout.kind
-                    ))
-                    .monospacedDigit()
-                }
-                .width(min: 76, ideal: 80, max: 90)
-                .customizationID("pace")
-
-                TableColumn("Energy", value: \WorkoutListItem.sortEnergy) { item in
-                    Text(WorkoutFormatting.energy(kilocalories: item.workout.activeEnergyKilocalories))
-                        .monospacedDigit()
-                }
-                .width(min: 64, ideal: 68, max: 74)
-                .customizationID("energy")
-
-                TableColumn("Avg HR", value: \WorkoutListItem.sortHeartRate) { item in
-                    Text(WorkoutFormatting.heartRate(item.workout.averageHeartRate))
-                        .monospacedDigit()
-                }
-                .width(min: 64, ideal: 70, max: 76)
-                .customizationID("heartRate")
-            }
-
-            // Hidden by default — most workouts have none, and the column would be mostly blank.
-            // Turned on from the header's context menu; the sidebar and search work regardless.
-            TableColumn("Tags") { item in
-                Text(item.tags.joined(separator: ", "))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            .width(min: 80, ideal: 120, max: 200)
-            .defaultVisibility(.hidden)
-            .customizationID("tags")
-        }
-        .tableStyle(.inset)
-        // SwiftUI's Table is exposed to accessibility as an *outline*, not a table, and the
-        // sidebar List is one too — so UI tests need a way to tell them apart that doesn't depend
-        // on ordering.
-        .accessibilityIdentifier("WorkoutTable")
-        .contextMenu(forSelectionType: WorkoutListItem.ID.self) { ids in
-            WorkoutActions(model: model, ids: ids)
-        } primaryAction: { ids in
-            // Double-click opens the detail for a single row.
-            if let id = ids.first, ids.count == 1 { model.selection = [id] }
-        }
-        .onAppear {
-            if let restored = try? JSONDecoder().decode(
-                TableColumnCustomization<WorkoutListItem>.self, from: columnCustomizationData
+        // Read for `reveal`: a selection set from elsewhere (the Same Route chart) would
+        // otherwise leave its row wherever it was, often far off-screen.
+        ScrollViewReader { proxy in
+            Table(
+                model.visibleItems,
+                selection: $model.selection,
+                sortOrder: $model.sortOrder,
+                columnCustomization: $columnCustomization
             ) {
-                columnCustomization = restored
+                TableColumn("Route") { item in
+                    RouteThumbnailView(
+                        renderer: model.thumbnails,
+                        workoutID: item.id,
+                        hasRoute: item.workout.hasRoute,
+                        hasDetail: item.hasDetail,
+                        isIndoor: item.workout.isIndoor,
+                        routeColor: model.settings.routeColor
+                    )
+                }
+                .width(104)
+                .customizationID("route")
+                .disabledCustomizationBehavior(.resize)
+
+                TableColumn("Date", value: \.workout.start) { item in
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(item.workout.start, format: .dateTime.year().month(.abbreviated).day())
+                        Text(item.workout.start, format: .dateTime.hour().minute())
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .width(min: 96, ideal: 100, max: 110)
+                .customizationID("date")
+
+                // Third, right after the date: what this app is for, so it must survive the inspector
+                // opening. Measured against a copy of the real library, at the default 1,398pt window
+                // with the inspector open the table shows only through Pace — when Strava was last,
+                // it was cut off at both that width and 160pt wider. Here it costs ~50pt and stays.
+                TableColumn("Strava") { item in
+                    // Centred: a lone glyph pinned to the leading edge of its column reads as
+                    // misaligned rather than as a column of status marks.
+                    StravaStateBadge(state: item.stravaState, showsLabel: false)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+                // Symbol alone, so the column is barely wider than its own header. The floor is the
+                // word "Strava", not the content.
+                .width(min: 44, ideal: 50, max: 58)
+                .customizationID("strava")
+
+                // Next to when and whether-it's-synced: where a workout happened is part of
+                // identifying it, and it reads better there than stranded past the numbers. A saved
+                // column arrangement wins over this order, since `customizationID` is what
+                // restoration keys on — hence the storage key's version.
+                TableColumn("Place") { item in
+                    PlaceCell(item: item)
+                }
+                .width(min: 110, ideal: 124, max: 160)
+                .customizationID("place")
+
+                TableColumn("Activity", value: \.workout.kind.displayName) { item in
+                    Label(item.workout.kind.displayName, systemImage: item.workout.kind.symbolName)
+                }
+                .width(min: 128, ideal: 134, max: 156)
+                .customizationID("activity")
+
+                // Grouped only because a `Table`'s column builder accepts at most ten columns per
+                // block, and the Tags column made eleven. A `Group` counts as one.
+                Group {
+                    TableColumn("Duration", value: \WorkoutListItem.workout.duration) { item in
+                        Text(WorkoutFormatting.duration(item.workout.duration))
+                            .monospacedDigit()
+                    }
+                    .width(min: 68, ideal: 72, max: 78)
+                    .customizationID("duration")
+
+                    TableColumn("Distance", value: \WorkoutListItem.sortDistance) { item in
+                        Text(WorkoutFormatting.distance(item.workout.distanceMeters))
+                            .monospacedDigit()
+                    }
+                    .width(min: 70, ideal: 76, max: 82)
+                    .customizationID("distance")
+
+                    TableColumn("Pace", value: \WorkoutListItem.sortPace) { item in
+                        Text(WorkoutFormatting.paceOrSpeed(
+                            metersPerSecond: item.workout.effectiveSpeedMetersPerSecond,
+                            for: item.workout.kind
+                        ))
+                        .monospacedDigit()
+                    }
+                    .width(min: 76, ideal: 80, max: 90)
+                    .customizationID("pace")
+
+                    TableColumn("Energy", value: \WorkoutListItem.sortEnergy) { item in
+                        Text(WorkoutFormatting.energy(kilocalories: item.workout.activeEnergyKilocalories))
+                            .monospacedDigit()
+                    }
+                    .width(min: 64, ideal: 68, max: 74)
+                    .customizationID("energy")
+
+                    TableColumn("Avg HR", value: \WorkoutListItem.sortHeartRate) { item in
+                        Text(WorkoutFormatting.heartRate(item.workout.averageHeartRate))
+                            .monospacedDigit()
+                    }
+                    .width(min: 64, ideal: 70, max: 76)
+                    .customizationID("heartRate")
+                }
+
+                // Hidden by default — most workouts have none, and the column would be mostly blank.
+                // Turned on from the header's context menu; the sidebar and search work regardless.
+                TableColumn("Tags") { item in
+                    Text(item.tags.joined(separator: ", "))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .width(min: 80, ideal: 120, max: 200)
+                .defaultVisibility(.hidden)
+                .customizationID("tags")
             }
-        }
-        .onChange(of: columnCustomization) { _, new in
-            columnCustomizationData = (try? JSONEncoder().encode(new)) ?? Data()
+            .tableStyle(.inset)
+            // SwiftUI's Table is exposed to accessibility as an *outline*, not a table, and the
+            // sidebar List is one too — so UI tests need a way to tell them apart that doesn't depend
+            // on ordering.
+            .accessibilityIdentifier("WorkoutTable")
+            .contextMenu(forSelectionType: WorkoutListItem.ID.self) { ids in
+                WorkoutActions(model: model, ids: ids)
+            } primaryAction: { ids in
+                // Double-click opens the detail for a single row.
+                if let id = ids.first, ids.count == 1 { model.selection = [id] }
+            }
+            .onAppear {
+                if let restored = try? JSONDecoder().decode(
+                    TableColumnCustomization<WorkoutListItem>.self, from: columnCustomizationData
+                ) {
+                    columnCustomization = restored
+                }
+            }
+            .onChange(of: columnCustomization) { _, new in
+                columnCustomizationData = (try? JSONEncoder().encode(new)) ?? Data()
+            }
+            .onChange(of: model.revealRequest) { _, request in
+                guard let request else { return }
+                withAnimation { proxy.scrollTo(request.workoutID, anchor: .center) }
+            }
         }
     }
 }

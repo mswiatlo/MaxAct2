@@ -126,7 +126,8 @@ struct WorkoutDetailView: View {
 
                 if let routeHistory, routeHistory.id == item.id {
                     RouteHistoryView(history: routeHistory.history, kind: workout.kind,
-                                     tint: Color(model.settings.routeColor))
+                                     tint: Color(model.settings.routeColor),
+                                     open: { model.reveal($0) })
                 } else if let progress = model.routeSketchProgress, workout.hasRoute, item.hasDetail {
                     // The first time, every route is read; without this the section's absence
                     // would look like "never done before" until it finishes.

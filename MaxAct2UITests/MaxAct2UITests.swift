@@ -1222,6 +1222,44 @@ final class SeededTableUITests: XCTestCase {
         XCTAssertFalse(count.exists, "A workout done once shouldn't show a Same Route section.")
     }
 
+    /// Issue 23: pointing at another attempt in the Same Route chart shows its exact time, and
+    /// clicking it opens that workout and scrolls the table to it. The seed's other ride on the
+    /// route is a month older — about 30 rows down, well off-screen.
+    @MainActor
+    func testClickingAnAttemptOpensThatWorkout() throws {
+        let app = launchSeeded()
+        let table = app.outlines["WorkoutTable"]
+        XCTAssertTrue(table.waitForExistence(timeout: 15))
+        table.cells.element(boundBy: 0).click()
+        XCTAssertTrue(app.staticTexts["RouteHistoryCount"].waitForExistence(timeout: 15))
+        let olderRow = table.staticTexts["Sep 9, 2025"]
+        XCTAssertFalse(olderRow.exists && olderRow.isHittable, "The older ride should start off-screen.")
+
+        // The chart is one accessibility element, so find the older attempt's point by pointing:
+        // it's the leftmost, at whatever height an all-equal axis puts it.
+        let chart = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == 'Time on this route per attempt'")).firstMatch
+        let inspector = app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5))
+        for _ in 0..<6 where !(chart.exists && chart.isHittable) { inspector.scroll(byDeltaX: 0, deltaY: -200) }
+        let tooltip = app.staticTexts.containing(NSPredicate(format: "value CONTAINS 'Click to open' OR label CONTAINS 'Click to open'"))
+            .firstMatch
+        var spot: XCUICoordinate?
+        search: for dy in stride(from: 0.1, through: 0.9, by: 0.1) {
+            for dx in stride(from: 0.0, through: 0.4, by: 0.025) {
+                let point = chart.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: dy))
+                point.hover()
+                if tooltip.waitForExistence(timeout: 0.3) { spot = point; break search }
+            }
+        }
+        let point = try XCTUnwrap(spot, "Pointing along the chart never showed another attempt's time.")
+        point.click()
+
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "value CONTAINS 'September 9, 2025'"))
+            .firstMatch.waitForExistence(timeout: 5), "The inspector should show the clicked ride.")
+        XCTAssertTrue(olderRow.waitForExistence(timeout: 5) && olderRow.isHittable,
+                      "The table should scroll to the clicked ride.")
+    }
+
     /// Phase 8: an empty filter says what it means; only an actual search gets "No Results".
     /// The seed has no failed uploads, so Upload Failed is empty.
     @MainActor

@@ -80,6 +80,15 @@ final class AppModel {
     /// width depends on it (see `MaxActApp`). Safe to share now that the app is one window.
     var showsDetail = false
 
+    /// A workout the table should scroll to, set by ``reveal(_:)``. A fresh value each time, so
+    /// revealing the same workout twice still scrolls.
+    private(set) var revealRequest: RevealRequest?
+
+    struct RevealRequest: Equatable {
+        let workoutID: String
+        let serial: Int
+    }
+
     /// The narrowest window that holds sidebar, table and inspector at their minimums.
     ///
     /// Measured, not summed: at 1,300pt with the inspector open the table sat at 664pt against a
@@ -371,6 +380,20 @@ final class AppModel {
             result = result.filter { $0.matches(searchText: searchText) }
         }
         return result.sorted(using: sortOrder)
+    }
+
+    /// Selects one workout, shows it in the inspector and scrolls the table to it — for links from
+    /// elsewhere, like the Same Route chart. If the current search or filter hides it, the table
+    /// goes back to All Workouts first: the inspector only shows workouts the table lists.
+    func reveal(_ workoutID: String) {
+        guard items.contains(where: { $0.id == workoutID }) else { return }
+        if !visibleItems.contains(where: { $0.id == workoutID }) {
+            searchText = ""
+            sidebarSelection = .filter(.all)
+        }
+        selection = [workoutID]
+        showsDetail = true
+        revealRequest = RevealRequest(workoutID: workoutID, serial: (revealRequest?.serial ?? 0) + 1)
     }
 
     var selectedItems: [WorkoutListItem] {

@@ -4,7 +4,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 (HAE), with batch upload to Strava.
 
 **Status:** Phases 0–8 complete and checked by the user. Next: see §1.
-**Last updated:** 2026-10-23.
+**Last updated:** 2026-10-24.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first: the HAE data
 > contract, the Xcode tooling limits, and the Strava API facts. **`HISTORY.md`** holds how we got
@@ -24,17 +24,17 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ---
 
-## 1. Where things stand — 2026-10-23
+## 1. Where things stand — 2026-10-24
 
 All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 354 in
-`MaxActCore` (`swift test`), 60 app and UI tests (`RunAllTests` — ask first, then leave the Mac
+`MaxActCore` (`swift test`), 61 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~5 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
 
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** 23 built, awaiting the user's check; then 24, 25, 29 and 31. The audits, 27 (code quality) then 28 (security), come last, once the app is close to finished. Issue 7 (TrainingPeaks) starts with
+**Next:** 24, 25, 29, 31 and 32. The audits, 27 (code quality) then 28 (security), come last, once the app is close to finished. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -43,7 +43,7 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–20, 22, 26 and 30 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–20, 22, 23, 26 and 30 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
 **21. Health Auto Export bug report** *(sent by the user 2026-10-14; HAE acknowledged it and asked
@@ -65,21 +65,15 @@ exported route piece is exactly one entry of the workout's `activities` array, o
 incomplete-route note, despite explicit accessibility labels — check with VoiceOver /
 `debugDescription` which element the identifier lands on.
 
-**23. Similar routes in the inspector** *(requested 2026-10-15)* — for the selected workout, find
-other workouts over the same route and show how many times it's been done, the fastest (and where
-this one ranks), and a trend over time. **Decided (user, 2026-10-15):** the same route means the
-same activity kind and mostly the same path **in the same direction** (an out-and-back reversed is
-a different route). Show the count, the fastest time/pace with its date, this one's rank, and a
-chart of pace or time per attempt over the dates. No attempt list or map overlay.
-**Built 2026-10-23, awaiting the user's check** — "Same Route" section under the inspector's
-stats. Matching was measured on the library (details in `HISTORY.md` §8). The rules: same kind,
-starts and finishes within 200 m, and at least 80% of each route within 50 m of the other at about
-the same point along it. Ranked by time, with pace shown alongside (user's choices). Checked on a copy:
-the newest commute ride shows 92 times, 69th; a run 4 times, 3rd; both agree with the measurement.
-**To check:** select a commute ride and a run. The first time, a progress line shows while the 79
-sketches cleared by issue 22 are rebuilt.
-**Follow-up:** after a detail re-download, the inspector uses the old sketch until the
+**Follow-up from 23:** after a detail re-download, the inspector uses the old sketch until the
 sketches are next loaded (a Statistics visit).
+
+**32. Back to the previous selection** *(requested 2026-10-24)* — now that the Same Route chart
+jumps to another workout (and the statistics' bests do too), offer a way back to what was
+selected before: a Back command (⌘[) and a toolbar button, like a browser's history. To decide:
+whether ordinary clicks in the table join the history or only jumps do, how far back it goes,
+whether Forward (⌘]) is wanted too, and what Back does if the jump also cleared a search or
+filter (restore them, or just the selection).
 
 **24. "Everything" should mean everything** *(requested 2026-10-15)* — the sync panel's
 "Everything (7 years)" asks Health Auto Export for seven years back (`SyncPanel.swift`), so older
