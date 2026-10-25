@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** 24's live run and 25's App Icon Source click (user); then 29, 31 and 32. The audits, 27 (code quality) then 28 (security), come last, once the app is close to finished. Issue 7 (TrainingPeaks) starts with
+**Next:** 24's live run (user); then 29, 31 and 32. The audits, 27 (code quality) then 28 (security), come last, once the app is close to finished. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -83,13 +83,10 @@ The panel shows "Back to <month year> · N imported". **To check:** set the sync
 `10.0.0.158` (the phone's new address), run Everything with HAE in front (about 2 hours for
 ~2,867 workouts by Phase 1's count), and check the oldest workout and the count.
 
-**25. App icon** *(requested 2026-10-15; image supplied 2026-10-25)* — `Assets.xcassets/AppIcon.appiconset`
-holds the full-bleed design at all ten macOS sizes (16–1024 px). The full-bleed square is used, not the
-pre-rounded one: macOS applies its own mask and glass, and a pre-masked icon looks jagged (HIG).
-**Waiting on one click:** the target has no Primary App Icon Set Name, and Xcode's build-settings
-tool rejects `ASSETCATALOG_COMPILER_APPICON_NAME` as unknown (project.pbxproj isn't hand-edited). In
-Xcode: target MaxAct2 ▸ General ▸ App Icons ▸ App Icon Source = **AppIcon**. Then rebuild and check
-that the Dock and Finder show the icon.
+**25. App icon** *(requested 2026-10-15; built 2026-10-25, awaiting the user's check)* — the user's
+design, full-bleed version, at all ten macOS sizes in `Assets.xcassets/AppIcon.appiconset`. The
+system rounds it and adds the glass (checked via `NSWorkspace.icon(forFile:)` on the built app), so the
+pre-rounded version wasn't used. **To check:** the Dock and Finder icon after the next build.
 
 **27. Code quality audit** *(requested 2026-10-23; after 29 and 31, near the finish)* — a review pass over the app and `MaxActCore`
 after eight phases and many fixes: dead or duplicated code, oversized types and files (`AppModel`,

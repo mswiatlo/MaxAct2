@@ -290,6 +290,16 @@ element is inside `window.frame` before pointing at it.
   empty frame. `firstMatch` alternated between x 1516 and x 0 across two reads. Read only a
   match whose frame has width.
 
+**A screensaver or locked screen breaks UI tests in two recognisable ways** *(2026-10-25)*: window
+screenshots fail with "Failed to look up screen N: Failed to match screen with displayID N", and launches
+fail with "Failed to activate application … (current state: Running Background)". Every check before
+those steps had passed. Rerun once the screen is awake; don't chase them as test bugs.
+
+**`UpdateTargetBuildSetting` rejects some real settings as unknown**, e.g.
+`ASSETCATALOG_COMPILER_APPICON_NAME` (the target lists no `ASSETCATALOG_*` keys). That one was added
+to `project.pbxproj` by hand, with the user's explicit override (issue 25). The rule against hand-editing
+still stands, so ask before doing it again.
+
 **Background work in the app is far slower while XCUI is polling it** *(measured, issue 23)*.
 Building route sketches for 479 workouts took 4 min 20 s inside a real-content UI test, against
 ~16 s in a package test. Every `waitForExistence` poll snapshots the accessibility tree on the

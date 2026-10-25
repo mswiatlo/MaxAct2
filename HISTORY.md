@@ -1159,6 +1159,13 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-25** — **25 wired up.** The build-settings tool rejects `ASSETCATALOG_COMPILER_APPICON_NAME`
+  as unknown, so, with the user's explicit one-off override of the no-hand-editing rule, it was
+  added to the MaxAct2 target's Debug and Release configurations in `project.pbxproj` (two lines;
+  `plutil -lint` OK). The built app now has `CFBundleIconName = AppIcon`, `AppIcon.icns` and
+  `Assets.car`. Full UI suite 60 passed, 3 skipped. The earlier screenshot and activation failures
+  were the screensaver, as the user suspected.
+
 - **2026-10-25** — **33 built:** "Uploaded to Strava by another source." **25 started:** the user's
   icon, full-bleed version, at all macOS sizes in a new `AppIcon` set. It isn't wired up yet: the
   build-settings tool rejects `ASSETCATALOG_COMPILER_APPICON_NAME` and the built app had no icon
