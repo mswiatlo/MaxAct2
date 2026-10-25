@@ -1159,6 +1159,14 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-25** — **33 built:** "Uploaded to Strava by another source." **25 started:** the user's
+  icon, full-bleed version, at all macOS sizes in a new `AppIcon` set. It isn't wired up yet: the
+  build-settings tool rejects `ASSETCATALOG_COMPILER_APPICON_NAME` and the built app had no icon
+  entry, so the user sets App Icon Source in Xcode. Full UI run: 54 passed. 6 then failed only
+  at window screenshots ("Failed to match screen with displayID 2"), and a rerun couldn't
+  activate the app ("Running Background"). The display setup changed while the user was away;
+  rerun when they're back.
+
 - **2026-10-25** — Committed Xcode's recommended-settings update after the Xcode update
   (`LastUpgradeCheck` 2710; the signing team moved to the project level; scheme rewritten,
   still `keepNever` for test recordings). The last two full UI runs used these settings.
