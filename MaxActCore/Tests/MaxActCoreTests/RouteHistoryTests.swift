@@ -114,6 +114,8 @@ import Testing
         #expect(history.attempts.map(\.workoutID) == ["a", "b", "c"])   // oldest first
         #expect(history.fastest.workoutID == "b")
         #expect(history.rank == 3)
+        // Every attempt has its own place, for the chart's tooltip: b 18, a 20, c 22 minutes.
+        #expect(history.attempts.map { history.rank(of: $0) } == [2, 1, 3])
         #expect(try #require(RouteHistory(for: workouts[1], routes: routes, among: workouts)).rank == 1)
     }
 

@@ -1235,6 +1235,9 @@ final class SeededTableUITests: XCTestCase {
         // Matched on value: a table cell's text is its value, with an empty label.
         let olderRow = table.staticTexts.matching(NSPredicate(format: "value == 'Sep 9, 2025'")).firstMatch
         XCTAssertFalse(olderRow.exists && olderRow.isHittable, "The older ride should start off-screen.")
+        // Where the Date column starts, to check the jump scrolls only vertically: the table is
+        // wider than its view with the inspector open, and a centring scroll shifted it sideways.
+        let dateColumnX = try XCTUnwrap(laidOutX(of: "Oct 9, 2025", in: table))
 
         // The chart is one accessibility element that hides its children — the tooltip drawn in it
         // never reaches XCTest (measured) — so find the older attempt's point by clicking: it's
@@ -1254,6 +1257,9 @@ final class SeededTableUITests: XCTestCase {
         let found = try XCTUnwrap(spot, "Clicking along the chart never opened the other attempt.")
         XCTAssertTrue(olderRow.waitForExistence(timeout: 5) && olderRow.isHittable,
                       "The table should scroll to the clicked ride.")
+        Thread.sleep(forTimeInterval: 0.5)   // let the scroll animation finish
+        XCTAssertEqual(try XCTUnwrap(laidOutX(of: "Sep 9, 2025", in: table)), dateColumnX, accuracy: 1,
+                       "The jump scrolled the table sideways.")
 
         // For checking by eye: back on the newest ride, the tooltip over the same point.
         table.cells.element(boundBy: 0).click()
@@ -1265,6 +1271,15 @@ final class SeededTableUITests: XCTestCase {
         attachment.name = "23-same-route-tooltip"
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    /// Where a date cell starts, reading only a copy that's laid out. The table recycles cells,
+    /// and `firstMatch` alternated between the visible cell (x 1516) and a recycled one with an
+    /// empty frame (x 0) across two reads a moment apart (measured).
+    @MainActor
+    private func laidOutX(of date: String, in table: XCUIElement) -> CGFloat? {
+        table.staticTexts.matching(NSPredicate(format: "value == %@", date)).allElementsBoundByIndex
+            .map { $0.frame }.first { $0.width > 0 }?.minX
     }
 
     /// Phase 8: an empty filter says what it means; only an actual search gets "No Results".

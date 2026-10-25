@@ -168,8 +168,12 @@ public struct RouteHistory: Equatable, Sendable {
 
     /// This workout's place by time, 1 being the fastest. Ties share the better place.
     public var rank: Int {
-        guard let this = attempts.first(where: { $0.workoutID == workoutID }) else { return count }
-        return attempts.filter { $0.duration < this.duration }.count + 1
+        attempts.first(where: { $0.workoutID == workoutID }).map(rank(of:)) ?? count
+    }
+
+    /// Any attempt's place by time, 1 being the fastest. Ties share the better place.
+    public func rank(of attempt: Attempt) -> Int {
+        attempts.filter { $0.duration < attempt.duration }.count + 1
     }
 
     /// The history of `workout`'s route among `candidates`, or `nil` if it has no route or no other

@@ -168,7 +168,10 @@ struct WorkoutTable: View {
             }
             .onChange(of: model.revealRequest) { _, request in
                 guard let request else { return }
-                withAnimation { proxy.scrollTo(request.workoutID, anchor: .center) }
+                // Leading, not `.center`: with the inspector open the columns are wider than the
+                // view, and centring the row centred it sideways too — 95 pt left (measured),
+                // putting the route thumbnails under the sidebar.
+                withAnimation { proxy.scrollTo(request.workoutID, anchor: UnitPoint(x: 0, y: 0.5)) }
             }
         }
     }

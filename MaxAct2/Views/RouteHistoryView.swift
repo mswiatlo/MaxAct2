@@ -37,7 +37,7 @@ struct RouteHistoryView: View {
                 }
                 GridRow {
                     Text("This one").foregroundStyle(.secondary)
-                    Text(rankText).accessibilityIdentifier("RouteHistoryRank")
+                    Text(rankText(history.rank)).accessibilityIdentifier("RouteHistoryRank")
                 }
             }
             .font(.callout.monospacedDigit())
@@ -46,10 +46,9 @@ struct RouteHistoryView: View {
         }
     }
 
-    private var rankText: String {
-        history.rank == 1
-            ? "Fastest of \(history.count)"
-            : "\(Self.ordinal(history.rank)) of \(history.count)"
+    /// "Fastest of 92" or "69th of 92" — shared by the summary and the chart's tooltip.
+    private func rankText(_ rank: Int) -> String {
+        rank == 1 ? "Fastest of \(history.count)" : "\(Self.ordinal(rank)) of \(history.count)"
     }
 
     private func describe(_ attempt: RouteHistory.Attempt) -> String {
@@ -82,6 +81,8 @@ struct RouteHistoryView: View {
             Text(attempt.date, format: .dateTime.weekday(.abbreviated).day().month(.abbreviated).year().hour().minute())
             Text(WorkoutFormatting.duration(attempt.duration)
                  + " · " + WorkoutFormatting.paceOrSpeed(metersPerSecond: attempt.averageSpeedMetersPerSecond, for: kind))
+                .foregroundStyle(.secondary)
+            Text(rankText(history.rank(of: attempt)))
                 .foregroundStyle(.secondary)
             if attempt.workoutID != history.workoutID {
                 Text("Click to open").font(.caption2).foregroundStyle(.tertiary)

@@ -1159,6 +1159,13 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-24** — Same Route polish, from the user: the chart's tooltip now gives the attempt's
+  rank ("3rd of 4", the section's wording; `RouteHistory.rank(of:)`, mutation-checked). A jump no
+  longer scrolls the table sideways: `scrollTo(_:anchor: .center)` centred the row horizontally
+  too, by 95 pt (measured), hiding the thumbnails under the sidebar. It now anchors at
+  `UnitPoint(x: 0, y: 0.5)`. The UI test compares the Date column's x before and after, and fails
+  with `.center`. Full suite 58 passed, 3 skipped.
+
 - **2026-10-24** — **Issue 23 closed**, confirmed by the user. Extended (UI test, mutation-checked; full suite 58 passed, 3 skipped): the Same Route chart's
   points show their exact date and time on hover and open their workout on click. The table
   scrolls to the row (`ScrollViewReader` around the `Table`). Planned 32: Back to the previous

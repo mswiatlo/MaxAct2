@@ -282,7 +282,11 @@ element is inside `window.frame` before pointing at it.
   a hover annotation, never reaches XCTest. Test the chart's effect instead (click a point,
   check what opened) and screenshot the window to check the drawing by eye.
 - `ScrollViewReader` + `proxy.scrollTo(id)` **does** scroll a macOS SwiftUI `Table` to a row
-  (mutation-checked).
+  (mutation-checked). Don't anchor it at `.center`: that centres the row **horizontally** too, and a
+  table wider than its view (inspector open) jumped 95 pt sideways. Use `UnitPoint(x: 0, y: 0.5)`.
+- Table cells are recycled, so a query for a cell's text can match a recycled copy with an
+  empty frame. `firstMatch` alternated between x 1516 and x 0 across two reads. Read only a
+  match whose frame has width.
 
 **Background work in the app is far slower while XCUI is polling it** *(measured, issue 23)*.
 Building route sketches for 479 workouts took 4 min 20 s inside a real-content UI test, against
