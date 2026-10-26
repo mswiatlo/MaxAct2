@@ -1190,6 +1190,12 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-26** — **Issue 31 built: coloured routes.** The user's choices: a menu on the map, remembered;
+  thumbnails too; heart rate by zone; a blue-to-red ramp with grey gaps and a legend. Found while
+  testing: a flat route's 0.2 m of sensor noise filled the whole ramp, and merging short
+  stretches cascaded into one colour, which hid it. Fixed with a minimum span per colouring
+  (10 m, 0.5 m/s, 10 bpm); the test now fails without smoothing or without the minimum span.
+
 - **2026-10-26** — 34 fixed (zones caption sums the whole span when unhovered); 35 closed as not
   reproducible.
 

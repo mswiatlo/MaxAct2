@@ -147,11 +147,18 @@ final class AppSettings {
         didSet { defaults.set(routeColor.rawValue, forKey: "routeColor") }
     }
 
+    /// What routes are coloured by on the inspector map and thumbnails (issue 31). Chosen from
+    /// the map, remembered across workouts and launches. The heatmap ignores it.
+    var routeColoring: RouteColoring {
+        didSet { defaults.set(routeColoring.rawValue, forKey: "routeColoring") }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         host = defaults.string(forKey: "syncHost") ?? ""
         token = defaults.string(forKey: "syncToken") ?? ""
         routeColor = RouteColor(storageKey: defaults.string(forKey: "routeColor"))
+        routeColoring = RouteColoring(storageKey: defaults.string(forKey: "routeColoring"))
         muteStravaUploads = defaults.object(forKey: "muteStravaUploads") as? Bool ?? true
         hasSeenWelcome = defaults.bool(forKey: "hasSeenWelcome")
         restingHeartRate = defaults.integer(forKey: "restingHeartRate")

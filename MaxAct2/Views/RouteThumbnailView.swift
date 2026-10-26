@@ -14,6 +14,9 @@ struct RouteThumbnailView: View {
     let hasDetail: Bool
     let isIndoor: Bool?
     let routeColor: RouteColor
+    /// Issue 31: what the route is coloured by, and the profile its zones come from.
+    var coloring: RouteColoring = .solid
+    var profile: HeartRateProfile?
     var size = CGSize(width: 96, height: 56)
 
     @Environment(\.colorScheme) private var colorScheme
@@ -28,7 +31,12 @@ struct RouteThumbnailView: View {
             width: Int(size.width),
             height: Int(size.height),
             isDark: colorScheme == .dark,
-            routeColor: routeColor
+            routeColor: routeColor,
+            coloring: coloring,
+            // Only heart rate depends on the profile; leaving it out otherwise keeps a profile
+            // change from redrawing every elevation or pace thumbnail.
+            zoneProfile: coloring == .heartRate
+                ? profile.map { .init(resting: $0.resting, maximum: $0.maximum) } : nil
         )
     }
 

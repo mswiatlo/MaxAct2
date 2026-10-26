@@ -68,6 +68,31 @@ struct WorkoutDetailView: View {
     /// Other times this route was done (issue 23), tagged with its workout like `loaded`.
     @State private var routeHistory: (id: String, history: RouteHistory)?
 
+    /// The route coloured by elevation, heart rate or pace (issue 31), worked out off the main
+    /// actor and kept, since the map redraws on every hover. Tagged like `loaded`.
+    @State private var coloredRoute: ColoredRoute?
+
+    private struct ColoredRoute {
+        let identity: ColoringIdentity
+        let runs: [(coordinates: [CLLocationCoordinate2D], color: Color)]
+        /// `nil` when shaded by zone; the whole value `nil` when there was nothing to colour by.
+        let gradient: RouteGradient?
+    }
+
+    /// What the colouring depends on: the workout, the choice, and — for zones — the profile.
+    private struct ColoringIdentity: Hashable {
+        let workoutID: String?
+        let coloring: RouteColoring
+        let resting: Double?
+        let maximum: Double?
+    }
+
+    private var coloringIdentity: ColoringIdentity {
+        let profile = model.settings.routeColoring == .heartRate ? model.settings.heartRateProfile : nil
+        return ColoringIdentity(workoutID: loaded?.id, coloring: model.settings.routeColoring,
+                                resting: profile?.resting, maximum: profile?.maximum)
+    }
+
     /// How close, on screen, a click must land to the route to count as a click *on* it. Judged
     /// in points because a fixed distance in metres means something different at every zoom.
     private static let routeClickTolerance: CGFloat = 20
@@ -111,6 +136,7 @@ struct WorkoutDetailView: View {
 
                 if let series, !series.coordinates.isEmpty {
                     routeMap(series)
+                    coloringLegend
                     if series.series.routeIsIncomplete(duration: workout.duration) {
                         incompleteRouteNote(series.series)
                     }
@@ -160,6 +186,7 @@ struct WorkoutDetailView: View {
         }
         .navigationTitle(workout.kind.displayName)
         .task(id: item.id) { await load() }
+        .task(id: coloringIdentity) { await colorRoute(coloringIdentity) }
         // Separate from `load`, so the route and charts don't wait on matching. Re-run when the
         // sketches arrive, in case they were still being built when this workout was selected.
         .task(id: "\(item.id)-\(model.preparedRoutes.count)") {
@@ -271,11 +298,19 @@ struct WorkoutDetailView: View {
         let marker = highlighted.flatMap { RouteLookup.point(at: $0, in: series.route) }
         return MapReader { proxy in
             Map(position: $camera) {
-                MapPolyline(coordinates: series.coordinates)
-                    .stroke(
-                        Color(model.settings.routeColor),
-                        style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round)
-                    )
+                if let colored = coloredRoute, colored.identity == coloringIdentity, colored.gradient != nil {
+                    ForEach(colored.runs.indices, id: \.self) { index in
+                        MapPolyline(coordinates: colored.runs[index].coordinates)
+                            .stroke(colored.runs[index].color,
+                                    style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                    }
+                } else {
+                    MapPolyline(coordinates: series.coordinates)
+                        .stroke(
+                            Color(model.settings.routeColor),
+                            style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round)
+                        )
+                }
                 if let marker {
                     Annotation(
                         "Highlighted position",
@@ -300,6 +335,93 @@ struct WorkoutDetailView: View {
         .frame(height: 280)
         .clipShape(.rect(cornerRadius: 10))
         .accessibilityLabel("Route map with \(series.coordinates.count) points")
+        .overlay(alignment: .topTrailing) { coloringMenu.padding(8) }
+    }
+
+    /// Solid / Elevation / Heart Rate / Pace, on the map itself (issue 31). The choice is
+    /// remembered across workouts and launches.
+    private var coloringMenu: some View {
+        Menu {
+            Picker("Colour route by", selection: Binding(
+                get: { model.settings.routeColoring }, set: { model.settings.routeColoring = $0 })) {
+                ForEach(RouteColoring.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            Label(model.settings.routeColoring == .solid ? "Colour" : model.settings.routeColoring.title,
+                  systemImage: "paintpalette")
+        }
+        .menuStyle(.button)
+        .buttonStyle(.glass)
+        .fixedSize()
+        .help("Colour the route by elevation, heart rate or pace")
+        .accessibilityIdentifier("RouteColoringMenu")
+    }
+
+    /// Under the map: what the colours mean — the low and high ends of the ramp, or the zones.
+    @ViewBuilder
+    private var coloringLegend: some View {
+        let coloring = model.settings.routeColoring
+        if coloring != .solid, let colored = coloredRoute, colored.identity == coloringIdentity {
+            Group {
+                if let gradient = colored.gradient, let range = gradient.range {
+                    HStack(spacing: 8) {
+                        Text(legendValue(range.low, coloring))
+                        Capsule()
+                            .fill(LinearGradient(colors: RouteShade.ramp, startPoint: .leading, endPoint: .trailing))
+                            .frame(height: 6)
+                        Text(legendValue(range.high, coloring))
+                    }
+                } else if colored.gradient != nil {
+                    HStack(spacing: 10) {
+                        ForEach(HeartRateZone.allCases.filter { $0 != .below }) { zone in
+                            HStack(spacing: 4) {
+                                Circle().fill(zone.color).frame(width: 8, height: 8)
+                                Text(zone.title)
+                            }
+                        }
+                    }
+                } else {
+                    Text(coloring == .heartRate ? "No heart rate to colour by." : "Nothing to colour by.")
+                }
+            }
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(.secondary)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("RouteColoringLegend")
+        }
+    }
+
+    private func legendValue(_ value: Double, _ coloring: RouteColoring) -> String {
+        switch coloring {
+        case .elevation: WorkoutFormatting.elevation(meters: value)
+        case .pace: WorkoutFormatting.paceOrSpeed(metersPerSecond: value, for: workout.kind)
+        case .heartRate: WorkoutFormatting.heartRate(value)
+        case .solid: ""
+        }
+    }
+
+    /// Works out the coloured route off the main actor, simplified like the solid line.
+    private func colorRoute(_ identity: ColoringIdentity) async {
+        guard identity.coloring != .solid, let loaded, loaded.id == identity.workoutID else {
+            coloredRoute = nil
+            return
+        }
+        let route = loaded.route, heartRate = loaded.series.heartRate
+        let profile = identity.coloring == .heartRate ? model.settings.heartRateProfile : nil
+        let result = await Task.detached(priority: .userInitiated) { () -> (RouteGradient, [RouteGradient.Run])? in
+            guard let gradient = RouteGradient(identity.coloring, route: route, heartRate: heartRate, profile: profile)
+            else { return nil }
+            return (gradient, gradient.simplified(fittingPixels: 900))
+        }.value
+        guard !Task.isCancelled else { return }
+        coloredRoute = ColoredRoute(
+            identity: identity,
+            runs: (result?.1 ?? []).map { run in
+                (run.coordinates.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) },
+                 run.shade.color)
+            },
+            gradient: result?.0)
     }
 
     /// The moment the route passed closest to a click, or `nil` if the click wasn't near the route.

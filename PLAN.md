@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** 31. 24's live run waits for HAE's fix (21). The audits, 27 (code quality) then 28 (security), come last, once the app is close to finished. Issue 7 (TrainingPeaks) starts with
+**Next:** 31 awaiting check; then the audits (27, 28). 24's live run waits for HAE's fix (21). The audits, 27 (code quality) then 28 (security), come last, once the app is close to finished. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -93,19 +93,15 @@ and file protection, entitlements and sandboxing, and that the test isolation ca
 Output as for 27. Already found: the HAE bearer token sits in plain UserDefaults (`syncToken`, `WorkoutActions.swift`),
 not the Keychain.
 
-**31. Colour a workout's route by elevation, heart rate or pace** *(requested 2026-10-23)* —
-besides the flat route colours, offer gradients that colour each workout's route by its elevation,
-heart rate or pace. The heatmap always stays in the chosen flat colour. Proposed shape: keep the
-"Route colour" picker as it is and add a separate choice, "Colour routes by: Solid / Elevation /
-Heart Rate / Pace". The heatmap ignores that choice, so it always has a flat colour to use. To decide:
-- whether the choice is app-wide (like Route colour today) or set per workout;
-- whether thumbnails get the gradient too, or only the inspector map (thumbnails are cached per
-  colour, `RouteThumbnailRenderer`);
-- the scale: per-workout min–max, or fixed (heart-rate zones for HR, which already exist);
-- a legend on the map;
-- what to draw where the data is missing (no HR, or pauses).
-Gradients have to stay legible over the map, like the flat colours (`RouteColor`). Check on a
-real copy of the library.
+**31. Colour a workout's route by elevation, heart rate or pace** *(requested 2026-10-23; built
+2026-10-26, awaiting the user's check)* — a menu on the inspector map (Solid / Elevation / Heart Rate /
+Pace), remembered across workouts and launches (`routeColoring`). Thumbnails follow it; the heatmap
+stays solid. Elevation and pace use a blue → green → yellow → red ramp over the workout's 2nd–98th
+percentile, at least 10 m / 0.5 m/s / 10 bpm wide, and for pace faster is hotter. Heart rate uses the
+zone colours when a profile is set, otherwise the ramp. Pauses (gaps over 30 s) and missing values are
+grey. A legend under the map gives the low and high values, or the zones. The core is
+`RouteGradient` (8 tests, 4 mutation-checked). **To check:** the look on real routes (stretch
+lengths, the legend), and thumbnails redrawing when the choice changes.
 
 **33. Say who uploaded it** *(requested 2026-10-24; built 2026-10-25, awaiting the user's check)* —
 the inspector's note for a workout found already on Strava now reads "Uploaded to Strava by another

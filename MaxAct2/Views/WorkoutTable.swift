@@ -43,7 +43,9 @@ struct WorkoutTable: View {
                         hasRoute: item.workout.hasRoute,
                         hasDetail: item.hasDetail,
                         isIndoor: item.workout.isIndoor,
-                        routeColor: model.settings.routeColor
+                        routeColor: model.settings.routeColor,
+                        coloring: model.settings.routeColoring,
+                        profile: model.settings.heartRateProfile
                     )
                 }
                 .width(104)

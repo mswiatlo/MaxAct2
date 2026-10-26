@@ -29,6 +29,16 @@ final class RouteThumbnailRenderer {
         /// indefinitely, so without this a colour change would leave every existing thumbnail in
         /// the old colour until something else happened to invalidate it.
         let routeColor: RouteColor
+        /// What the route is coloured by (issue 31), and — only when that's heart rate — the
+        /// profile's resting and maximum, since they move the zones. Both part of the identity
+        /// for the same reason as the colour.
+        var coloring: RouteColoring = .solid
+        var zoneProfile: ZoneProfile?
+
+        struct ZoneProfile: Hashable {
+            let resting: Double
+            let maximum: Double
+        }
 
         /// Bump when anything about *how* the track is drawn changes, as opposed to what is drawn
         /// from. `2` introduced `RouteQuality` filtering: a single spurious fix can be a 20-pixel
@@ -39,7 +49,11 @@ final class RouteThumbnailRenderer {
 
         var fileName: String {
             "\(workoutID)-\(width)x\(height)-\(isDark ? "dark" : "light")"
-                + "-\(routeColor.cacheToken)-v\(Self.drawingVersion).png"
+                + "-\(routeColor.cacheToken)" + coloringToken + "-v\(Self.drawingVersion).png"
+        }
+        private var coloringToken: String {
+            guard coloring != .solid else { return "" }
+            return "-\(coloring.rawValue)" + (zoneProfile.map { "-\(Int($0.resting))-\(Int($0.maximum))" } ?? "")
         }
         var cacheKey: NSString { fileName as NSString }
     }
@@ -120,15 +134,13 @@ final class RouteThumbnailRenderer {
         }
 
         guard let series = await seriesStore.loadIfAvailable(key.workoutID) else { return nil }
-        guard let prepared = Self.prepare(
-            series.cleanedRoute.map(\.coordinate), pixels: key.width
-        ) else {
+        guard let prepared = Self.prepare(series, key: key, routeColor: key.routeColor) else {
             return nil
         }
         if Task.isCancelled { return nil }
 
         guard await acquireSlot() else { return nil }
-        let rendered = await snapshotPNG(prepared.coordinates, bounds: prepared.bounds, key: key)
+        let rendered = await snapshotPNG(prepared.strokes, bounds: prepared.bounds, key: key)
         running -= 1
         if Task.isCancelled { return nil }
 
@@ -136,10 +148,7 @@ final class RouteThumbnailRenderer {
         // Tiles are a nicety; the shape is the point. Offline, or with the snapshotter refusing
         // under load, draw the line alone rather than showing nothing.
         let image = rendered.flatMap(NSImage.init(data:))
-            ?? polylineOnly(
-                prepared.coordinates, bounds: prepared.bounds, size: size,
-                isDark: key.isDark, color: key.routeColor
-            )
+            ?? polylineOnly(prepared.strokes, bounds: prepared.bounds, size: size, isDark: key.isDark)
         guard let image else { return nil }
 
         memory.setObject(image, forKey: key.cacheKey)
@@ -149,11 +158,30 @@ final class RouteThumbnailRenderer {
 
     /// Simplification and bounds are pure maths on value types, so they need no isolation and can
     /// run wherever the caller happens to be.
-    nonisolated private static func prepare(
-        _ coordinates: [Coordinate], pixels: Int
-    ) -> (coordinates: [Coordinate], bounds: CoordinateBounds)? {
+    /// One stretch of the line in one colour: the whole route when solid, or each shade's
+    /// stretch when coloured (issue 31).
+    struct Stroke {
+        let coordinates: [Coordinate]
+        let color: NSColor
+    }
+
+    private static func prepare(
+        _ series: WorkoutSeries, key: Key, routeColor: RouteColor
+    ) -> (strokes: [Stroke], bounds: CoordinateBounds)? {
+        let route = series.cleanedRoute
+        let coordinates = route.map(\.coordinate)
         guard coordinates.count >= 2, let bounds = CoordinateBounds(coordinates) else { return nil }
-        return (RouteSimplifier.simplify(coordinates, fittingPixels: pixels), bounds)
+        let profile = key.zoneProfile.flatMap {
+            HeartRateProfile(resting: $0.resting, maximum: $0.maximum, curve: .male)   // the curve doesn't move zones
+        }
+        if let gradient = RouteGradient(key.coloring, route: route, heartRate: series.heartRate, profile: profile) {
+            let strokes = gradient.simplified(fittingPixels: key.width).map {
+                Stroke(coordinates: $0.coordinates, color: NSColor($0.shade.color))
+            }
+            return (strokes, bounds)
+        }
+        return ([Stroke(coordinates: RouteSimplifier.simplify(coordinates, fittingPixels: key.width),
+                        color: NSColor(routeColor))], bounds)
     }
 
     /// Takes the snapshot and draws the route onto it, returning **PNG bytes**.
@@ -162,7 +190,7 @@ final class RouteThumbnailRenderer {
     /// `MKMapSnapshotter.Snapshot` is not `Sendable` and cannot be carried out through a
     /// continuation. `Data` can.
     private func snapshotPNG(
-        _ coordinates: [Coordinate], bounds: CoordinateBounds, key: Key
+        _ strokes: [Stroke], bounds: CoordinateBounds, key: Key
     ) async -> Data? {
         let options = MKMapSnapshotter.Options()
         // Tighter framing than the detail map: at 96×56 the track needs the pixels more than it
@@ -186,9 +214,7 @@ final class RouteThumbnailRenderer {
                     return
                 }
                 continuation.resume(
-                    returning: Self.draw(
-                        coordinates, over: snapshot, size: size, color: key.routeColor
-                    ).pngData
+                    returning: Self.draw(strokes, over: snapshot, size: size).pngData
                 )
             }
         }
@@ -205,40 +231,41 @@ final class RouteThumbnailRenderer {
     }
 
     private static func draw(
-        _ coordinates: [Coordinate], over snapshot: MKMapSnapshotter.Snapshot, size: NSSize,
-        color: RouteColor
+        _ strokes: [Stroke], over snapshot: MKMapSnapshotter.Snapshot, size: NSSize
     ) -> NSImage {
         let image = NSImage(size: size)
         image.lockFocus()
         snapshot.image.draw(in: NSRect(origin: .zero, size: size))
-
-        let path = NSBezierPath()
-        for (index, coordinate) in coordinates.enumerated() {
-            let point = snapshot.point(for: CLLocationCoordinate2D(
-                latitude: coordinate.latitude, longitude: coordinate.longitude
-            ))
-            index == 0 ? path.move(to: point) : path.line(to: point)
+        stroke(strokes) { coordinate in
+            snapshot.point(for: CLLocationCoordinate2D(latitude: coordinate.latitude, longitude: coordinate.longitude))
         }
-        path.lineJoinStyle = .round
-        path.lineCapStyle = .round
-
-        // A dark casing under the line keeps it legible over both parkland and city blocks.
-        path.lineWidth = 4
-        NSColor.black.withAlphaComponent(0.35).setStroke()
-        path.stroke()
-        path.lineWidth = 2
-        NSColor(color).setStroke()
-        path.stroke()
-
         image.unlockFocus()
         return image
     }
 
+    /// Draws the strokes: first a dark casing under the whole line, which keeps it legible over
+    /// both parkland and city blocks, then each stretch in its colour.
+    private static func stroke(_ strokes: [Stroke], casing: Bool = true, at point: (Coordinate) -> NSPoint) {
+        let paths = strokes.map { stroke -> (NSBezierPath, NSColor) in
+            let path = NSBezierPath()
+            for (index, coordinate) in stroke.coordinates.enumerated() {
+                index == 0 ? path.move(to: point(coordinate)) : path.line(to: point(coordinate))
+            }
+            path.lineJoinStyle = .round
+            path.lineCapStyle = .round
+            return (path, stroke.color)
+        }
+        if casing {
+            NSColor.black.withAlphaComponent(0.35).setStroke()
+            for (path, _) in paths { path.lineWidth = 4; path.stroke() }
+        }
+        for (path, color) in paths { path.lineWidth = 2; color.setStroke(); path.stroke() }
+    }
+
     private func polylineOnly(
-        _ coordinates: [Coordinate], bounds: CoordinateBounds, size: NSSize, isDark: Bool,
-        color: RouteColor
+        _ strokes: [Stroke], bounds: CoordinateBounds, size: NSSize, isDark: Bool
     ) -> NSImage? {
-        guard coordinates.count >= 2 else { return nil }
+        guard strokes.reduce(0, { $0 + $1.coordinates.count }) >= 2 else { return nil }
         let scale = cos(bounds.centre.latitude * .pi / 180)
         let spanX = max(bounds.longitudeSpan * scale, 1e-9)
         let spanY = max(bounds.latitudeSpan, 1e-9)
@@ -253,18 +280,10 @@ final class RouteThumbnailRenderer {
         (isDark ? NSColor.controlBackgroundColor : NSColor.windowBackgroundColor).setFill()
         NSRect(origin: .zero, size: size).fill()
 
-        let path = NSBezierPath()
-        for (index, coordinate) in coordinates.enumerated() {
-            let x = inset + offsetX + (coordinate.longitude - bounds.minLongitude) * scale * fit
-            let y = inset + offsetY + (coordinate.latitude - bounds.minLatitude) * fit
-            let point = NSPoint(x: x, y: y)
-            index == 0 ? path.move(to: point) : path.line(to: point)
+        Self.stroke(strokes, casing: false) { coordinate in
+            NSPoint(x: inset + offsetX + (coordinate.longitude - bounds.minLongitude) * scale * fit,
+                    y: inset + offsetY + (coordinate.latitude - bounds.minLatitude) * fit)
         }
-        path.lineWidth = 2
-        path.lineJoinStyle = .round
-        path.lineCapStyle = .round
-        NSColor(color).setStroke()
-        path.stroke()
 
         image.unlockFocus()
         return image

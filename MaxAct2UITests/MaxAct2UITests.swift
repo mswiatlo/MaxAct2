@@ -1113,6 +1113,31 @@ final class SeededTableUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Map of '")).firstMatch.exists)
     }
 
+    /// Issue 31: the inspector map's menu colours the route by elevation, with a legend of the
+    /// low and high values; back to Solid, the legend goes. The seed's altitudes run 5–35 m.
+    @MainActor
+    func testTheRouteCanBeColouredByElevation() throws {
+        let app = launchSeeded()
+        let table = app.outlines["WorkoutTable"]
+        XCTAssertTrue(table.waitForExistence(timeout: 15))
+        table.cells.element(boundBy: 0).click()
+
+        let menu = app.descendants(matching: .any)["RouteColoringMenu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 15), "The route map should offer colouring.")
+        let legend = app.descendants(matching: .any)["RouteColoringLegend"]
+        XCTAssertFalse(legend.exists, "Solid by default: no legend.")
+
+        menu.click()
+        app.menuItems["Elevation"].click()
+        XCTAssertTrue(legend.waitForExistence(timeout: 10), "Colouring by elevation should show a legend.")
+        let text = (legend.value as? String ?? "") + legend.label
+        XCTAssertTrue(text.contains(" m"), "The legend should give heights: \(text)")
+
+        menu.click()
+        app.menuItems["Solid"].click()
+        XCTAssertTrue(legend.waitForNonExistence(timeout: 5), "Back to Solid, the legend should go.")
+    }
+
     /// Issue 29: clicking a route on the heatmap opens its workout; where routes overlap, a picker
     /// lists them. The seed's routes are loops of different sizes around one point, and its two
     /// identical rides share a loop, so a sweep along the centre line meets both cases. Leftwards,
