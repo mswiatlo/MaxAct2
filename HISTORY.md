@@ -1200,6 +1200,8 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-26** — Planned 36: a visual README, after the audits, with seeded-data screenshots only.
+
 - **2026-10-26** — **Issue 31 closed**, confirmed by the user. Full suite: 67 passed, 3 skipped.
 
 - **2026-10-26** — 31 revised after the user's review: colouring is per workout, stored with its local
