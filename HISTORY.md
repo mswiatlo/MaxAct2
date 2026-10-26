@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed or closed known issues (1–20, 22, 23, 25–27, 29–32, 34, 35, 37)
+## 2. Fixed or closed known issues (1–20, 22, 23, 25–27, 29–32, 34, 35, 37, 38)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -518,6 +518,25 @@ other in order, and ranking by time. Checked on a copy: the newest commute 92 ti
 times, 3rd. Extended the next day: pointing at an attempt shows its exact date, time and
 duration, and clicking it opens that workout and scrolls the table to it (`AppModel.reveal`). If
 a search or filter hides it, the table goes back to All Workouts. Going back is issue 32.
+
+**38. ~~Bugs found by the audit.~~ — done 2026-10-26, confirmed by the user.** —
+- **Pace showed a minute fast.** 299.6 s/km displayed as "4:00 /km"; it is now rounded once.
+- **The inspector reloads when its series changes.** `SeriesStore.observe` reports every save and
+  discard, and `AppModel.seriesRevisions` keys the detail load. Before, Download Detail left it blank
+  until you reselected, and a re-download kept showing the old route.
+- **A failed dense heart-rate lookup keeps the download,** with the export's heart rate, and logs it.
+- **A damaged series file is removed and logged, and the workout is offered for download again.**
+  It used to count as downloaded with nothing to show.
+- **Stopping an upload leaves the in-flight workout as it was** (was "failed: cancelled").
+- **Place lookup pages past starts it can't name.** It used to stop at a batch of 200 with nothing
+  named, so older workouts never got a place.
+- **The Strava settings note names both permissions.**
+- **No real address in the UI:** the Settings placeholder is now "required", and the help examples
+  use `192.168.1.20`.
+- **Pause gap is 30 s everywhere** (the user's choice; was 60 s for charts, moving time, splits and
+  TCX tracks).
+
+Tests: 5 package tests and 3 app tests, each mutation-checked.
 
 **27. ~~Code quality audit.~~ — done 2026-10-26, triaged with the user.** — four parallel read-only
 reviews (app state and support; views and rendering; core ingest, store and Strava; core model and
@@ -1213,6 +1232,8 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-26** — **Issue 38 closed**, confirmed by the user. Full suite: 70 passed, 3 skipped, after one heatmap-sweep flake in the first run (noted under 43).
 
 - **2026-10-26** — **38 built: the audit's bugs.** Two findings while fixing:
   - The time-zone fix was nearly built on a wrong reading. A fixture's February date had a summer

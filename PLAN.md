@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** the code-quality fixes 38–43 in order (38 first), then 28 (security audit), then 36
+**Next:** the code-quality fixes 39–43 in order, then 28 (security audit), then 36
 (README). 24's live run waits for HAE's fix (21). Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
@@ -44,7 +44,7 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–20, 22, 23, 25, 26, 27, 29–32, 34, 35 and 37 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–20, 22, 23, 25, 26, 27, 29–32, 34, 35, 37 and 38 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
 **21. Health Auto Export bug report** *(sent by the user 2026-10-14; HAE acknowledged it and asked
@@ -79,26 +79,6 @@ Server screen and set it in MaxAct (it changes between networks), run Everything
 count), and check the oldest workout and the count.
 
 **From the code-quality audit (27, 2026-10-26; agreed with the user, in this order):**
-
-**38. Bugs found by the audit** *(built 2026-10-26 on `audit-bugs`, awaiting the user's check)* —
-- **Pace showed a minute fast.** 299.6 s/km displayed as "4:00 /km"; it is now rounded once.
-- **The inspector reloads when its series changes.** `SeriesStore.observe` reports every save and
-  discard, and `AppModel.seriesRevisions` keys the detail load. Before, Download Detail left it blank
-  until you reselected, and a re-download kept showing the old route.
-- **A failed dense heart-rate lookup keeps the download,** with the export's heart rate, and logs it.
-- **A damaged series file is removed and logged, and the workout is offered for download again.**
-  It used to count as downloaded with nothing to show.
-- **Stopping an upload leaves the in-flight workout as it was** (was "failed: cancelled").
-- **Place lookup pages past starts it can't name.** It used to stop at a batch of 200 with nothing
-  named, so older workouts never got a place.
-- **The Strava settings note names both permissions.**
-- **No real address in the UI:** the Settings placeholder is now "required", and the help examples
-  use `192.168.1.20`.
-- **Pause gap is 30 s everywhere** (the user's choice; was 60 s for charts, moving time, splits and
-  TCX tracks).
-
-Tests: 5 package tests and 3 app tests, each mutation-checked. To check: Download Detail on a
-selected workout fills the inspector at once; paces and moving times look right.
 
 **Follow-up from 38 — Strava names and time zones.** Activity names use the Mac's time zone, so a
 morning run abroad can be named "Night Run". The fix depends on what HAE's UTC offset means, which
@@ -159,6 +139,8 @@ matters.
   - the repair passes, backfill and delete;
   - `itemsUploadingToStrava`;
   - `PlaceResolver` and `WorkoutFilter`.
+- `testClickingTheHeatmapOpensAWorkoutOrOffersAChoice` failed once in a full run (2026-10-26).
+  The sweep found a single route but not the shared loop. It passed alone and in the next full run.
 - Split the 1,873-line UI test file by class, and share test helpers (store factory ×8, date
   helper ×4, route builders ×5).
 
