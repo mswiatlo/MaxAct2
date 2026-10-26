@@ -28,7 +28,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 354 in
 `MaxActCore` (`swift test`), 68 app and UI tests (`RunAllTests` — ask first, then leave the Mac
-alone for ~5 minutes; the two real-content tests skip unless a library copy is in place). A full
+alone for ~15 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
 
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide

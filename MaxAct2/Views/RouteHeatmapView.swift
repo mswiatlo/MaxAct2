@@ -19,8 +19,19 @@ struct RouteHeatmapSection: View {
     @State private var regionID: String?
     @State private var position: MapCameraPosition = .automatic
     @AppStorage("heatmapShowsSquares") private var showsSquares = false
+    /// Several routes under a click: the picker's contents and where it points (issue 29).
+    @State private var pick: Pick?
+
+    struct Pick: Identifiable {
+        let id = UUID()
+        let workoutIDs: [String]
+        let anchor: UnitPoint
+    }
 
     static let mapHeight: CGFloat = 380
+    /// How near, on screen, a click must be to a route to land on it. In points, so it feels the
+    /// same at every zoom; the lines are 2 pt wide.
+    static let clickTolerance: CGFloat = 10
 
     private var routeColor: Color { Color(model.settings.routeColor) }
 
@@ -80,6 +91,45 @@ struct RouteHeatmapSection: View {
     }
 
     private func map(_ sketches: [RouteSketch]) -> some View {
+        GeometryReader { geometry in
+            MapReader { proxy in
+                routesMap(sketches)
+                    // A click opens the workout under it, or offers a choice where several
+                    // overlap (issue 29). Through `reveal`, so Back returns here.
+                    .onTapGesture { location in
+                        let hits = routes(at: location, among: sketches, proxy: proxy)
+                        if hits.count == 1 {
+                            model.reveal(hits[0])
+                        } else if hits.count > 1 {
+                            pick = Pick(workoutIDs: hits, anchor: UnitPoint(
+                                x: location.x / max(geometry.size.width, 1),
+                                y: location.y / max(geometry.size.height, 1)))
+                        }
+                    }
+                    .popover(item: $pick, attachmentAnchor: .point(pick?.anchor ?? .center)) { pick in
+                        RoutePicker(model: model, workoutIDs: pick.workoutIDs) { self.pick = nil }
+                    }
+            }
+        }
+        .frame(height: Self.mapHeight)
+        .clipShape(.rect(cornerRadius: 8))
+        .accessibilityLabel("Map of \(sketches.count) routes")
+    }
+
+    /// The routes within ``clickTolerance`` of a click, nearest first.
+    private func routes(at location: CGPoint, among sketches: [RouteSketch], proxy: MapProxy) -> [String] {
+        guard let clicked = proxy.convert(location, from: .local),
+              let aside = proxy.convert(CGPoint(x: location.x + Self.clickTolerance, y: location.y), from: .local)
+        else { return [] }
+        // The tolerance in metres at this zoom: how far 10 pt reaches on the map here.
+        let metres = WorkoutSplits.distance(
+            from: Coordinate(latitude: clicked.latitude, longitude: clicked.longitude),
+            to: Coordinate(latitude: aside.latitude, longitude: aside.longitude))
+        return RouteHeatmap.routes(near: Coordinate(latitude: clicked.latitude, longitude: clicked.longitude),
+                                   within: metres, among: sketches)
+    }
+
+    private func routesMap(_ sketches: [RouteSketch]) -> some View {
         Map(position: $position) {
             if showsSquares {
                 ForEach(Array(RouteHeatmap.tiles(sketches)), id: \.self) { tile in
@@ -103,9 +153,6 @@ struct RouteHeatmapSection: View {
             }
         }
         .mapStyle(.standard(emphasis: .muted))
-        .frame(height: Self.mapHeight)
-        .clipShape(.rect(cornerRadius: 8))
-        .accessibilityLabel("Map of \(sketches.count) routes")
     }
 
     private func squaresSummary(all sketches: [RouteSketch], region: RouteRegion?) -> some View {
@@ -155,5 +202,47 @@ struct RouteHeatmapSection: View {
 
     static func region(for place: RouteRegion) -> MKCoordinateRegion {
         MKCoordinateRegion(fitting: place.focus, headroom: 1.15, minimumSpan: 0.02)
+    }
+}
+
+/// Where several routes overlap under a click on the heatmap: every one, newest first, to pick
+/// from (issue 29). Near home that can be hundreds, so it's a plain scrolling list.
+struct RoutePicker: View {
+    let model: AppModel
+    let workoutIDs: [String]
+    let dismiss: () -> Void
+
+    var body: some View {
+        let ids = Set(workoutIDs)
+        let items = model.items.filter { ids.contains($0.id) }.sorted { $0.workout.start > $1.workout.start }
+        VStack(alignment: .leading, spacing: 0) {
+            Text("\(items.count) routes pass here")
+                .font(.headline)
+                .padding([.horizontal, .top], 12)
+                .padding(.bottom, 6)
+            List(items) { item in
+                Button {
+                    dismiss()
+                    model.reveal(item.id)
+                } label: {
+                    HStack {
+                        Label(item.workout.kind.displayName, systemImage: item.workout.kind.symbolName)
+                        Spacer()
+                        Text(item.workout.start, format: .dateTime.year().month(.abbreviated).day())
+                            .foregroundStyle(.secondary)
+                        Text(WorkoutFormatting.distance(item.workout.distanceMeters))
+                            .frame(width: 70, alignment: .trailing)
+                        Text(WorkoutFormatting.duration(item.workout.duration))
+                            .frame(width: 60, alignment: .trailing)
+                    }
+                    .font(.callout.monospacedDigit())
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+            }
+            .listStyle(.plain)
+            .accessibilityIdentifier("HeatmapRoutePicker")
+        }
+        .frame(width: 420, height: min(80 + CGFloat(items.count) * 28, 380))
     }
 }

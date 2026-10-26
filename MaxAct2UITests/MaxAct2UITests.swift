@@ -1113,6 +1113,60 @@ final class SeededTableUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Map of '")).firstMatch.exists)
     }
 
+    /// Issue 29: clicking a route on the heatmap opens its workout; where routes overlap, a picker
+    /// lists them. The seed's routes are loops of different sizes around one point, and its two
+    /// identical rides share a loop, so a sweep along the centre line meets both cases. Leftwards,
+    /// because the inspector opens over the right of the statistics after a hit.
+    @MainActor
+    func testClickingTheHeatmapOpensAWorkoutOrOffersAChoice() throws {
+        let app = launchSeeded()
+        let sidebar = app.outlines["Sidebar"]
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 15))
+        sidebar.staticTexts.containing(NSPredicate(format: "value == 'Statistics' OR label == 'Statistics'"))
+            .firstMatch.click()
+        let scroll = app.scrollViews["StatisticsScroll"]
+        XCTAssertTrue(scroll.waitForExistence(timeout: 10))
+        let toggle = app.checkBoxes["Show squares"]
+        for _ in 0..<15 where !(toggle.exists && toggle.isHittable) { scroll.scroll(byDeltaX: 0, deltaY: -400) }
+        XCTAssertTrue(toggle.waitForExistence(timeout: 20), "The routes section should finish preparing.")
+        let map = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Map of '")).firstMatch
+        scrollFullyIntoView(map, scrolling: scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)),
+                            in: app.windows.firstMatch)
+
+        // Clicks go to whatever is in front at those screen points: once another app's window
+        // covered MaxAct and the sweep clicked into it. Make sure MaxAct is frontmost first.
+        app.activate()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 5), "MaxAct must be frontmost before clicking the map.")
+        let back = app.toolbars.buttons["Back"]
+        let picker = app.staticTexts.containing(NSPredicate(format: "value ENDSWITH 'routes pass here'")).firstMatch
+        var openedDirectly = false, offeredChoice = false
+        for dx in stride(from: 0.5, through: 0.02, by: -0.01) where !offeredChoice {
+            map.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: 0.5)).click()
+            if picker.waitForExistence(timeout: 0.5) {
+                offeredChoice = true
+            } else if back.isEnabled {
+                openedDirectly = true
+            }
+        }
+        // Keep the evidence — but only of MaxAct: a screenshot with another app in front shows that app.
+        if !offeredChoice, app.state == .runningForeground {
+            print("HEATMAP map \(map.frame) window \(app.windows.firstMatch.frame)")
+            let evidence = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+            evidence.name = "heatmap-no-choice"; evidence.lifetime = .keepAlways; add(evidence)
+        }
+        XCTAssertTrue(openedDirectly, "Clicking a single route should open its workout.")
+        XCTAssertTrue(offeredChoice, "Clicking the two rides' shared loop should offer a choice.")
+        XCTAssertTrue((picker.value as? String ?? "").hasPrefix("2 "), "The two identical rides: \(picker.value ?? "")")
+
+        // Picking one opens it in the inspector.
+        let row = app.descendants(matching: .any)["HeatmapRoutePicker"].buttons.firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        row.click()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "value BEGINSWITH 'Cycling'")).firstMatch
+            .waitForExistence(timeout: 5), "The picked ride should open in the inspector.")
+        XCTAssertFalse(picker.exists, "The picker should close once a route is picked.")
+    }
+
     /// Issue 15: with a heart-rate profile set, Statistics shows time in each zone. The profile is
     /// passed as launch-argument defaults, which sit over the throwaway settings.
     @MainActor
@@ -1260,7 +1314,7 @@ final class SeededTableUITests: XCTestCase {
         }
         let found = try XCTUnwrap(spot, "Clicking along the chart never opened the other attempt.")
         let scrolledTo = olderRow.waitForExistence(timeout: 5) && olderRow.isHittable
-        if !scrolledTo {   // keep the evidence: this has failed intermittently in full runs
+        if !scrolledTo, app.state == .runningForeground {   // evidence of MaxAct only, never another app in front
             let all = table.staticTexts.matching(NSPredicate(format: "value == 'Sep 9, 2025'")).allElementsBoundByIndex.map { $0.frame }
             print("NOT-SCROLLED all \(all) table \(table.frame) window \(app.windows.firstMatch.frame) sidebar \(app.outlines["Sidebar"].frame)")
             let evidence = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
@@ -1271,7 +1325,7 @@ final class SeededTableUITests: XCTestCase {
         let afterX = try XCTUnwrap(laidOutX(of: "Sep 9, 2025", in: table))
         // Once in four full runs this read x 466 against 1516, and it hasn't recurred. Keep the
         // evidence if it does: every copy's frame, the table and window, and the window itself.
-        if abs(afterX - dateColumnX) > 1 {
+        if abs(afterX - dateColumnX) > 1, app.state == .runningForeground {
             let all = table.staticTexts.matching(NSPredicate(format: "value == 'Sep 9, 2025'")).allElementsBoundByIndex.map { $0.frame }
             print("SIDEWAYS before \(dateColumnX) after \(afterX) all \(all) table \(table.frame) window \(app.windows.firstMatch.frame) sidebar \(app.outlines["Sidebar"].frame)")
             let evidence = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())

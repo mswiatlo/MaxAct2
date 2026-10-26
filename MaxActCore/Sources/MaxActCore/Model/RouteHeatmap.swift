@@ -155,4 +155,39 @@ public enum RouteHeatmap {
     public static func tiles(_ sketches: some Sequence<RouteSketch>) -> Set<ExplorerTile> {
         sketches.reduce(into: Set()) { $0.formUnion($1.tiles) }
     }
+
+    /// The workouts whose drawn route passes within `metres` of `point`, nearest first — what a
+    /// click on the heatmap means (issue 29). Measured against the sketch, which is what's drawn,
+    /// segment by segment, so a click between two vertices of a long straight still counts.
+    public static func routes(near point: Coordinate, within metres: Double,
+                              among sketches: some Sequence<RouteSketch>) -> [String] {
+        // Flat-earth metres around the click: exact enough over the few metres to few hundred
+        // metres a click tolerance spans.
+        let metresPerDegree = 111_195.0
+        let cosLatitude = cos(point.latitude * .pi / 180)
+        func planar(_ c: Coordinate) -> (x: Double, y: Double) {
+            ((c.longitude - point.longitude) * metresPerDegree * cosLatitude,
+             (c.latitude - point.latitude) * metresPerDegree)
+        }
+        // Distance from the click (the origin) to the segment a–b.
+        func distance(_ a: (x: Double, y: Double), _ b: (x: Double, y: Double)) -> Double {
+            let dx = b.x - a.x, dy = b.y - a.y
+            let lengthSquared = dx * dx + dy * dy
+            let t = lengthSquared > 0 ? max(0, min(1, -(a.x * dx + a.y * dy) / lengthSquared)) : 0
+            let x = a.x + t * dx, y = a.y + t * dy
+            return (x * x + y * y).squareRoot()
+        }
+        var hits: [(id: String, distance: Double)] = []
+        for sketch in sketches {
+            let points = sketch.coordinates.map(planar)
+            guard let first = points.first else { continue }
+            var nearest = (first.x * first.x + first.y * first.y).squareRoot()
+            for (a, b) in zip(points, points.dropFirst()) {
+                nearest = min(nearest, distance(a, b))
+                if nearest <= metres { break }
+            }
+            if nearest <= metres { hits.append((sketch.workoutID, nearest)) }
+        }
+        return hits.sorted { $0.distance < $1.distance }.map(\.id)
+    }
 }

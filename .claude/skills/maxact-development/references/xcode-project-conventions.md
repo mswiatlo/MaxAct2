@@ -290,6 +290,13 @@ element is inside `window.frame` before pointing at it.
   empty frame. `firstMatch` alternated between x 1516 and x 0 across two reads. Read only a
   match whose frame has width.
 
+**Another app in front of MaxAct sends a UI test's clicks to that app** *(2026-10-26)*. Mid-run,
+Xcode was frontmost over MaxAct's window: the heatmap sweep and the jump test clicked into
+Xcode, and a "window" screenshot captured Xcode, including the user's conversation. Tests that
+click by coordinates call `app.activate()` and assert `.runningForeground` first. Evidence
+screenshots are taken only while MaxAct is frontmost. If one ever shows another app, delete it and
+its result bundle at once.
+
 **A screensaver or locked screen breaks UI tests in two recognisable ways** *(2026-10-25)*: window
 screenshots fail with "Failed to look up screen N: Failed to match screen with displayID N", and launches
 fail with "Failed to activate application … (current state: Running Background)". Every check before
