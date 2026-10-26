@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed or closed known issues (1–20, 22, 23, 25, 26, 30)
+## 2. Fixed or closed known issues (1–20, 22, 23, 25, 26, 30, 32)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -518,6 +518,12 @@ other in order, and ranking by time. Checked on a copy: the newest commute 92 ti
 times, 3rd. Extended the next day: pointing at an attempt shows its exact date, time and
 duration, and clicking it opens that workout and scrolls the table to it (`AppModel.reveal`). If
 a search or filter hides it, the table goes back to All Workouts. Going back is issue 32.
+
+**32. ~~Back to the previous selection.~~ — done 2026-10-26, confirmed by the user.** — View ▸ Back
+(⌘[) / Forward (⌘]) and toolbar arrows, greyed out when there's nowhere to go. Only jumps
+(`AppModel.reveal`: Same Route points, statistics bests, later the heatmap) make history, so Back
+returns to where a jump started. Each step restores the search and sidebar filter a jump
+changed. The history is capped at 50. 5 app tests plus the Same Route jump UI test.
 
 **30. ~~`testPointingAtAChartHighlightsTheMap` failed.~~ — done 2026-10-23.** — "Pointing at a chart
 didn't put a marker on the map", every run, on `main` too. The app was fine: the user checked it by
@@ -1164,6 +1170,9 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-26** — **Issue 32 closed**, confirmed by the user. Full suite: 65 passed, 3 skipped. The first
+  attempt ended in Xcode's "result bundle incomplete" error (a tooling hiccup); the rerun was clean.
 
 - **2026-10-26** — **Issue 32 built: Back and Forward.** It retraces jumps only, restores the view a
   jump changed, and has a menu, shortcuts and toolbar arrows (all choices the user's). 5 app tests (one
