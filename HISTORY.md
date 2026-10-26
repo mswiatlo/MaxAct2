@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed or closed known issues (1–20, 22, 23, 25, 26, 30, 32)
+## 2. Fixed or closed known issues (1–20, 22, 23, 25, 26, 29, 30, 32)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -524,6 +524,13 @@ a search or filter hides it, the table goes back to All Workouts. Going back is 
 (`AppModel.reveal`: Same Route points, statistics bests, later the heatmap) make history, so Back
 returns to where a jump started. Each step restores the search and sidebar filter a jump
 changed. The history is capped at 50. 5 app tests plus the Same Route jump UI test.
+
+**29. ~~Click the heatmap to open a workout.~~ — done 2026-10-26, confirmed by the user.** — a click on
+a route opens it, through `reveal`, so Back returns to the statistics. Where several routes are under the
+click, a popover lists them newest first ("N routes pass here"). A click counts within 10 pt of a
+line, converted to metres at the current zoom. Hits are tested against the drawn sketches, segment by
+segment (`RouteHeatmap.routes(near:within:among:)`, 5 package tests, mutation-checked). The UI test
+sweeps the seeded loops; with the picker removed, it fails.
 
 **30. ~~`testPointingAtAChartHighlightsTheMap` failed.~~ — done 2026-10-23.** — "Pointing at a chart
 didn't put a marker on the map", every run, on `main` too. The app was fine: the user checked it by
@@ -1170,6 +1177,10 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-26** — **Issue 29 closed**, confirmed by the user. Full suite: 66 passed, 3 skipped. Earlier
+  failures were Xcode frontmost over MaxAct, so the tests clicked into Xcode. The click tests now activate
+  MaxAct first and only screenshot it while it's frontmost.
 
 - **2026-10-26** — **Issue 32 closed**, confirmed by the user. Full suite: 65 passed, 3 skipped. The first
   attempt ended in Xcode's "result bundle incomplete" error (a tooling hiccup); the rerun was clean.
