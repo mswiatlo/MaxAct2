@@ -84,6 +84,20 @@ import Testing
         #expect(try await store.item(id: "B")?.tags == [])
     }
 
+    /// Issue 31: a route's colouring belongs to that workout alone, and a re-sync keeps it.
+    @Test("a route colouring is per workout, survives a re-sync, and Solid clears it")
+    func routeColoringIsPerWorkout() async throws {
+        let store = try store()
+        try await store.upsert([ingested("A"), ingested("B")])
+        try await store.setRouteColoring(.elevation, for: "A")
+        try await store.upsert([ingested("A"), ingested("B")])   // a later sync
+        #expect(try await store.item(id: "A")?.routeColoring == .elevation)
+        #expect(try await store.item(id: "B")?.routeColoring == .solid, "only the one changed")
+
+        try await store.setRouteColoring(.solid, for: "A")
+        #expect(try await store.item(id: "A")?.routeColoring == .solid)
+    }
+
     @Test("Commute, Trainer and Race are always offered, even before any workout has them")
     func builtInsOffered() async throws {
         let store = try store()

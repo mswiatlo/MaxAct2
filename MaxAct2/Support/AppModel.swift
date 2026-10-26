@@ -613,6 +613,16 @@ final class AppModel {
 
     // MARK: Strava
 
+    // MARK: Route colouring
+
+    /// Colours one workout's route (issue 31): per workout, so only its own thumbnail redraws.
+    func setRouteColoring(_ coloring: RouteColoring, for workoutID: String) {
+        Task {
+            try? await store.setRouteColoring(coloring, for: workoutID)
+            await refreshItems()
+        }
+    }
+
     // MARK: Tags
 
     func addTag(_ name: String, to ids: Set<String>) {

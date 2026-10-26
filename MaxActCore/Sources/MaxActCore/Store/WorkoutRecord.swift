@@ -95,6 +95,10 @@ public final class WorkoutRecord {
     /// Default declared here so the existing store migrates without a mapping model.
     public var tagNames: [String] = []
 
+    /// What this workout's route is coloured by (`RouteColoring`, issue 31); `nil` is solid.
+    /// Local state, per workout, never touched by a re-sync. Defaulted so the store migrates.
+    public var routeColoringKey: String? = nil
+
     /// A Strava-backed tag was edited here on a workout already on Strava, and the change hasn't
     /// reached Strava yet. While set, a sync-status check must not overwrite the local value with
     /// Strava's stale one — that would silently undo the user's edit.
@@ -232,6 +236,7 @@ public struct WorkoutListItem: Identifiable, Hashable, Sendable {
     public let stravaActivityID: Int?
     public let hasDetail: Bool
     public let thumbnailFileName: String?
+    public let routeColoring: RouteColoring
 
     public var id: String { workout.id }
 
@@ -245,6 +250,7 @@ public struct WorkoutListItem: Identifiable, Hashable, Sendable {
         stravaActivityID = record.stravaActivityID
         hasDetail = record.hasDetail
         thumbnailFileName = record.thumbnailFileName
+        routeColoring = RouteColoring(storageKey: record.routeColoringKey)
     }
 }
 

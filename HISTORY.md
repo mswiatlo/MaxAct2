@@ -1190,6 +1190,11 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-26** — 31 revised after the user's review: colouring is per workout, stored with its local
+  state (a store test shows a re-sync keeps it; it fails if nothing is stored), so only that
+  thumbnail redraws. The menu always names the current choice ("Solid", not "Colour"). The UI test
+  checks that another workout stays solid and the first keeps its choice.
+
 - **2026-10-26** — **Issue 31 built: coloured routes.** The user's choices: a menu on the map, remembered;
   thumbnails too; heart rate by zone; a blue-to-red ramp with grey gaps and a legend. Found while
   testing: a flat route's 0.2 m of sensor noise filled the whole ramp, and merging short

@@ -95,8 +95,9 @@ not the Keychain.
 
 **31. Colour a workout's route by elevation, heart rate or pace** *(requested 2026-10-23; built
 2026-10-26, awaiting the user's check)* — a menu on the inspector map (Solid / Elevation / Heart Rate /
-Pace), remembered across workouts and launches (`routeColoring`). Thumbnails follow it; the heatmap
-stays solid. Elevation and pace use a blue → green → yellow → red ramp over the workout's 2nd–98th
+Pace), per workout (`WorkoutRecord.routeColoringKey`; a re-sync keeps it), so changing one redraws
+only that workout's thumbnail. The button names the current choice, "Solid" included. Thumbnails
+follow each workout's choice; the heatmap stays solid. Elevation and pace use a blue → green → yellow → red ramp over the workout's 2nd–98th
 percentile, at least 10 m / 0.5 m/s / 10 bpm wide, and for pace faster is hotter. Heart rate uses the
 zone colours when a profile is set, otherwise the ramp. Pauses (gaps over 30 s) and missing values are
 grey. A legend under the map gives the low and high values, or the zones. The core is

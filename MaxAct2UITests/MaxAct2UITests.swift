@@ -1113,8 +1113,9 @@ final class SeededTableUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Map of '")).firstMatch.exists)
     }
 
-    /// Issue 31: the inspector map's menu colours the route by elevation, with a legend of the
-    /// low and high values; back to Solid, the legend goes. The seed's altitudes run 5–35 m.
+    /// Issue 31: the inspector map's menu colours *that workout's* route by elevation, with a
+    /// legend of the low and high values. Another workout stays solid; the first keeps its
+    /// choice; back to Solid, the legend goes. The seed's altitudes run 5–35 m.
     @MainActor
     func testTheRouteCanBeColouredByElevation() throws {
         let app = launchSeeded()
@@ -1124,14 +1125,31 @@ final class SeededTableUITests: XCTestCase {
 
         let menu = app.descendants(matching: .any)["RouteColoringMenu"]
         XCTAssertTrue(menu.waitForExistence(timeout: 15), "The route map should offer colouring.")
+        let menuText = { (menu.value as? String ?? "") + menu.label + menu.title }
+        XCTAssertTrue(menuText().contains("Solid"), "Solid by default, named as such: \(menuText())")
         let legend = app.descendants(matching: .any)["RouteColoringLegend"]
-        XCTAssertFalse(legend.exists, "Solid by default: no legend.")
+        XCTAssertFalse(legend.exists, "Solid: no legend.")
 
         menu.click()
         app.menuItems["Elevation"].click()
         XCTAssertTrue(legend.waitForExistence(timeout: 10), "Colouring by elevation should show a legend.")
         let text = (legend.value as? String ?? "") + legend.label
         XCTAssertTrue(text.contains(" m"), "The legend should give heights: \(text)")
+
+        // Per workout: the next workout with a route is still solid.
+        var steps = 0
+        repeat {
+            app.typeKey(.downArrow, modifierFlags: [])
+            steps += 1
+            Thread.sleep(forTimeInterval: 0.5)
+        } while !menu.exists && steps < 15
+        XCTAssertTrue(menu.exists, "Another workout with a route should come up.")
+        XCTAssertTrue(menuText().contains("Solid"), "Another workout keeps its own (solid) colouring: \(menuText())")
+        XCTAssertFalse(legend.exists)
+
+        // And the first keeps Elevation.
+        for _ in 0..<steps { app.typeKey(.upArrow, modifierFlags: []) }
+        XCTAssertTrue(legend.waitForExistence(timeout: 10), "The first workout should still be coloured by elevation.")
 
         menu.click()
         app.menuItems["Solid"].click()

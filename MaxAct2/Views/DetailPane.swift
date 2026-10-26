@@ -88,8 +88,8 @@ struct WorkoutDetailView: View {
     }
 
     private var coloringIdentity: ColoringIdentity {
-        let profile = model.settings.routeColoring == .heartRate ? model.settings.heartRateProfile : nil
-        return ColoringIdentity(workoutID: loaded?.id, coloring: model.settings.routeColoring,
+        let profile = item.routeColoring == .heartRate ? model.settings.heartRateProfile : nil
+        return ColoringIdentity(workoutID: loaded?.id, coloring: item.routeColoring,
                                 resting: profile?.resting, maximum: profile?.maximum)
     }
 
@@ -338,18 +338,18 @@ struct WorkoutDetailView: View {
         .overlay(alignment: .topTrailing) { coloringMenu.padding(8) }
     }
 
-    /// Solid / Elevation / Heart Rate / Pace, on the map itself (issue 31). The choice is
-    /// remembered across workouts and launches.
+    /// Solid / Elevation / Heart Rate / Pace, on the map itself (issue 31). Each workout keeps
+    /// its own choice, so changing it redraws only that workout's thumbnail.
     private var coloringMenu: some View {
         Menu {
             Picker("Colour route by", selection: Binding(
-                get: { model.settings.routeColoring }, set: { model.settings.routeColoring = $0 })) {
+                get: { item.routeColoring }, set: { model.setRouteColoring($0, for: item.id) })) {
                 ForEach(RouteColoring.allCases) { Text($0.title).tag($0) }
             }
             .pickerStyle(.inline)
         } label: {
-            Label(model.settings.routeColoring == .solid ? "Colour" : model.settings.routeColoring.title,
-                  systemImage: "paintpalette")
+            // The current choice, Solid included — one name, not "Colour" for Solid (user's choice).
+            Label(item.routeColoring.title, systemImage: "paintpalette")
         }
         .menuStyle(.button)
         .buttonStyle(.glass)
@@ -361,7 +361,7 @@ struct WorkoutDetailView: View {
     /// Under the map: what the colours mean — the low and high ends of the ramp, or the zones.
     @ViewBuilder
     private var coloringLegend: some View {
-        let coloring = model.settings.routeColoring
+        let coloring = item.routeColoring
         if coloring != .solid, let colored = coloredRoute, colored.identity == coloringIdentity {
             Group {
                 if let gradient = colored.gradient, let range = gradient.range {

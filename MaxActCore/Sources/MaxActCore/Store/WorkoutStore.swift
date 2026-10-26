@@ -125,6 +125,13 @@ public actor WorkoutStore {
         }
     }
 
+    /// Colours one workout's route by `coloring` (issue 31). Local state, like tags.
+    public func setRouteColoring(_ coloring: RouteColoring, for workoutID: String) throws {
+        guard let record = try record(id: workoutID) else { return }
+        record.routeColoringKey = coloring == .solid ? nil : coloring.rawValue
+        try modelContext.save()
+    }
+
     private func editTags(
         of workoutIDs: [String], touching name: String, _ change: ([String]) -> [String]?
     ) throws -> [String] {
