@@ -34,7 +34,8 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** the audits — 27 (code quality), then 28 (security); then 36 (README). 24's live run waits for HAE's fix (21). Issue 7 (TrainingPeaks) starts with
+**Next:** the code-quality fixes 38–43 in order (38 first), then 28 (security audit), then 36
+(README). 24's live run waits for HAE's fix (21). Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -43,7 +44,7 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–20, 22, 23, 25, 26, 29–32, 34, 35 and 37 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–20, 22, 23, 25, 26, 27, 29–32, 34, 35 and 37 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
 **21. Health Auto Export bug report** *(sent by the user 2026-10-14; HAE acknowledged it and asked
@@ -77,21 +78,91 @@ the re-import gets whole routes and heart rate. Then: check the phone's current 
 Server screen and set it in MaxAct (it changes between networks), run Everything with HAE in front (about 2 hours for ~2,867 workouts by Phase 1's
 count), and check the oldest workout and the count.
 
-**27. Code quality audit** *(requested 2026-10-23; after 29 and 31, near the finish)* — a review pass over the app and `MaxActCore`
-after eight phases and many fixes: dead or duplicated code, oversized types and files (`AppModel`,
-`DetailPane`), error handling that swallows failures, concurrency and isolation, naming, and gaps in
-test coverage. Output: a findings list, triaged with the user before anything is changed; fixes go
-in as their own issues. Include: "a seven-year library summarises quickly" (200 ms limit) failed
-once in a full `swift test` run under load and took ~75 ms alone. Its limit is tighter than the
-"catch 10× regressions" rule for performance tests.
+**From the code-quality audit (27, 2026-10-26; agreed with the user, in this order):**
+
+**38. Bugs found by the audit** —
+- **Pace one minute fast.** `WorkoutFormatting.pace` truncates the minutes but rounds the seconds:
+  299.6 s/km displays as "4:00 /km" (measured).
+- **Inspector blank after Download Detail.** `DetailPane` reloads only when the selection changes,
+  so the map and charts stay missing until you reselect. A replaced series also shows the old route.
+- **One failed heart-rate lookup loses a good download.** A failed `get_health_metrics` call throws
+  away an otherwise good detail download (`HAEWorkoutSource.fetchDetail`).
+- **Damaged series files.** A damaged blob reads as "not found" yet keeps `hasDetail`, so it is
+  never re-offered, and its thumbnail says "No route recorded".
+- **Strava activity names use the Mac's time zone,** not the workout's.
+- **Stopping an upload marks the in-flight workout failed** instead of requeueing it (unconfirmed).
+- **Place lookup can stall** if the 200 newest unresolved workouts all fail (unconfirmed).
+- **The Strava settings note omits `activity:read_all`.**
+- **The Settings host placeholder is the user's real phone address.**
+- **Pause gap:** use 30 s for the charts, moving time and splits too, matching the coloured route
+  (the user's choice; was 60 s).
+
+**39. One owner for running jobs** — Stop doesn't stop:
+- `cancelSync` marks the sync idle at once, but the task later writes "Synced N".
+- A second sync can start meanwhile, and both talk to HAE at once.
+- Background passes can overwrite a running status with an error.
+- Strava check and upload can each start twice.
+- Delete All Data isn't blocked during a sync.
+- `RouteSketchCache` re-adds digests after `clear()`/`invalidate()`.
+- Two Strava token refreshes, and two rate-limit waiters, can overlap (actor reentrancy).
+
+Fix with one job runner owning `syncStatus`/`syncTask`. Split the sync and Strava parts out of
+`AppModel` (1,226 lines) with it.
+
+**40. Silent failures** — these `try?` calls ignore errors:
+- route colouring, tags and Strava disconnect;
+- the route fill during detail fetch;
+- saving an upload result;
+- `RouteSketchCache.save`;
+- the MCP `initialized` notice.
+
+A Keychain read error also looks the same as "not connected". Log every one; tell the user where it
+matters.
+
+**41. Performance** — measure on a library copy first, and fix only what shows:
+- detail load and thumbnail preparation run on the main actor;
+- `cleanedRoute` is computed five or more times per workout opened;
+- finished thumbnails are dropped when scrolling cancels their task;
+- the heatmap re-sorts everything on every render and computes its tiles three times;
+- `Date.now` in Statistics' `body`;
+- `personalBests` is computed twice;
+- `selectedItems` re-sorts the library three times per render;
+- `sync` reloads the whole model after every week.
+
+**42. Structure, duplication and dead code** (no change in behaviour):
+- Split `DetailPane`, `StatisticsView` and `WorkoutStore`.
+- Move `AppSettings`/`SettingsView` out of `WorkoutActions.swift`.
+- `sync` and `syncEverything` are near-copies.
+- Shared stat cell, section header, duration text and coordinate conversion.
+- Core maths in one place: cumulative distance (5 copies), thinning (2), by-period buckets (2),
+  metres-per-degree (two values).
+- Remove about 12 unused APIs, including the thumbnail-filename chain,
+  `StravaClient.updateActivity` and status cases that are never created.
+- Fix about 10 stale or misplaced comments.
+
+**43. Tests:**
+- Timing limits too tight (200/300/200 ms, 1 s): loosen to the 10× rule.
+- `ConnectionCheckTests` uses the real network.
+- The `xmllint` pipe can deadlock.
+- The UI tests use about 28 fixed sleeps.
+- No tests yet for:
+  - `AppModel`'s Strava pipeline;
+  - the repair passes, backfill and delete;
+  - `itemsUploadingToStrava`;
+  - `PlaceResolver` and `WorkoutFilter`.
+- Split the 1,873-line UI test file by class, and share test helpers (store factory ×8, date
+  helper ×4, route builders ×5).
 
 **28. Security audit** *(requested 2026-10-23; after 27, near the finish)* — secrets (HAE token, Strava client
 secret and OAuth tokens: Keychain use, nothing in logs, defaults or crash output), the MCP link
 (plain HTTP on the LAN, token in transit), Strava OAuth (redirect handling, state check, token
 refresh), handling of untrusted input (HAE and Strava replies, stored series files), on-disk data
 and file protection, entitlements and sandboxing, and that the test isolation can't reach real data.
-Output as for 27. Already found: the HAE bearer token sits in plain UserDefaults (`syncToken`, `WorkoutActions.swift`),
-not the Keychain.
+Output as for 27. Already found:
+- The HAE bearer token sits in plain UserDefaults (`syncToken`, `WorkoutActions.swift`), not the
+  Keychain.
+- `SeriesStore.fileURL(for:)` builds a path from the unchecked workout id, so `../` could escape
+  `Series/`.
 
 **33. Say who uploaded it** *(requested 2026-10-24; built 2026-10-25, awaiting the user's check)* —
 the inspector's note for a workout found already on Strava now reads "Uploaded to Strava by another

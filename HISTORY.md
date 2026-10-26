@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed or closed known issues (1–20, 22, 23, 25, 26, 29–32, 34, 35, 37)
+## 2. Fixed or closed known issues (1–20, 22, 23, 25–27, 29–32, 34, 35, 37)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -518,6 +518,13 @@ other in order, and ranking by time. Checked on a copy: the newest commute 92 ti
 times, 3rd. Extended the next day: pointing at an attempt shows its exact date, time and
 duration, and clicking it opens that workout and scrolls the table to it (`AppModel.reveal`). If
 a search or filter hides it, the table goes back to All Workouts. Going back is issue 32.
+
+**27. ~~Code quality audit.~~ — done 2026-10-26, triaged with the user.** — four parallel read-only
+reviews (app state and support; views and rendering; core ingest, store and Strava; core model and
+tests), with the serious findings checked by hand. The pace bug was confirmed by running it. About
+60 findings were grouped into issues 38–43 in `PLAN.md`: bugs; one owner for running jobs; silent
+failures; performance, measured first; structure and dead code; tests. Two security points went to
+28. The user chose a 30 s pause gap everywhere.
 
 **37. ~~Colour routes by gradient.~~ — done 2026-10-26, confirmed by the user.** — a fifth choice in
 the map's colouring menu: the slope in percent, as a least-squares fit of height against distance
@@ -1206,6 +1213,8 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-26** — **Issue 27 closed: code-quality audit.** Findings triaged into 38–43.
 
 - **2026-10-26** — **Issue 37 closed**, confirmed by the user. Full suite: 67 passed, 3 skipped.
 
