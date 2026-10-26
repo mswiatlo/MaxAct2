@@ -1194,6 +1194,11 @@ final class SeededTableUITests: XCTestCase {
         XCTAssertTrue(source.waitForExistence(timeout: 20))
         let measured = Int((source.value as? String ?? "").split(separator: " ").dropFirst().first ?? "") ?? 0
         XCTAssertGreaterThan(measured, 0, "Seeded detail carries heart rate, so some workouts count.")
+        // Unhovered, the zones sum the whole span, not the latest period (user's choice). The seed
+        // covers several weeks, so the caption names a range.
+        let focus = app.staticTexts["ZonesFocus"]
+        let caption = (focus.value as? String ?? "") + focus.label
+        XCTAssertTrue(caption.contains(" – "), "The caption should cover the whole span: \(caption)")
         let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
         attachment.name = "15-heart-rate-zones"
         attachment.lifetime = .keepAlways

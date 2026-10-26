@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** 34 and 35 (statistics bugs), then 31. 24's live run waits for HAE's fix (21). The audits, 27 (code quality) then 28 (security), come last, once the app is close to finished. Issue 7 (TrainingPeaks) starts with
+**Next:** 31. 24's live run waits for HAE's fix (21). The audits, 27 (code quality) then 28 (security), come last, once the app is close to finished. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -43,7 +43,7 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–20, 22, 23, 25, 26, 29, 30 and 32 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–20, 22, 23, 25, 26, 29, 30, 32, 34 and 35 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
 **21. Health Auto Export bug report** *(sent by the user 2026-10-14; HAE acknowledged it and asked
@@ -110,22 +110,6 @@ real copy of the library.
 **33. Say who uploaded it** *(requested 2026-10-24; built 2026-10-25, awaiting the user's check)* —
 the inspector's note for a workout found already on Strava now reads "Uploaded to Strava by another
 source." (user's wording; was "Already uploaded to Strava.").
-
-**34. Statistics: the heart-rate zones hover shows the wrong period** *(reported 2026-10-26)* — hovering
-the zones chart changes the caption seemingly at random: over May 2026 it can show October 2026. The
-chart (`HeartRateZonesView`) uses `chartXSelection` on a horizontally scrollable chart. When the
-selection is `nil` the caption falls back to the latest period (`?? buckets.last`), and October 2026 is
-the latest, so "October while hovering May" is probably the selection coming back empty, not
-a wrong month. The History chart above uses the same pattern and wasn't reported. **First:**
-reproduce on a library copy and log the selected date as the pointer moves. Measure whether the
-selection drops to `nil` over some bars or is offset once the chart has scrolled.
-
-**35. Statistics: the heatmap's place menu does nothing** *(reported 2026-10-26)* — clicking the
-"Place" picker above the routes map (`RouteHeatmapSection`) has no effect. Unknown yet whether the
-menu doesn't open, or opens and the choice doesn't move the map. Ruled out: `RouteRegion.id` is
-stable (the place's first workout). Seeded data has only one place, so the picker never shows in UI
-tests; check on a library copy, and add a seed with two places for a test. Also check whether 29's
-new tap gesture or popover on the map, just below, plays a part.
 
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.

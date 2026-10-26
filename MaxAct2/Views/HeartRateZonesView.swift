@@ -56,14 +56,25 @@ struct HeartRateZonesSection: View {
         // Empty buckets while preparing, so the chart keeps its axis and height.
         let buckets = HeartRateZone.byPeriod(measured.isEmpty ? workouts.map { ($0.start, HeartRateHistogram()) } : measured,
                                              profile: profile, period: period, through: now, calendar: calendar)
-        let focused = hovered.flatMap { hovered in buckets.last { $0.interval.start <= hovered } } ?? buckets.last
+        // The period under the pointer; otherwise the whole span, summed (user's choice) — not the
+        // latest period, which read as if it were the hovered one.
+        let hoveredBucket = hovered.flatMap { hovered in buckets.last { $0.interval.start <= hovered } }
+        let times = hoveredBucket?.times ?? buckets.reduce(into: [:]) { total, bucket in
+            total.merge(bucket.times, uniquingKeysWith: +)
+        }
+        let span: String = {
+            if let hoveredBucket { return period.label(for: hoveredBucket.interval.start) }
+            guard let first = buckets.first, let last = buckets.last else { return "" }
+            return first.interval.start == last.interval.start ? period.label(for: first.interval.start)
+                : "\(period.label(for: first.interval.start)) – \(period.label(for: last.interval.start))"
+        }()
 
-        Text(focused.map { "\(period.label(for: $0.interval.start)) · " + HeartRateZoneBreakdown.describe($0.times.values.reduce(0, +)) } ?? " ")
+        Text(buckets.isEmpty ? " " : "\(span) · " + HeartRateZoneBreakdown.describe(times.values.reduce(0, +)))
             .font(.callout.monospacedDigit())
             .foregroundStyle(.secondary)
             .accessibilityIdentifier("ZonesFocus")
 
-        HeartRateZoneBreakdown(times: focused?.times ?? [:], profile: profile)
+        HeartRateZoneBreakdown(times: times, profile: profile)
 
         chart(buckets)
             .frame(height: 160)

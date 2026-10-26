@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed or closed known issues (1–20, 22, 23, 25, 26, 29, 30, 32)
+## 2. Fixed or closed known issues (1–20, 22, 23, 25, 26, 29, 30, 32, 34, 35)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -531,6 +531,18 @@ click, a popover lists them newest first ("N routes pass here"). A click counts 
 line, converted to metres at the current zoom. Hits are tested against the drawn sketches, segment by
 segment (`RouteHeatmap.routes(near:within:among:)`, 5 package tests, mutation-checked). The UI test
 sweeps the seeded loops; with the picker removed, it fails.
+
+**34. ~~Zones hover showed the wrong period.~~ — done 2026-10-26.** — hovering May 2026 sometimes
+showed October 2026. When the chart had no hovered bar, even briefly between bars, the caption fell back
+to the latest period, the current month: "October 2026 · 0 mins" (read from the mutation-checked test).
+By the user's choice, the unhovered caption and zone breakdown now sum the whole span ("September 2025 –
+October 2026 · …"), and hovering shows one period. The user couldn't reproduce the original symptom
+when retesting. The zones UI test checks the span caption and fails with the old fallback.
+
+**35. ~~Heatmap place menu did nothing.~~ — closed 2026-10-26, not reproducible.** — on retesting it
+worked for the user, and it isn't known when it failed. Ruled out: `RouteRegion.id` is stable. Seeded
+data has one place, so the menu is untested in UI tests; a two-place seed would cover it if it
+recurs.
 
 **30. ~~`testPointingAtAChartHighlightsTheMap` failed.~~ — done 2026-10-23.** — "Pointing at a chart
 didn't put a marker on the map", every run, on `main` too. The app was fine: the user checked it by
@@ -1177,6 +1189,9 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-26** — 34 fixed (zones caption sums the whole span when unhovered); 35 closed as not
+  reproducible.
 
 - **2026-10-26** — Planned 34 (zones hover shows the wrong period) and 35 (heatmap place menu does
   nothing), both reported by the user, with first findings.
