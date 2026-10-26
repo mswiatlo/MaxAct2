@@ -1178,6 +1178,9 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-26** — Planned 34 (zones hover shows the wrong period) and 35 (heatmap place menu does
+  nothing), both reported by the user, with first findings.
+
 - **2026-10-26** — **Issue 29 closed**, confirmed by the user. Full suite: 66 passed, 3 skipped. Earlier
   failures were Xcode frontmost over MaxAct, so the tests clicked into Xcode. The click tests now activate
   MaxAct first and only screenshot it while it's frontmost.

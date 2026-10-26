@@ -111,6 +111,22 @@ real copy of the library.
 the inspector's note for a workout found already on Strava now reads "Uploaded to Strava by another
 source." (user's wording; was "Already uploaded to Strava.").
 
+**34. Statistics: the heart-rate zones hover shows the wrong period** *(reported 2026-10-26)* — hovering
+the zones chart changes the caption seemingly at random: over May 2026 it can show October 2026. The
+chart (`HeartRateZonesView`) uses `chartXSelection` on a horizontally scrollable chart. When the
+selection is `nil` the caption falls back to the latest period (`?? buckets.last`), and October 2026 is
+the latest, so "October while hovering May" is probably the selection coming back empty, not
+a wrong month. The History chart above uses the same pattern and wasn't reported. **First:**
+reproduce on a library copy and log the selected date as the pointer moves. Measure whether the
+selection drops to `nil` over some bars or is offset once the chart has scrolled.
+
+**35. Statistics: the heatmap's place menu does nothing** *(reported 2026-10-26)* — clicking the
+"Place" picker above the routes map (`RouteHeatmapSection`) has no effect. Unknown yet whether the
+menu doesn't open, or opens and the choice doesn't move the map. Ruled out: `RouteRegion.id` is
+stable (the place's first workout). Seeded data has only one place, so the picker never shows in UI
+tests; check on a library copy, and add a seed with two places for a test. Also check whether 29's
+new tap gesture or popover on the map, just below, plays a part.
+
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.
 
