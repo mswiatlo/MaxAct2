@@ -3,7 +3,7 @@ import Foundation
 /// What a workout's route is coloured by (issue 31). Solid is the route colour; the others colour
 /// each stretch by a value along the route. The heatmap always stays solid.
 public enum RouteColoring: String, CaseIterable, Identifiable, Sendable {
-    case solid, elevation, heartRate, pace
+    case solid, elevation, gradient, heartRate, pace
 
     public var id: Self { self }
 
@@ -11,6 +11,7 @@ public enum RouteColoring: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .solid: "Solid"
         case .elevation: "Elevation"
+        case .gradient: "Gradient"
         case .heartRate: "Heart Rate"
         case .pace: "Pace"
         }
@@ -67,6 +68,7 @@ public struct RouteGradient: Sendable, Equatable {
         case .solid: return nil
         case .elevation: values = Self.smoothed(route.map(\.altitudeMeters), times: route.map(\.timestamp), window: 10)
         case .pace: values = Self.speeds(route, window: 15)
+        case .gradient: values = Self.grades(route)
         case .heartRate: values = Self.heartRates(at: route.map(\.timestamp), from: heartRate)
         }
 
@@ -79,6 +81,11 @@ public struct RouteGradient: Sendable, Equatable {
             guard !known.isEmpty else { return nil }
             var low = known[Int(Double(known.count - 1) * 0.02)]
             var high = known[Int(Double(known.count - 1) * 0.98)]
+            // Gradient is centred on flat, so flat always sits mid-ramp: down blue, up red.
+            if coloring == .gradient {
+                let steepest = max(abs(low), abs(high))
+                (low, high) = (-steepest, steepest)
+            }
             // A flat route's few metres of sensor noise mustn't be stretched across the whole
             // ramp (measured: a 0.2 m spread did exactly that), so the range is at least
             // `minimumSpan` wide, centred on the values.
@@ -109,10 +116,12 @@ public struct RouteGradient: Sendable, Equatable {
         return runs.map { Run(coordinates: RouteSimplifier.simplify($0.coordinates, tolerance: tolerance), shade: $0.shade) }
     }
 
-    /// The narrowest range the ramp spans: 10 m, 0.5 m/s (about 25 s/km at a 5 min/km pace), 10 bpm.
+    /// The narrowest range the ramp spans: 10 m, ±8 % of gradient, 0.5 m/s (about 25 s/km at a
+    /// 5 min/km pace), 10 bpm.
     static func minimumSpan(_ coloring: RouteColoring) -> Double {
         switch coloring {
         case .elevation: 10
+        case .gradient: 16
         case .pace: 0.5
         case .heartRate: 10
         case .solid: 0
@@ -155,6 +164,38 @@ public struct RouteGradient: Sendable, Equatable {
             let pausedHere = (i > 0 && route[i].timestamp.timeIntervalSince(route[i - 1].timestamp) > pauseGap)
             let seconds = route[hi].timestamp.timeIntervalSince(route[lo].timestamp)
             result.append(pausedHere || seconds <= 0 ? nil : (cumulative[hi] - cumulative[lo]) / seconds)
+        }
+        return result
+    }
+
+    /// Gradient at each fix, in percent: the least-squares slope of height against distance over
+    /// ±`halfWindow` metres of route. A fit, not a difference of smoothed heights: smoothing then
+    /// differencing read a steady 5 % climb as 2.7 % near both ends, where the windows are
+    /// one-sided (measured); a fit stays true there and still averages out height noise.
+    /// `nil` without heights, or where the window covers under 20 m (no honest slope).
+    static func grades(_ route: [RoutePoint], halfWindow: Double = 50) -> [Double?] {
+        var cumulative = [0.0]
+        for (a, b) in zip(route, route.dropFirst()) {
+            cumulative.append(cumulative[cumulative.count - 1] + WorkoutSplits.distance(from: a.coordinate, to: b.coordinate))
+        }
+        var result: [Double?] = []
+        var lo = 0, hi = 0
+        for i in route.indices {
+            while hi < route.count - 1, cumulative[hi + 1] - cumulative[i] <= halfWindow { hi += 1 }
+            while cumulative[i] - cumulative[lo] > halfWindow { lo += 1 }
+            // At least one neighbour each side: on a sparse route (a point every ~70 m) the
+            // window would otherwise hold the point alone, and nothing could be fitted.
+            let from = min(lo, max(i - 1, 0)), to = max(hi, min(i + 1, route.count - 1))
+            guard cumulative[to] - cumulative[from] >= 20 else { result.append(nil); continue }
+            var n = 0.0, sx = 0.0, sy = 0.0, sxx = 0.0, sxy = 0.0
+            for j in from...to {
+                guard let y = route[j].altitudeMeters else { continue }
+                let x = cumulative[j] - cumulative[i]
+                n += 1; sx += x; sy += y; sxx += x * x; sxy += x * y
+            }
+            let denominator = n * sxx - sx * sx
+            guard n >= 2, denominator > 0 else { result.append(nil); continue }
+            result.append((n * sxy - sx * sy) / denominator * 100)
         }
         return result
     }

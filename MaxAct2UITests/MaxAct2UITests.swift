@@ -1136,6 +1136,16 @@ final class SeededTableUITests: XCTestCase {
         let text = (legend.value as? String ?? "") + legend.label
         XCTAssertTrue(text.contains(" m"), "The legend should give heights: \(text)")
 
+        // Gradient: the slope, in percent either side of flat.
+        menu.click()
+        app.menuItems["Gradient"].click()
+        let percent = NSPredicate(format: "label CONTAINS '%' OR value CONTAINS '%'")
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "RouteColoringLegend")
+            .matching(percent).firstMatch.waitForExistence(timeout: 10),
+                      "Colouring by gradient should show slopes: \((legend.value as? String ?? "") + legend.label)")
+        menu.click()
+        app.menuItems["Elevation"].click()
+
         // Per workout: the next workout with a route is still solid.
         var steps = 0
         repeat {

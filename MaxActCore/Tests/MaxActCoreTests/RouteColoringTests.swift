@@ -96,6 +96,62 @@ import Testing
         #expect(ramped.range == RouteGradient.Range(low: 110, high: 180))
     }
 
+    // MARK: Gradient (slope)
+
+    /// 3 m/s, so `percent` % of 3 m a second.
+    static func climbing(_ percent: (Int) -> Double, count: Int = 600) -> [RoutePoint] {
+        var height = 100.0
+        var heights: [Double] = []
+        for i in 0..<count { if i > 0 { height += 3 * percent(i) / 100 }; heights.append(height) }
+        return route(count: count, altitude: { heights[$0] })
+    }
+
+    @Test func aSteadyClimbIsOneStepAboveFlat() throws {
+        let gradient = try #require(RouteGradient(.gradient, route: Self.climbing { _ in 5 }, heartRate: [], profile: nil))
+        let steps = Set(Self.steps(gradient))
+        #expect(steps.count == 1, "a steady 5 % is one colour: \(steps.sorted())")
+        #expect(steps.allSatisfy { $0 > RouteGradient.steps / 2 }, "uphill is above mid-ramp")
+        let range = try #require(gradient.range)
+        #expect(range.low == -range.high, "centred on flat")
+    }
+
+    @Test func upIsRedAndDownIsBlue() throws {
+        let gradient = try #require(RouteGradient(.gradient, route: Self.climbing { $0 < 300 ? 8 : -8 },
+                                                  heartRate: [], profile: nil))
+        let steps = Self.steps(gradient)
+        #expect(steps.first == RouteGradient.steps - 1, "climbing: \(steps)")
+        #expect(steps.last == 0, "descending: \(steps)")
+    }
+
+    @Test func flatGroundIsMidRampWithAtLeastEightPercentEachWay() throws {
+        let gradient = try #require(RouteGradient(.gradient, route: Self.climbing { _ in 0 }, heartRate: [], profile: nil))
+        #expect(Set(Self.steps(gradient)).isSubset(of: [4, 5]))
+        #expect(try #require(gradient.range).high >= 8)
+    }
+
+    /// Standing still with the height reading wandering ±2 m must not show as a steep spike:
+    /// the slope comes from the road either side, here flat.
+    @Test func heightNoiseWhileStoppedIsNoSpike() throws {
+        let route = Self.route(count: 300, speed: { $0 > 100 && $0 < 200 ? 0 : 3 },
+                               altitude: { $0 > 100 && $0 < 200 ? 10 + Double(($0 * 7919) % 5) - 2 : 10 })
+        let gradient = try #require(RouteGradient(.gradient, route: route, heartRate: [], profile: nil))
+        #expect(Set(Self.steps(gradient)).isSubset(of: [4, 5]), "\(Self.steps(gradient))")
+    }
+
+    /// A sparse route — a point every 70 m — still has a slope: the window takes the neighbours.
+    @Test func aSparseRouteStillHasAGradient() throws {
+        let route = Self.route(count: 100, speed: { _ in 70 }, altitude: { Double($0) * 3.5 })   // 5 %
+        let grades = RouteGradient.grades(route)
+        #expect(grades.allSatisfy { $0 != nil })
+        #expect(abs((grades[50] ?? 0) - 5) < 0.5, "\(String(describing: grades[50]))")
+    }
+
+    /// No slope where the whole window covers next to no ground.
+    @Test func noGroundCoveredIsGrey() throws {
+        let route = Self.route(count: 120, speed: { _ in 0.1 }, altitude: { Double($0 % 3) })
+        #expect(RouteGradient.grades(route).allSatisfy { $0 == nil })
+    }
+
     @Test func noHeartRateAtAllIsNoGradient() {
         #expect(RouteGradient(.heartRate, route: Self.route(count: 100), heartRate: [], profile: nil) == nil)
     }

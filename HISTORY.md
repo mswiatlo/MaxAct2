@@ -1200,6 +1200,12 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-26** — **37 built: gradient colouring.** Found while testing:
+  - Smoothing heights over time and then differencing read a steady 5 % climb as 2.7 % near both ends,
+    so the slope is now a least-squares fit over distance.
+  - The seeded routes, a point every ~70 m, had no slope at all in a ±50 m window, so the window
+    always takes the neighbouring fixes.
+
 - **2026-10-26** — Planned 36: a visual README, after the audits, with seeded-data screenshots only.
 
 - **2026-10-26** — **Issue 31 closed**, confirmed by the user. Full suite: 67 passed, 3 skipped.

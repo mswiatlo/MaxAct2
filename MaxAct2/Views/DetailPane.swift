@@ -395,6 +395,7 @@ struct WorkoutDetailView: View {
     private func legendValue(_ value: Double, _ coloring: RouteColoring) -> String {
         switch coloring {
         case .elevation: WorkoutFormatting.elevation(meters: value)
+        case .gradient: value.formatted(.number.precision(.fractionLength(0)).sign(strategy: .always(includingZero: false))) + "%"
         case .pace: WorkoutFormatting.paceOrSpeed(metersPerSecond: value, for: workout.kind)
         case .heartRate: WorkoutFormatting.heartRate(value)
         case .solid: ""

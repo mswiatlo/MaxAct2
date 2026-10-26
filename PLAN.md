@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** the audits — 27 (code quality), then 28 (security); then 36 (README). 24's live run waits for HAE's fix (21). The audits, 27 (code quality) then 28 (security), come last, once the app is close to finished. Issue 7 (TrainingPeaks) starts with
+**Next:** 37 awaiting check; then the audits — 27 (code quality), then 28 (security); then 36 (README). 24's live run waits for HAE's fix (21). The audits, 27 (code quality) then 28 (security), come last, once the app is close to finished. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -96,6 +96,13 @@ not the Keychain.
 **33. Say who uploaded it** *(requested 2026-10-24; built 2026-10-25, awaiting the user's check)* —
 the inspector's note for a workout found already on Strava now reads "Uploaded to Strava by another
 source." (user's wording; was "Already uploaded to Strava.").
+
+**37. Colour routes by gradient** *(requested 2026-10-26; built the same day, awaiting the user's check)*
+— a fifth choice in the map's colouring menu: the slope, in percent. It's a least-squares fit of
+height against distance over ±50 m, always including the neighbouring fixes so sparse routes work.
+Grey where the window covers under 20 m. The ramp is centred on flat (downhill blue, uphill red)
+and spans at least ±8 %, widening to the route's 98th-percentile slope either way. The legend reads
+e.g. "−12% … +12%". 6 package tests (4 mutation-checked); the colouring UI test picks it.
 
 **36. A visual README** *(requested 2026-10-26; after the audits)* — a `README.md` at the root that
 introduces MaxAct and shows its features: what it is (a Mac browser for Apple Health workouts
