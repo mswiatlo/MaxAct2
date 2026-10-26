@@ -295,6 +295,10 @@ screenshots fail with "Failed to look up screen N: Failed to match screen with d
 fail with "Failed to activate application … (current state: Running Background)". Every check before
 those steps had passed. Rerun once the screen is awake; don't chase them as test bugs.
 
+**A new app icon may not show in the Dock** *(issue 25)* when the app has run icon-less from the
+same DerivedData path before: the Dock caches it. If the built bundle has `CFBundleIconName` and
+`Assets.car`, `killall Dock` fixes it, with no project change needed.
+
 **`UpdateTargetBuildSetting` rejects some real settings as unknown**, e.g.
 `ASSETCATALOG_COMPILER_APPICON_NAME` (the target lists no `ASSETCATALOG_*` keys). That one was added
 to `project.pbxproj` by hand, with the user's explicit override (issue 25). The rule against hand-editing

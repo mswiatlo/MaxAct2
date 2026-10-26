@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed or closed known issues (1–20, 22, 23, 26, 30)
+## 2. Fixed or closed known issues (1–20, 22, 23, 25, 26, 30)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -526,6 +526,12 @@ so the hover at its centre (y 1255) landed 4 pt outside the window. Scrolling th
 test didn't move the chart. Fixed in the test: if the chart reaches below the window, drag the
 bottom edge down by the shortfall (109 pt here), then assert the chart is inside before hovering.
 The fix passed. Disabling `.chartXSelection` in the app made it fail again, so it still checks the feature.
+
+**25. ~~App icon.~~ — done 2026-10-26, confirmed by the user.** — the user's design, the full-bleed
+version (macOS masks and glazes it itself), at all ten macOS sizes in `AppIcon.appiconset`. The
+build-settings tool rejected `ASSETCATALOG_COMPILER_APPICON_NAME`, so it was added to `project.pbxproj`
+by hand with the user's explicit override. The Dock kept showing the generic icon until the Dock
+was restarted (`killall Dock`): it had cached the icon-less app at the same DerivedData path.
 
 **26. ~~Simpler "already on Strava" text.~~ — done 2026-10-23, confirmed by the user.** — the
 inspector's note for a workout found already on Strava said "Already on Strava — uploaded from
@@ -1158,6 +1164,8 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-26** — **Issue 25 closed**, confirmed by the user after `killall Dock`.
 
 - **2026-10-25** — The phone's address isn't fixed: it's 10.0.0.x at home and 192.168.x.x at
   work, per the user. Read it from HAE's Server screen each session; earlier entries quoting one

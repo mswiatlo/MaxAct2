@@ -4,7 +4,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 (HAE), with batch upload to Strava.
 
 **Status:** Phases 0–8 complete and checked by the user. Next: see §1.
-**Last updated:** 2026-10-24.
+**Last updated:** 2026-10-26.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first: the HAE data
 > contract, the Xcode tooling limits, and the Strava API facts. **`HISTORY.md`** holds how we got
@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** 25's Dock icon (see 25); then 29, 31 and 32. 24's live run waits for HAE's fix (21). The audits, 27 (code quality) then 28 (security), come last, once the app is close to finished. Issue 7 (TrainingPeaks) starts with
+**Next:** 29, 31 and 32. 24's live run waits for HAE's fix (21). The audits, 27 (code quality) then 28 (security), come last, once the app is close to finished. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -43,7 +43,7 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–20, 22, 23, 26 and 30 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–20, 22, 23, 25, 26 and 30 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
 **21. Health Auto Export bug report** *(sent by the user 2026-10-14; HAE acknowledged it and asked
@@ -83,17 +83,6 @@ window costs 0.03–0.2 s and a workout ~2.1 s, so the empty weeks add a minute 
 the re-import gets whole routes and heart rate. Then: check the phone's current address on HAE's
 Server screen and set it in MaxAct (it changes between networks), run Everything with HAE in front (about 2 hours for ~2,867 workouts by Phase 1's
 count), and check the oldest workout and the count.
-
-**25. App icon** *(requested 2026-10-15; built 2026-10-25 — not yet showing in the Dock)* — the user's
-design, full-bleed version, at all ten macOS sizes in `Assets.xcassets/AppIcon.appiconset`, wired up
-with `ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon`. The built app has `CFBundleIconName`, `AppIcon.icns`
-and `Assets.car`, and `NSWorkspace.icon(forFile:)` on it renders the icon correctly (rounded, glass), and
-Xcode shows it beside the project name. **But the user saw the generic icon in the Dock when running
-from Xcode** (2026-10-25). No code sets `applicationIconImage` or the dock tile. First suspect: the
-Dock and Launch Services icon caches, since the same bundle at the same DerivedData path ran many times
-without an icon. Next: check which app the Dock is showing (Debug build or another copy); re-register
-it (`lsregister -f`) or touch the bundle and relaunch; failing that, `killall Dock`. Measure before
-changing anything in the project.
 
 **27. Code quality audit** *(requested 2026-10-23; after 29 and 31, near the finish)* — a review pass over the app and `MaxActCore`
 after eight phases and many fixes: dead or duplicated code, oversized types and files (`AppModel`,
