@@ -262,6 +262,37 @@ import Testing
         #expect(await seriesStore.loadIfAvailable("W1") == nil, "views must degrade, not crash")
     }
 
+    /// Issue 38: a damaged blob is removed and reported, so the workout can be downloaded again
+    /// rather than counting as downloaded forever; saves are reported too, so views can reload.
+    @Test("a damaged blob is discarded and reported; a save is reported")
+    func damagedSeriesIsDiscardedAndReported() async throws {
+        let store = try makeStore()
+        let seriesStore = try makeSeriesStore()
+        let changes = Changes()
+        await seriesStore.observe { id, change in changes.append(id, change) }
+
+        try await store.upsert([ingested(workout(hasRoute: true), series: series(routePoints: 200))], seriesStore: seriesStore)
+        #expect(changes.all == ["W1 saved"])
+
+        let url = await seriesStore.fileURL(for: "W1")
+        let intact = try Data(contentsOf: url)
+        try intact.prefix(intact.count / 3).write(to: url)
+
+        #expect(await seriesStore.loadIfAvailable("W1") == nil)
+        #expect(await !seriesStore.has("W1"), "removed, so it reads as not downloaded")
+        #expect(changes.all == ["W1 saved", "W1 discardedDamaged"])
+
+        try await store.markDetailMissing("W1")
+        #expect(try #require(try await store.item(id: "W1")).hasDetail == false)
+    }
+
+    private final class Changes: @unchecked Sendable {
+        private let lock = NSLock()
+        private var list: [String] = []
+        var all: [String] { lock.withLock { list } }
+        func append(_ id: String, _ change: SeriesStore.Change) { lock.withLock { list.append("\(id) \(change)") } }
+    }
+
     @Test("the list pass does not overwrite a stored detail blob with an empty one")
     func emptySeriesDoesNotClobberDetail() async throws {
         let store = try makeStore()

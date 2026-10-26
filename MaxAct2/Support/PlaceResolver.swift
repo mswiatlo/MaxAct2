@@ -18,7 +18,7 @@ actor PlaceResolver {
 
     /// What one cell resolves to: the short label the column shows, and the parts — city,
     /// subdivision, country — that search terms are built from and that borrowing compares.
-    private struct Place {
+    struct Place {
         let label: String
         let parts: PlaceDescription?
     }
@@ -32,15 +32,21 @@ actor PlaceResolver {
     private var unresolvable: Set<String> = []
 
     /// Between network requests only; a cache hit waits for nothing.
-    private let requestInterval: Duration = .seconds(1)
+    private let requestInterval: Duration
     private var lastRequest: ContinuousClock.Instant?
 
     /// Stop after this many consecutive failures. A geocoder that has started refusing won't be
     /// talked round by continuing to ask, and a silent hour of retries is worse than stopping.
     private let failureLimit = 3
 
-    init(store: WorkoutStore) {
+    /// Tests stand in for MapKit here, and skip the throttle.
+    private let lookUpOverride: (@Sendable (Coordinate) async -> Outcome)?
+
+    init(store: WorkoutStore, requestInterval: Duration = .seconds(1),
+         lookUp: (@Sendable (Coordinate) async -> Outcome)? = nil) {
         self.store = store
+        self.requestInterval = requestInterval
+        lookUpOverride = lookUp
     }
 
     /// Resolves every workout that has a coarse start but no name yet.
@@ -50,17 +56,21 @@ actor PlaceResolver {
     @discardableResult
     func resolvePending(limit: Int? = nil) async -> Int {
         var stored = 0
+        let size = limit ?? 200
+        var offset = 0
         // Re-query between batches. A detail backfill stores routes while this is running, so
         // workouts become pending *during* the run; a single up-front fetch would leave them
         // until the next launch.
         while !Task.isCancelled {
-            let batch = (try? await store.itemsNeedingPlace(limit: limit ?? 200)) ?? []
+            let batch = (try? await store.itemsNeedingPlace(limit: size, offset: offset)) ?? []
             guard !batch.isEmpty else { break }
             let (batchStored, exhausted) = await resolve(batch)
             stored += batchStored
-            // Nothing in that batch could be stored — every entry was already known unresolvable,
-            // or the geocoder gave up. Re-querying would return the same rows for ever.
-            if batchStored == 0 || exhausted { break }
+            if exhausted || batch.count < size { break }
+            // Named rows leave the pending set; the rest stay, so step past them. Stopping at a
+            // batch with nothing named instead (issue 38) let 200 starts the geocoder can't name
+            // — a park you often start from — hide every older workout for good.
+            offset += batch.count - batchStored
         }
         // Then fill in subdivisions MapKit didn't give, from places in the same city that have
         // one. Every time, not only after new lookups: it's a cheap local pass, and it lets a
@@ -107,7 +117,7 @@ actor PlaceResolver {
         return (stored, false)
     }
 
-    private enum Outcome {
+    enum Outcome {
         case found(Place)
         case nothingThere
         case failed
@@ -127,6 +137,7 @@ actor PlaceResolver {
     /// those return the street address ("4629 Haggart St, Vancouver"), which is the whole thing
     /// the snapping exists to avoid.
     private func lookUp(_ coordinate: Coordinate) async -> Outcome {
+        if let lookUpOverride { return await lookUpOverride(coordinate) }
         guard let request = MKReverseGeocodingRequest(
             location: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
         ) else { return .nothingThere }

@@ -1214,6 +1214,13 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-26** — **38 built: the audit's bugs.** Two findings while fixing:
+  - The time-zone fix was nearly built on a wrong reading. A fixture's February date had a summer
+    offset, but `make_fixture.py` moves dates and keeps the offset, so it showed nothing. Left open
+    until measured.
+  - The place-lookup stall was real in principle. A spot the geocoder can't name, if it is the
+    start of 200 recent workouts, hid every older workout from lookup.
+
 - **2026-10-26** — **Issue 27 closed: code-quality audit.** Findings triaged into 38–43.
 
 - **2026-10-26** — **Issue 37 closed**, confirmed by the user. Full suite: 67 passed, 3 skipped.

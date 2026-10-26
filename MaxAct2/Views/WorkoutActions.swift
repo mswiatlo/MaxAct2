@@ -194,7 +194,8 @@ struct SettingsView: View {
 
         Form {
             Section {
-                TextField("iPhone address", text: $settings.host, prompt: Text("10.0.0.158"))
+                // Not a sample address: one reads as filled in (see `WelcomeSheet`).
+                TextField("iPhone address", text: $settings.host, prompt: Text("required"))
                 TextField("Bearer token", text: $settings.token)
             } header: {
                 Text("Health Auto Export")

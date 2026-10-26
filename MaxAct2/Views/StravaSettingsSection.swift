@@ -57,7 +57,8 @@ struct StravaSettingsSection: View {
                     **localhost**, then paste its client ID and secret here. Both are kept in \
                     your Keychain.
 
-                    When Strava asks, leave "Upload your activities" ticked.
+                    When Strava asks, leave "Upload your activities" and "View data about your \
+                    private activities" ticked: MaxAct needs both.
                     """)
                 .font(.callout)
                 .foregroundStyle(.secondary)

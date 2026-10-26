@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Per-sample data on disk, one compressed file per workout.
 ///
@@ -27,6 +28,25 @@ public actor SeriesStore {
     /// throwaway folder when the series do.
     public nonisolated let directory: URL
     private let fileManager = FileManager.default
+
+    /// What happened to a workout's series, for ``observe(_:)``.
+    public enum Change: Sendable {
+        /// Written: new detail, a re-download, or a route filled from Strava.
+        case saved
+        /// Found unreadable and removed, so the workout can be downloaded again.
+        case discardedDamaged
+    }
+
+    private var observer: (@Sendable (String, Change) -> Void)?
+
+    /// Told of every series written or discarded (issue 38), so anything showing one can reload
+    /// it: the inspector keyed only on the selection kept showing nothing after Download Detail.
+    /// One observer; a second call replaces the first.
+    public func observe(_ observer: @escaping @Sendable (_ workoutID: String, _ change: Change) -> Void) {
+        self.observer = observer
+    }
+
+    private static let log = Logger(subsystem: "com.swiatlowski.MaxAct", category: "store")
 
     /// - Parameter directory: defaults to
     ///   `Application Support/com.swiatlowski.MaxAct/Series`. Tests pass a temporary directory.
@@ -67,6 +87,7 @@ public actor SeriesStore {
         let target = url(for: series.workoutID)
         // Atomic, so a crash mid-write can't leave a half-file that later reads as corrupt.
         try compressed.write(to: target, options: .atomic)
+        observer?(series.workoutID, .saved)
         return fileName(for: series.workoutID)
     }
 
@@ -89,8 +110,21 @@ public actor SeriesStore {
 
     /// Non-throwing convenience for views: a missing or damaged blob degrades to "no series"
     /// rather than taking the detail pane down with it.
+    ///
+    /// A damaged blob is **removed** and reported to the observer (issue 38). Left in place it
+    /// read as "no series" while the workout still counted as downloaded, so it was never offered
+    /// for download again, and its thumbnail claimed "No route recorded". The phone still has it.
     public func loadIfAvailable(_ workoutID: String) -> WorkoutSeries? {
-        try? load(workoutID)
+        do {
+            return try load(workoutID)
+        } catch let StoreError.corrupt(_, detail) {
+            Self.log.error("Discarding the damaged series for \(workoutID, privacy: .public): \(detail, privacy: .public)")
+            try? fileManager.removeItem(at: url(for: workoutID))
+            observer?(workoutID, .discardedDamaged)
+            return nil
+        } catch {
+            return nil
+        }
     }
 
     public func delete(_ workoutID: String) throws {

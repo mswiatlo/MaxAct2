@@ -26,8 +26,8 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ## 1. Where things stand — 2026-10-24
 
-All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 374 in
-`MaxActCore` (`swift test`), 70 app and UI tests (`RunAllTests` — ask first, then leave the Mac
+All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 377 in
+`MaxActCore` (`swift test`), 73 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~15 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
 
@@ -80,22 +80,31 @@ count), and check the oldest workout and the count.
 
 **From the code-quality audit (27, 2026-10-26; agreed with the user, in this order):**
 
-**38. Bugs found by the audit** —
-- **Pace one minute fast.** `WorkoutFormatting.pace` truncates the minutes but rounds the seconds:
-  299.6 s/km displays as "4:00 /km" (measured).
-- **Inspector blank after Download Detail.** `DetailPane` reloads only when the selection changes,
-  so the map and charts stay missing until you reselect. A replaced series also shows the old route.
-- **One failed heart-rate lookup loses a good download.** A failed `get_health_metrics` call throws
-  away an otherwise good detail download (`HAEWorkoutSource.fetchDetail`).
-- **Damaged series files.** A damaged blob reads as "not found" yet keeps `hasDetail`, so it is
-  never re-offered, and its thumbnail says "No route recorded".
-- **Strava activity names use the Mac's time zone,** not the workout's.
-- **Stopping an upload marks the in-flight workout failed** instead of requeueing it (unconfirmed).
-- **Place lookup can stall** if the 200 newest unresolved workouts all fail (unconfirmed).
-- **The Strava settings note omits `activity:read_all`.**
-- **The Settings host placeholder is the user's real phone address.**
-- **Pause gap:** use 30 s for the charts, moving time and splits too, matching the coloured route
-  (the user's choice; was 60 s).
+**38. Bugs found by the audit** *(built 2026-10-26 on `audit-bugs`, awaiting the user's check)* —
+- **Pace showed a minute fast.** 299.6 s/km displayed as "4:00 /km"; it is now rounded once.
+- **The inspector reloads when its series changes.** `SeriesStore.observe` reports every save and
+  discard, and `AppModel.seriesRevisions` keys the detail load. Before, Download Detail left it blank
+  until you reselected, and a re-download kept showing the old route.
+- **A failed dense heart-rate lookup keeps the download,** with the export's heart rate, and logs it.
+- **A damaged series file is removed and logged, and the workout is offered for download again.**
+  It used to count as downloaded with nothing to show.
+- **Stopping an upload leaves the in-flight workout as it was** (was "failed: cancelled").
+- **Place lookup pages past starts it can't name.** It used to stop at a batch of 200 with nothing
+  named, so older workouts never got a place.
+- **The Strava settings note names both permissions.**
+- **No real address in the UI:** the Settings placeholder is now "required", and the help examples
+  use `192.168.1.20`.
+- **Pause gap is 30 s everywhere** (the user's choice; was 60 s for charts, moving time, splits and
+  TCX tracks).
+
+Tests: 5 package tests and 3 app tests, each mutation-checked. To check: Download Detail on a
+selected workout fills the inspector at once; paces and moving times look right.
+
+**Follow-up from 38 — Strava names and time zones.** Activity names use the Mac's time zone, so a
+morning run abroad can be named "Night Run". The fix depends on what HAE's UTC offset means, which
+is unmeasured: the recording's own zone, or the phone's zone at export. (The fixtures can't tell:
+`make_fixture.py` moves dates but keeps the offset.) Next time the phone is connected, fetch a
+winter workout. If it reads `-0800`, the offset is the recording's: store it and name by it.
 
 **39. One owner for running jobs** — Stop doesn't stop:
 - `cancelSync` marks the sync idle at once, but the task later writes "Synced N".

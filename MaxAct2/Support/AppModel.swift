@@ -219,6 +219,11 @@ final class AppModel {
 
     let store: WorkoutStore
     let seriesStore: SeriesStore
+    /// Bumped each time a workout's series is written or discarded (issue 38), so the inspector
+    /// reloads it: keyed on the selection alone, it stayed empty after Download Detail and kept
+    /// the old route after a re-download or a fill from Strava.
+    private(set) var seriesRevisions: [String: Int] = [:]
+    @ObservationIgnored private var observesSeries = false
 
     /// The heat map's route sketches (issue 15), cached beside the series they come from.
     let routeSketchCache: RouteSketchCache?
@@ -510,6 +515,7 @@ final class AppModel {
     func load() async {
         isLoading = true
         defer { isLoading = false }
+        await observeSeriesChanges()
         do {
             try await seedIfRequested()
             items = try await store.allItems()
@@ -524,6 +530,29 @@ final class AppModel {
         await repairSparseHeartRateIfNeeded()
         await markRepairsForRedownloadIfNeeded()
         await fillIncompleteRoutesIfNeeded()
+    }
+
+    private func observeSeriesChanges() async {
+        guard !observesSeries else { return }
+        observesSeries = true
+        await seriesStore.observe { [weak self] id, change in
+            Task { @MainActor in await self?.seriesChanged(id, change) }
+        }
+    }
+
+    private func seriesChanged(_ workoutID: String, _ change: SeriesStore.Change) async {
+        seriesRevisions[workoutID, default: 0] += 1
+        guard change == .discardedDamaged else { return }
+        // Damaged and removed: offer it for download again, rather than counting it as
+        // downloaded with nothing to show.
+        do {
+            try await store.markDetailMissing(workoutID)
+        } catch {
+            Self.log.error("Couldn't mark \(workoutID, privacy: .public) for re-download: \(String(describing: error), privacy: .public)")
+        }
+        await routeSketchCache?.invalidate([workoutID])
+        thumbnails.delete(workoutID: workoutID)
+        items = (try? await store.allItems()) ?? items
     }
 
     /// Once: workouts repaired before repairs were recorded go back to needing detail, so the next
@@ -877,6 +906,10 @@ final class AppModel {
                 await refreshItems()
                 return
             } catch {
+                // Stopped mid-request: not this workout's failure (issue 38; it was marked
+                // "failed: cancelled"). Left as it was — still queued, it goes back to not
+                // uploaded below; already accepted, it stays uploading and is resumed later.
+                if Task.isCancelled { break }
                 try? await store.setStravaState(.failed(reason: Self.describeUpload(error)), for: item.id)
                 index += 1
             }

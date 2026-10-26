@@ -45,6 +45,15 @@ import Testing
         #expect(secondStart.timeIntervalSince(firstEnd) > RouteQuality.pauseGapSeconds)
     }
 
+    /// Issue 38: a 45 s stop breaks the charts exactly where the coloured route turns grey.
+    @Test("charts and the coloured route agree on a short pause")
+    func chartsAndColouredRouteAgreeOnPauses() throws {
+        let points = route(seconds: 600, gapAfter: 300, gapSeconds: 45)
+        #expect(WorkoutCharts.elevation(WorkoutSeries(workoutID: "W", route: points)).count == 2)
+        let coloured = try #require(RouteGradient(.pace, route: points, heartRate: [], profile: nil))
+        #expect(coloured.runs.filter { $0.shade == .missing }.count == 1)
+    }
+
     @Test("an uninterrupted workout is a single segment")
     func noPauseNoSplit() {
         let series = WorkoutSeries(workoutID: "W", route: route(seconds: 600))

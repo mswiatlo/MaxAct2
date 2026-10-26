@@ -34,9 +34,8 @@ public enum WorkoutFormatting {
         let secondsPerKilometer = 1000 / speed
         // Beyond about 30 min/km the number stops being meaningful — that's standing still.
         guard secondsPerKilometer < 1800 else { return missing }
-        let minutes = Int(secondsPerKilometer) / 60
-        let seconds = Int(secondsPerKilometer.rounded()) % 60
-        return String(format: "%d:%02d /km", minutes, seconds)
+        // Rounded once, then split: rounding only the seconds read 299.6 s/km as "4:00".
+        return paceLabel(secondsPerKilometer: secondsPerKilometer)
     }
 
     /// A pace already expressed in seconds per kilometre, as `12:26 /km`.

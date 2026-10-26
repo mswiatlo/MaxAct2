@@ -132,6 +132,13 @@ public actor WorkoutStore {
         try modelContext.save()
     }
 
+    /// The workout's series is gone (it was damaged and discarded): offer it for download again.
+    public func markDetailMissing(_ workoutID: String) throws {
+        guard let record = try record(id: workoutID), record.hasDetail else { return }
+        record.hasDetail = false
+        try modelContext.save()
+    }
+
     private func editTags(
         of workoutIDs: [String], touching name: String, _ change: ([String]) -> [String]?
     ) throws -> [String] {
@@ -293,7 +300,7 @@ public actor WorkoutStore {
     /// Indoor workouts are excluded by having no route to snap in the first place, so there is no
     /// need to filter on `isIndoor` — and filtering on it would be wrong for an outdoor workout
     /// the watch happened to mark indoor.
-    public func itemsNeedingPlace(limit: Int? = nil) throws -> [(id: String, coordinate: Coordinate)] {
+    public func itemsNeedingPlace(limit: Int? = nil, offset: Int = 0) throws -> [(id: String, coordinate: Coordinate)] {
         let currentVersion = PlaceTerms.version
         var descriptor = FetchDescriptor<WorkoutRecord>(
             predicate: #Predicate {
@@ -303,6 +310,7 @@ public actor WorkoutStore {
         )
         descriptor.sortBy = [SortDescriptor(\.start, order: .reverse)]
         if let limit { descriptor.fetchLimit = limit }
+        descriptor.fetchOffset = offset
         return try modelContext.fetch(descriptor).compactMap { record in
             record.placeCoordinate.map { (record.id, $0) }
         }

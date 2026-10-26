@@ -51,8 +51,8 @@ public struct RouteGradient: Sendable, Equatable {
     }
 
     public static let steps = 10
-    /// A gap longer than this between fixes is a pause, drawn grey.
-    static let pauseGap: TimeInterval = 30
+    /// A gap longer than this between fixes is a pause, drawn grey — the charts' pause, too.
+    static let pauseGap = RouteQuality.pauseGapSeconds
     /// Stretches shorter than this many points are merged into the one before.
     static let minimumRunPoints = 4
 

@@ -79,6 +79,13 @@ struct WorkoutDetailView: View {
         let gradient: RouteGradient?
     }
 
+    /// What the loaded series depends on: the workout, whether it has detail, and which version.
+    private struct SeriesIdentity: Hashable {
+        let id: String
+        let hasDetail: Bool
+        let revision: Int
+    }
+
     /// What the colouring depends on: the workout, the choice, and — for zones — the profile.
     private struct ColoringIdentity: Hashable {
         let workoutID: String?
@@ -185,7 +192,10 @@ struct WorkoutDetailView: View {
             .padding(20)
         }
         .navigationTitle(workout.kind.displayName)
-        .task(id: item.id) { await load() }
+        // Not the selection alone (issue 38): Download Detail, a re-download or a route filled
+        // from Strava changes what there is to show without changing the selection.
+        .task(id: SeriesIdentity(id: item.id, hasDetail: item.hasDetail,
+                                 revision: model.seriesRevisions[item.id] ?? 0)) { await load() }
         .task(id: coloringIdentity) { await colorRoute(coloringIdentity) }
         // Separate from `load`, so the route and charts don't wait on matching. Re-run when the
         // sketches arrive, in case they were still being built when this workout was selected.

@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// The chosen ingest path: Health Auto Export's MCP server, pulled by the Mac.
 ///
@@ -16,6 +17,8 @@ public struct HAEWorkoutSource: WorkoutSource {
     public enum Aggregation: String, Sendable {
         case minutes, seconds
     }
+
+    private static let log = Logger(subsystem: "com.swiatlowski.MaxAct", category: "sync")
 
     private let client: MCPClient
     private let decoder = HAEWorkoutDecoder()
@@ -82,7 +85,18 @@ public struct HAEWorkoutSource: WorkoutSource {
         }
         // The export averaged the heart rate into a few readings (Apple Workout app recordings);
         // the metrics tool has every one. Kept only if it really is denser.
-        let dense = try await heartRate(from: found.workout.start, to: found.workout.end, recordedBy: found.workout.sourceName)
+        // An improvement on a good download, not part of it: if the lookup fails (a timeout, an
+        // older HAE without the tool, one unreadable reading), keep the export's heart rate rather
+        // than losing the route with it (issue 38). Cancelling still cancels.
+        let dense: [HeartRateSample]
+        do {
+            dense = try await heartRate(from: found.workout.start, to: found.workout.end, recordedBy: found.workout.sourceName)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            Self.log.error("Dense heart rate for \(workout.id, privacy: .public) failed; keeping the export's: \(String(describing: error), privacy: .public)")
+            return found
+        }
         guard dense.count > found.series.heartRate.count else { return found }
         return IngestedWorkout(workout: found.workout, series: found.series.replacingHeartRate(dense))
     }

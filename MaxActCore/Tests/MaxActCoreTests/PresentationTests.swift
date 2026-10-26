@@ -166,6 +166,8 @@ import Testing
         // 3.75 m/s is 13.5 km/h, or 4:27 per km.
         #expect(WorkoutFormatting.speed(metersPerSecond: 3.750324900751945) == "13.5 km/h")
         #expect(WorkoutFormatting.pace(metersPerSecond: 3.750324900751945) == "4:27 /km")
+        // Seconds that round up to the next minute carry into it.
+        #expect(WorkoutFormatting.pace(metersPerSecond: 1000 / 299.6) == "5:00 /km")
         #expect(WorkoutFormatting.paceOrSpeed(metersPerSecond: 3.75, for: .cycling).contains("km/h"))
         #expect(WorkoutFormatting.paceOrSpeed(metersPerSecond: 3.75, for: .running).contains("/km"))
     }

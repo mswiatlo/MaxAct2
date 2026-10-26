@@ -77,6 +77,18 @@ import Testing
         #expect(arguments["aggregate"] as? Bool == true)
     }
 
+    /// Issue 38: the lookup is an improvement on a good download, so its failure mustn't lose it.
+    @Test("a failed heart-rate lookup keeps the download, with the export's heart rate")
+    func failedLookupKeepsTheDownload() async throws {
+        let transport = MockTransport(responses: [.initialized, .json("{}"), Self.tools, Self.sparseWorkout,
+                                                  .json("Internal Server Error", status: 500)])
+        let source = HAEWorkoutSource(client: MCPClient(transport: transport, token: "t"))
+        try await source.connect()
+        let detail = try #require(try await source.fetchDetail(for: Self.workout))
+        #expect(detail.series.heartRate.count == 3)
+        #expect(detail.series.provenance.heartRateFromMetrics == nil)
+    }
+
     @Test("dense export heart rate costs no second query")
     func noFallback() async throws {
         let dense = (0..<360).map { index in

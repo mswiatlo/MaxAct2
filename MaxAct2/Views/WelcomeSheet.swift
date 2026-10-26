@@ -72,7 +72,7 @@ struct ConnectionFields: View {
         }
         if host.isEmpty { return "The iPhone address is still empty." }
         if MCPEndpoint(host) == nil {
-            return "That address can't be read. Try just the IP, like 10.0.0.158."
+            return "That address can't be read. Try just the IP, like 192.168.1.20."
         }
         if token.isEmpty { return "The token is still empty." }
         return nil

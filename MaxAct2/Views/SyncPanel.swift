@@ -120,7 +120,7 @@ struct SyncPanel: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("In Health Auto Export on your iPhone, open the **Server** screen and start the "
                  + "server. Copy the address and token it shows. The IP alone is enough — "
-                 + "`10.0.0.158` — but a full URL works too.")
+                 + "`192.168.1.20` — but a full URL works too.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

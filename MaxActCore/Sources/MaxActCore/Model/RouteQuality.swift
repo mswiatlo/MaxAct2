@@ -42,9 +42,11 @@ public enum RouteQuality {
     /// A gap longer than this is a pause, not a sampling interval.
     ///
     /// Not a delicate boundary: measured pauses ran 9.6 to 51.7 minutes while real sampling
-    /// dropouts were seconds. Shared by moving time, splits and chart segmentation so all three
-    /// agree on where a workout stopped.
-    public static let pauseGapSeconds: TimeInterval = 60
+    /// dropouts were seconds. Shared by moving time, splits, chart segmentation, the TCX tracks
+    /// and the coloured route, so all of them agree on where a workout stopped. 30 s, not the
+    /// earlier 60 s: the user's choice (issue 38), so the charts break where the coloured route
+    /// turns grey.
+    public static let pauseGapSeconds: TimeInterval = 30
 
     /// Whether a fix looks like a real position.
     ///
