@@ -26,15 +26,15 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ## 1. Where things stand — 2026-10-24
 
-All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 354 in
-`MaxActCore` (`swift test`), 69 app and UI tests (`RunAllTests` — ask first, then leave the Mac
+All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 368 in
+`MaxActCore` (`swift test`), 70 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~15 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
 
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** 31 awaiting check; then the audits (27, 28). 24's live run waits for HAE's fix (21). The audits, 27 (code quality) then 28 (security), come last, once the app is close to finished. Issue 7 (TrainingPeaks) starts with
+**Next:** the audits — 27 (code quality), then 28 (security). 24's live run waits for HAE's fix (21). The audits, 27 (code quality) then 28 (security), come last, once the app is close to finished. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -43,7 +43,7 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–20, 22, 23, 25, 26, 29, 30, 32, 34 and 35 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–20, 22, 23, 25, 26, 29–32, 34 and 35 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
 **21. Health Auto Export bug report** *(sent by the user 2026-10-14; HAE acknowledged it and asked
@@ -92,17 +92,6 @@ refresh), handling of untrusted input (HAE and Strava replies, stored series fil
 and file protection, entitlements and sandboxing, and that the test isolation can't reach real data.
 Output as for 27. Already found: the HAE bearer token sits in plain UserDefaults (`syncToken`, `WorkoutActions.swift`),
 not the Keychain.
-
-**31. Colour a workout's route by elevation, heart rate or pace** *(requested 2026-10-23; built
-2026-10-26, awaiting the user's check)* — a menu on the inspector map (Solid / Elevation / Heart Rate /
-Pace), per workout (`WorkoutRecord.routeColoringKey`; a re-sync keeps it), so changing one redraws
-only that workout's thumbnail. The button names the current choice, "Solid" included. Thumbnails
-follow each workout's choice; the heatmap stays solid. Elevation and pace use a blue → green → yellow → red ramp over the workout's 2nd–98th
-percentile, at least 10 m / 0.5 m/s / 10 bpm wide, and for pace faster is hotter. Heart rate uses the
-zone colours when a profile is set, otherwise the ramp. Pauses (gaps over 30 s) and missing values are
-grey. A legend under the map gives the low and high values, or the zones. The core is
-`RouteGradient` (8 tests, 4 mutation-checked). **To check:** the look on real routes (stretch
-lengths, the legend), and thumbnails redrawing when the choice changes.
 
 **33. Say who uploaded it** *(requested 2026-10-24; built 2026-10-25, awaiting the user's check)* —
 the inspector's note for a workout found already on Strava now reads "Uploaded to Strava by another

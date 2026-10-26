@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed or closed known issues (1–20, 22, 23, 25, 26, 29, 30, 32, 34, 35)
+## 2. Fixed or closed known issues (1–20, 22, 23, 25, 26, 29–32, 34, 35)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -518,6 +518,16 @@ other in order, and ranking by time. Checked on a copy: the newest commute 92 ti
 times, 3rd. Extended the next day: pointing at an attempt shows its exact date, time and
 duration, and clicking it opens that workout and scrolls the table to it (`AppModel.reveal`). If
 a search or filter hides it, the table goes back to All Workouts. Going back is issue 32.
+
+**31. ~~Colour a workout's route by elevation, heart rate or pace.~~ — done 2026-10-26, confirmed by the
+user.** — a menu on the inspector map (Solid / Elevation / Heart Rate / Pace), per workout
+(`WorkoutRecord.routeColoringKey`, kept by re-syncs), so changing one redraws only its thumbnail. The
+thumbnails follow it; the heatmap stays solid. Elevation and pace use a blue-to-red ramp over the
+workout's 2nd–98th percentile, at least 10 m / 0.5 m/s / 10 bpm wide (a flat route's 0.2 m of noise
+otherwise filled the ramp). Values are smoothed over ±10/15 s. Heart rate uses the zone colours with
+a profile set. Pauses and gaps are grey. A legend gives the low and high values, or the zones.
+`RouteGradient` has 8 tests (4 mutation-checked) plus a store test; there's a UI test for the menu,
+legend and per-workout choice.
 
 **32. ~~Back to the previous selection.~~ — done 2026-10-26, confirmed by the user.** — View ▸ Back
 (⌘[) / Forward (⌘]) and toolbar arrows, greyed out when there's nowhere to go. Only jumps
@@ -1189,6 +1199,8 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-26** — **Issue 31 closed**, confirmed by the user. Full suite: 67 passed, 3 skipped.
 
 - **2026-10-26** — 31 revised after the user's review: colouring is per workout, stored with its local
   state (a store test shows a re-sync keeps it; it fails if nothing is stored), so only that
