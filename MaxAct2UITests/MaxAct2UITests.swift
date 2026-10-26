@@ -1279,6 +1279,19 @@ final class SeededTableUITests: XCTestCase {
         }
         XCTAssertEqual(afterX, dateColumnX, accuracy: 1, "The jump scrolled the table sideways.")
 
+        // Issue 32: ⌘[ goes back to the ride the jump started from, ⌘] forward again, and the
+        // toolbar's Back does the same as the menu.
+        let newer = app.staticTexts.containing(NSPredicate(format: "value CONTAINS 'October 9, 2025'")).firstMatch
+        app.typeKey("[", modifierFlags: .command)
+        XCTAssertTrue(newer.waitForExistence(timeout: 5), "⌘[ should go back to the ride the jump started from.")
+        app.typeKey("]", modifierFlags: .command)
+        XCTAssertTrue(opened.waitForExistence(timeout: 5), "⌘] should go forward to the clicked ride again.")
+        let backButton = app.toolbars.buttons["Back"]
+        XCTAssertTrue(backButton.exists && backButton.isEnabled, "The toolbar should offer Back after a jump.")
+        backButton.click()
+        XCTAssertTrue(newer.waitForExistence(timeout: 5), "The toolbar's Back should go back too.")
+        XCTAssertFalse(backButton.isEnabled, "Nothing further back: Back should be greyed out.")
+
         // For checking by eye: back on the newest ride, the tooltip over the same point.
         table.cells.element(boundBy: 0).click()
         XCTAssertTrue(app.staticTexts["RouteHistoryCount"].waitForExistence(timeout: 10))

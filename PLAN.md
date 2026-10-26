@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** 29, 31 and 32. 24's live run waits for HAE's fix (21). The audits, 27 (code quality) then 28 (security), come last, once the app is close to finished. Issue 7 (TrainingPeaks) starts with
+**Next:** 32 awaiting check; then 29 and 31. 24's live run waits for HAE's fix (21). The audits, 27 (code quality) then 28 (security), come last, once the app is close to finished. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
@@ -68,12 +68,12 @@ incomplete-route note, despite explicit accessibility labels — check with Voic
 **Follow-up from 23:** after a detail re-download, the inspector uses the old sketch until the
 sketches are next loaded (a Statistics visit).
 
-**32. Back to the previous selection** *(requested 2026-10-24)* — now that the Same Route chart
-jumps to another workout (and the statistics' bests do too), offer a way back to what was
-selected before: a Back command (⌘[) and a toolbar button, like a browser's history. To decide:
-whether ordinary clicks in the table join the history or only jumps do, how far back it goes,
-whether Forward (⌘]) is wanted too, and what Back does if the jump also cleared a search or
-filter (restore them, or just the selection).
+**32. Back to the previous selection** *(requested 2026-10-24; built 2026-10-26, awaiting the user's
+check)* — View ▸ Back (⌘[) / Forward (⌘]) and back/forward arrows at the left of the toolbar,
+greyed out when there's nowhere to go. Decided with the user: only jumps make history (a Same Route
+point, a statistics best, later the heatmap), not table clicks; Back restores the search and
+filter a jump cleared; Forward too. The history is in `AppModel` (`reveal`, `goBack`, `goForward`),
+capped at 50 places. The statistics bests now jump through `reveal` as well.
 
 **24. "Everything" should mean everything** *(requested 2026-10-15; built 2026-10-25; live run deferred)* —
 "Everything" (was "Everything (7 years)") now syncs weekly, newest first, back to 2000. Health

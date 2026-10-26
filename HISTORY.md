@@ -1165,6 +1165,11 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-26** — **Issue 32 built: Back and Forward.** It retraces jumps only, restores the view a
+  jump changed, and has a menu, shortcuts and toolbar arrows (all choices the user's). 5 app tests (one
+  mutation-checked: without restoring the view, the filter and search stay cleared). The Same Route
+  jump UI test now also checks ⌘[, ⌘] and the toolbar Back.
+
 - **2026-10-26** — **Issue 25 closed**, confirmed by the user after `killall Dock`.
 
 - **2026-10-25** — The phone's address isn't fixed: it's 10.0.0.x at home and 192.168.x.x at

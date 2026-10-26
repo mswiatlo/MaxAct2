@@ -391,14 +391,65 @@ final class AppModel {
     /// elsewhere, like the Same Route chart. If the current search or filter hides it, the table
     /// goes back to All Workouts first: the inspector only shows workouts the table lists.
     func reveal(_ workoutID: String) {
-        guard items.contains(where: { $0.id == workoutID }) else { return }
+        guard items.contains(where: { $0.id == workoutID }), selection != [workoutID] else { return }
+        backStack.append(currentPlace)
+        if backStack.count > Self.historyLimit { backStack.removeFirst() }
+        forwardStack.removeAll()
         if !visibleItems.contains(where: { $0.id == workoutID }) {
             searchText = ""
             sidebarSelection = .filter(.all)
         }
-        selection = [workoutID]
+        show([workoutID])
+    }
+
+    // MARK: Back and Forward (issue 32)
+
+    /// Where the user was before a jump: the selection and the view it was seen in. Restoring
+    /// the view too means Back undoes a jump that had to clear a search or filter.
+    struct Place: Equatable {
+        let selection: Set<String>
+        let sidebarSelection: SidebarSelection?
+        let searchText: String
+    }
+
+    /// Places left by jumps (`reveal`), newest last. Only jumps add to it — clicking around the
+    /// table doesn't — so Back always returns to where a jump started (decided with the user).
+    private(set) var backStack: [Place] = []
+    private(set) var forwardStack: [Place] = []
+    private static let historyLimit = 50
+
+    var canGoBack: Bool { !backStack.isEmpty }
+    var canGoForward: Bool { !forwardStack.isEmpty }
+
+    func goBack() {
+        guard let place = backStack.popLast() else { return }
+        forwardStack.append(currentPlace)
+        restore(place)
+    }
+
+    func goForward() {
+        guard let place = forwardStack.popLast() else { return }
+        backStack.append(currentPlace)
+        restore(place)
+    }
+
+    private var currentPlace: Place {
+        Place(selection: selection, sidebarSelection: sidebarSelection, searchText: searchText)
+    }
+
+    private func restore(_ place: Place) {
+        sidebarSelection = place.sidebarSelection
+        searchText = place.searchText
+        // Workouts deleted since are simply dropped.
+        show(place.selection.filter { id in items.contains { $0.id == id } })
+    }
+
+    /// Selects `ids`, opens the inspector, and scrolls the table to a single selection.
+    private func show(_ ids: Set<String>) {
+        selection = ids
+        guard let only = ids.first, ids.count == 1 else { return }
         showsDetail = true
-        revealRequest = RevealRequest(workoutID: workoutID, serial: (revealRequest?.serial ?? 0) + 1)
+        revealRequest = RevealRequest(workoutID: only, serial: (revealRequest?.serial ?? 0) + 1)
     }
 
     var selectedItems: [WorkoutListItem] {

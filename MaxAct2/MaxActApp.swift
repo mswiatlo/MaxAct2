@@ -172,6 +172,7 @@ struct MaxActApp: App {
             // View ▸ Show/Hide Inspector with its standard shortcut. The detail pane starts
             // hidden, so there has to be a way to open it that isn't "select something".
             InspectorToggleCommand(model: model)
+            BackForwardCommands(model: model)
             // Replaces the system Help item, which only says help isn't available.
             CommandGroup(replacing: .help) {
                 Button("Getting Started with MaxAct…") { model.isWelcomePresented = true }
@@ -199,6 +200,23 @@ struct InspectorToggleCommand: Commands {
                 model.showsDetail.toggle()
             }
             .keyboardShortcut("i", modifiers: [.control, .command])
+        }
+    }
+}
+
+/// View ▸ Back / Forward, ⌘[ and ⌘] (issue 32): retrace jumps between workouts — from a Same
+/// Route point or a statistics best — the way a browser retraces links.
+struct BackForwardCommands: Commands {
+    @Bindable var model: AppModel
+
+    var body: some Commands {
+        CommandGroup(after: .sidebar) {
+            Button("Back") { model.goBack() }
+                .keyboardShortcut("[", modifiers: .command)
+                .disabled(!model.canGoBack)
+            Button("Forward") { model.goForward() }
+                .keyboardShortcut("]", modifiers: .command)
+                .disabled(!model.canGoForward)
         }
     }
 }

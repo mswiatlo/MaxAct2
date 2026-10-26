@@ -189,6 +189,16 @@ struct ContentView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
+        // Back and Forward through jumps (issue 32), where a browser and Finder put theirs.
+        ToolbarItemGroup(placement: .navigation) {
+            Button { model.goBack() } label: { Label("Back", systemImage: "chevron.backward") }
+                .help("Back to the workout before the last jump")
+                .disabled(!model.canGoBack)
+            Button { model.goForward() } label: { Label("Forward", systemImage: "chevron.forward") }
+                .help("Forward again")
+                .disabled(!model.canGoForward)
+        }
+
         ToolbarItemGroup {
             WorkoutActions(model: model, ids: model.selection)
                 .labelStyle(.iconOnly)

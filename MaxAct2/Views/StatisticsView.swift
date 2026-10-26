@@ -59,8 +59,8 @@ struct StatisticsView: View {
                                         now: now, calendar: calendar)
                     ConsistencySection(workouts: workouts, now: now, calendar: calendar)
                     BestsSection(workouts: workouts, kinds: model.presentKinds.map(\.kind)) { best, _ in
-                        model.selection = [best.workoutID]
-                        model.showsDetail = true
+                        // A jump, so Back returns here (issue 32).
+                        model.reveal(best.workoutID)
                     }
                     // Last, these two: their data arrives late (read from the series on first visit),
                     // so nothing below can shift when it does. Both reserve their height meanwhile.
