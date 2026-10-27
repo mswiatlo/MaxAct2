@@ -104,6 +104,13 @@ winter workout. If it reads `-0800`, the offset is the recording's: store it and
 
 **From the security audit (28, 2026-10-27; agreed with the user, in this order):**
 
+**Follow-up from 44 — the first table rebuild costs ~2 s.** Replacing the table that has been on
+screen since launch takes about 2 s wherever it happens: the first search keystroke now (2.3 s, two
+runs), or a later big insertion if recorded at load (1.9 s). A table built during the search
+replaces in about 0.5 s. Unexplained. Next ideas: whether `Table` builds row views for every row
+(Instruments, SwiftUI template), and what tearing one down costs. It's once per session, against
+6.5 s on every growth before 44.
+
 **45. Validate input from the phone** *(built 2026-10-27 on `input-validation`, awaiting the full UI
 run; nothing visible changes)* — `InputLimits` (new) holds the rules:
 - **Fails the workout** (reported like any unreadable one):

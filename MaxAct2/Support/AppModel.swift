@@ -26,11 +26,13 @@ final class AppModel {
     var sidebarSelection: SidebarSelection? = .filter(.all) {
         didSet {
             settings.sidebarSelectionKey = sidebarSelection?.storageKey
-            noteRowChange()
+            // Only a real change: the sidebar list writes back the value it holds, and a rebuild
+            // then lost the table's scroll (issue 44).
+            if sidebarSelection != oldValue { noteRowChange() }
         }
     }
     var searchText = "" {
-        didSet { noteRowChange() }
+        didSet { if searchText != oldValue { noteRowChange() } }   // as above
     }
     var selection: Set<String> = []
     var sortOrder: [KeyPathComparator<WorkoutListItem>] = TableSort.default {
@@ -398,9 +400,10 @@ final class AppModel {
     /// drawing, the old table still took the insertions first (1.8 s against ~0.6 s, measured).
     private func noteRowChange() {
         let ids = Set(visibleItems.map(\.id))
-        // Starts empty, so the first search or sidebar change also builds the table afresh. That
-        // looks wasteful, but measured: without it, deleting "California" back to "Ca" took 1.8 s
-        // (three runs); with it, 0.5 s (two runs).
+        // Starts empty, so the first real search or sidebar change builds the table afresh.
+        // Measured: replacing the table that has been on screen since launch costs ~2 s wherever
+        // it happens (the first keystroke, or a later big insertion); replacing one built during
+        // the search costs ~0.5 s. Unexplained; see PLAN.md.
         if ids.subtracting(shownRowIDs).count > Self.rebuildAbove { tableIdentity += 1 }
         shownRowIDs = ids
     }

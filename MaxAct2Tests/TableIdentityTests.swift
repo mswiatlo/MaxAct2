@@ -13,7 +13,15 @@ import Testing
         let model = AppModel.inMemoryFallback(settings: AppSettings(defaults: defaults), seedCount: 40,
                                               resolvesPlaces: false, stravaSecrets: InMemorySecretStore())
         await model.load()
-        model.searchText = ""   // the rows on screen: all 40
+        // A control writing back the value it already holds — the sidebar list as it collapses,
+        // the search field on focus — changes nothing, so mustn't rebuild the table and lose its
+        // scroll (seen in the attempt-jump UI test, 2026-10-27).
+        let initial = model.tableIdentity
+        model.searchText = ""
+        model.sidebarSelection = model.sidebarSelection
+        #expect(model.tableIdentity == initial)
+
+        model.searchText = "x"; model.searchText = ""   // the rows on screen: all 40
         let start = model.tableIdentity
 
         model.searchText = "Hiking"          // 40 → 6: rows leave, none arrive

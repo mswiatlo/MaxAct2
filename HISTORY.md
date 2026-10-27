@@ -1377,6 +1377,12 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-27** — **44 corrected.** The attempt-jump UI test failed twice. Its trace showed the
+  row scrolled away after the jump: a same-value write from the sidebar list or the search field
+  rebuilt the table. `searchText` and `sidebarSelection` now act only on real changes, with a unit
+  test that failed first. That moved the one-time cost of replacing the launch table (~2 s) to the
+  first search keystroke. Recorded as a follow-up.
+
 - **2026-10-27** — **46 built: Disconnect revokes at Strava.** Unverified live, by design: testing it disconnects the user's real account.
 
 - **2026-10-27** — **45 built: input validation.** Measured first: `appending(path: "../../x")`

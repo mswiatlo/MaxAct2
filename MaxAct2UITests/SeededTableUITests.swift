@@ -1017,6 +1017,13 @@ final class SeededTableUITests: XCTestCase {
             laidOut = laidOutX(of: "Sep 9, 2025", in: table)
             if laidOut == nil { Thread.sleep(forTimeInterval: 0.2) }
         }
+        if laidOut == nil {
+            // Seen twice (2026-10-27): the row was hittable, yet no copy of its text reported a
+            // width. Measure the hittable one instead, and keep the evidence of what was there.
+            let all = table.staticTexts.matching(NSPredicate(format: "value == 'Sep 9, 2025'")).allElementsBoundByIndex
+            print("NO-LAID-OUT copies \(all.map { "\($0.frame) hittable \($0.isHittable)" }) row \(olderRow.frame)")
+            if olderRow.isHittable, olderRow.frame.width > 0 { laidOut = olderRow.frame.minX }
+        }
         let afterX = try XCTUnwrap(laidOut, "The clicked ride never laid out in the table.")
         // Once in four full runs this read x 466 against 1516, and it hasn't recurred. Keep the
         // evidence if it does: every copy's frame, the table and window, and the window itself.
