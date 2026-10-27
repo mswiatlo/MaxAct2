@@ -77,7 +77,6 @@ import Testing
         try await store.upsert([ingested(workout())])
         try await store.setStravaState(.uploaded, activityID: 998877, for: "W1")
         try await store.setPlace(label: "Vancouver, BC", for: "W1")
-        try await store.setThumbnailFileName("W1.png", for: "W1")
 
         // A later sync brings the same workout back with slightly different imported numbers.
         try await store.upsert([ingested(workout(distance: 10_500, energy: 260))])
@@ -86,7 +85,6 @@ import Testing
         #expect(item.stravaState == .uploaded)
         #expect(item.stravaActivityID == 998877)
         #expect(item.placeLabel == "Vancouver, BC")
-        #expect(item.thumbnailFileName == "W1.png")
         // …while the imported side did update.
         #expect(item.workout.distanceMeters == 10_500)
     }
@@ -372,18 +370,6 @@ import Testing
         try await store.setStravaState(.uploaded, for: "W1")  // no id supplied
 
         #expect(try #require(try await store.item(id: "W1")).stravaActivityID == 123)
-    }
-
-    @Test("the detail backlog lists only workouts without stored series")
-    func detailBacklog() async throws {
-        let store = try makeStore()
-        let seriesStore = try makeSeriesStore()
-        try await store.upsert([
-            ingested(workout(id: "withDetail", hasRoute: true), series: series(id: "withDetail")),
-            ingested(workout(id: "without")),
-        ], seriesStore: seriesStore)
-
-        #expect(try await store.itemsNeedingDetail().map(\.id) == ["without"])
     }
 
     // MARK: - Round-tripping enums

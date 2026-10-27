@@ -93,9 +93,7 @@ struct SyncPanel: View {
     @State private var backfillScope: AppModel.BackfillScope = .everything
 
     var body: some View {
-        @Bindable var settings = model.settings
-
-        return VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 14) {
             Text("Sync from iPhone")
                 .font(.headline)
 

@@ -28,6 +28,14 @@ struct MaxActApp: App {
     /// Either kind of test: run against throwaway stores, in memory, never the user's.
     static var isIsolatedForTesting: Bool { isUITesting || isHostingUnitTests }
 
+    /// Whether a first launch shows the welcome sheet by itself. Not under UI tests — every test
+    /// launches with fresh settings, and a sheet over the window would block them all — unless a
+    /// test asks for it with `--ui-testing-welcome`.
+    static var showsWelcomeOnFirstLaunch: Bool {
+        let arguments = ProcessInfo.processInfo.arguments
+        return !arguments.contains("--ui-testing") || arguments.contains("--ui-testing-welcome")
+    }
+
     /// `--ui-testing-seed=<n>` plants n synthetic workouts in the in-memory store. Only honoured
     /// alongside `--ui-testing`, so it can never touch the real database.
     ///
@@ -39,14 +47,6 @@ struct MaxActApp: App {
     /// as a file to open, and that request — for a document this app can't open, in an app with no
     /// `DocumentGroup` — suppresses `WindowGroup`'s window. `App.body` runs; its content closure
     /// never does. Joining the value into one token leaves nothing stray.
-    /// Whether a first launch shows the welcome sheet by itself. Not under UI tests — every test
-    /// launches with fresh settings, and a sheet over the window would block them all — unless a
-    /// test asks for it with `--ui-testing-welcome`.
-    static var showsWelcomeOnFirstLaunch: Bool {
-        let arguments = ProcessInfo.processInfo.arguments
-        return !arguments.contains("--ui-testing") || arguments.contains("--ui-testing-welcome")
-    }
-
     static var uiTestingSeedCount: Int? {
         let prefix = "--ui-testing-seed="
         guard let argument = ProcessInfo.processInfo.arguments
@@ -160,8 +160,8 @@ struct MaxActApp: App {
         }
         // Sized to hold the table and no more. Measured, not estimated: with the inspector closed
         // the table settles at the sum of its column *minimums*, 824pt including the fixed Route
-        // column, and the sidebar takes 223pt. 1,090 leaves ~40pt for the table's own inset and
-        // the scroller gutter without leaving a band of empty space to the right.
+        // column, and the sidebar takes 223pt — but the table's insets add ~185pt more, so the
+        // width is 1,300, measured (see the content's ideal width above).
         //
         // The inspector is deliberately not counted, because it starts closed — opening it widens
         // the window rather than squeezing the list.

@@ -87,14 +87,15 @@ import Testing
         try await seriesStore.save(WorkoutSeries(workoutID: "INDOOR"))
 
         let first = try RouteSketchCache(directory: root)
-        let built = await first.sketches(for: ["A", "INDOOR", "NOT-DOWNLOADED"], seriesStore: seriesStore)
+        let built = await first.digests(for: ["A", "INDOOR", "NOT-DOWNLOADED"], seriesStore: seriesStore).compactMap(\.sketch)
         #expect(built.map(\.workoutID) == ["A"])
 
         // With the series gone, a fresh cache (as after relaunch) still has the sketch.
         try await seriesStore.delete("A")
         let second = try RouteSketchCache(directory: root)
         let calls = Counter()
-        let reloaded = await second.sketches(for: ["A", "INDOOR"], seriesStore: seriesStore) { _, _ in await calls.bump() }
+        let reloaded = await second.digests(for: ["A", "INDOOR"], seriesStore: seriesStore) { _, _ in await calls.bump() }
+            .compactMap(\.sketch)
         #expect(reloaded.map(\.workoutID) == ["A"])
         #expect(await calls.value == 0, "nothing should have needed building")
         // The indoor workout has a digest — heart rate, no sketch.

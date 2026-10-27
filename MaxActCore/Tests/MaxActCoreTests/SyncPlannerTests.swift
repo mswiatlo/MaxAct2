@@ -63,47 +63,4 @@ import Testing
     }
 
     // MARK: - Frontier
-
-    @Test("resume skips completed windows and keeps the rest in order")
-    func frontierSkipsCompleted() throws {
-        let start = try date("2026-01-01T00:00:00Z")
-        let windows = SyncPlanner.windows(from: start, to: start.addingTimeInterval(28 * day))
-        var frontier = SyncFrontier()
-        frontier.markListed(windows[0])
-        frontier.markListed(windows[2])
-
-        let pending = frontier.pending(windows)
-        #expect(pending == [windows[1], windows[3]])
-        #expect(abs(frontier.progress(over: windows) - 0.5) < 1e-9)
-    }
-
-    @Test("a frontier round-trips through Codable, so it can be persisted in Phase 3")
-    func frontierIsCodable() throws {
-        let start = try date("2026-01-01T00:00:00Z")
-        var frontier = SyncFrontier()
-        frontier.markListed(SyncWindow(start: start, end: start.addingTimeInterval(7 * day)))
-        frontier.markDetailFetched("WORKOUT-1")
-
-        let restored = try JSONDecoder().decode(
-            SyncFrontier.self, from: try JSONEncoder().encode(frontier)
-        )
-        #expect(restored == frontier)
-        #expect(restored.needsDetail("WORKOUT-1") == false)
-        #expect(restored.needsDetail("WORKOUT-2"))
-    }
-
-    @Test("re-listing a window is harmless, which is what makes resume safe")
-    func markingIsIdempotent() throws {
-        let start = try date("2026-01-01T00:00:00Z")
-        let window = SyncWindow(start: start, end: start.addingTimeInterval(7 * day))
-        var frontier = SyncFrontier()
-        frontier.markListed(window)
-        frontier.markListed(window)
-        #expect(frontier.completedWindows.count == 1)
-    }
-
-    @Test("progress over an empty plan is complete, not a division by zero")
-    func emptyPlanProgress() {
-        #expect(SyncFrontier().progress(over: []) == 1)
-    }
 }

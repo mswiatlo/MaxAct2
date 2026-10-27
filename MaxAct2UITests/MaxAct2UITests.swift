@@ -25,9 +25,10 @@ extension XCTestCase {
     /// Also isolates the app's data: `--ui-testing` swaps in a throwaway defaults domain,
     /// in-memory database and separate Keychain service. These tests type into the connection
     /// fields, and without it a test run once overwrote the user's real token.
-    @MainActor
+    ///
     /// `defaults` become `-key value` pairs, placed *before* `--ui-testing`: after it, AppKit pairs
     /// `-ui-testing` with the next token and the stray value is opened as a document — no window.
+    @MainActor
     func launchMaxAct(seed: Int? = nil, defaults: KeyValuePairs<String, String> = [:],
                       extraArguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication(bundleIdentifier: "com.swiatlowski.MaxAct")
@@ -59,9 +60,9 @@ extension XCTestCase {
 /// writable through the available tooling. The scheme's build action builds the app for testing,
 /// so the bundle is present by the time this runs.
 ///
-/// These run against whatever is in the real database, so they assert on structure that holds
-/// either way rather than on specific rows. Phase 8 adds a seeded multi-select and batch-action
-/// test once there's a way to launch with fixture data.
+/// These launch with an empty, in-memory library (`--ui-testing`), so they cover the app's chrome:
+/// menus, the sync panel, settings and the welcome sheet. Tests that need workouts are in
+/// `SeededTableUITests`.
 final class MaxAct2UITests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false

@@ -681,8 +681,6 @@ extension PersonalBest {
     }
 }
 
-// MARK: - A workout from the statistics
-
 // MARK: - The inspector over the statistics
 
 /// The statistics with the workout inspector drawn **over** their trailing edge, not beside them as

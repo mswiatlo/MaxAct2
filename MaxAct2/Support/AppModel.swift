@@ -101,7 +101,7 @@ final class AppModel {
     static let minimumWidth: CGFloat = 1040
 
     /// The window's minimum for what's on screen now. The inspector is never shown beside the
-    /// statistics (see `ContentView.inspectorPresented`), so only the list needs the extra room.
+    /// statistics (see `ContentView.systemInspectorPresented`), so only the list needs the extra room.
     var minimumWindowWidth: CGFloat {
         showsDetail && sidebarSelection != .statistics ? Self.minimumWidthWithInspector : Self.minimumWidth
     }
@@ -214,7 +214,6 @@ final class AppModel {
         placeResolver = PlaceResolver(store: store)
     }
 
-    /// Used when the on-disk stores can't be opened. Everything works; nothing persists.
     /// A model over a **copy** of a real library, for UI tests that need real content — how long
     /// real place names are, how wide real numbers run — without touching the real one.
     ///
@@ -239,6 +238,8 @@ final class AppModel {
         )
     }
 
+    /// Used when the on-disk stores can't be opened, and by tests. Everything works; nothing
+    /// persists.
     static func inMemoryFallback(
         settings: AppSettings, seedCount: Int? = nil, resolvesPlaces: Bool = true,
         stravaSecrets: any AppSecretStore = KeychainSecretStore()

@@ -47,7 +47,7 @@ extension AppModel {
                     Self.log.error("Couldn't clear sent tag edits for \(entry.workoutID, privacy: .public): \(String(describing: error), privacy: .public)")
                 }
             } catch {
-                return "Couldn't update tags on Strava: \(Self.describeUpload(error)). "
+                return "Couldn't update tags on Strava: \(Self.describeStravaError(error)). "
                     + "They'll be sent again with the next check or upload."
             }
         }
@@ -138,7 +138,7 @@ extension AppModel {
             } catch let error as StravaError {
                 return .failed(error.description)
             } catch {
-                return .failed(Self.describeUpload(error))
+                return .failed(Self.describeStravaError(error))
             }
         }
     }
@@ -264,7 +264,7 @@ extension AppModel {
                 // "failed: cancelled"). Left as it was — still queued, it goes back to not
                 // uploaded below; already accepted, it stays uploading and is resumed later.
                 if Task.isCancelled { break }
-                await recordStravaState(.failed(reason: Self.describeUpload(error)), for: item.id)
+                await recordStravaState(.failed(reason: Self.describeStravaError(error)), for: item.id)
                 index += 1
             }
             await refreshItems()
@@ -390,7 +390,7 @@ extension AppModel {
         }
     }
 
-    static func describeUpload(_ error: any Error) -> String {
+    static func describeStravaError(_ error: any Error) -> String {
         if let strava = error as? StravaError { return strava.description }
         if let url = error as? URLError {
             return url.code == .notConnectedToInternet ? "No internet connection" : url.localizedDescription
@@ -413,7 +413,7 @@ extension AppModel {
             if filled > 0 { items = (try? await store.allItems()) ?? items }
         } catch {
             // Tried again next launch; said now, since a route stays incomplete until it works.
-            reportQuietly("Couldn't fill incomplete routes from Strava: \(Self.describeUpload(error)). "
+            reportQuietly("Couldn't fill incomplete routes from Strava: \(Self.describeStravaError(error)). "
                           + "MaxAct will try again next time it opens.")
         }
     }

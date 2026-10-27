@@ -76,9 +76,10 @@ public actor WorkoutStore {
 
     // MARK: - Reads
 
-    public func allItems(newestFirst: Bool = true) throws -> [WorkoutListItem] {
+    /// Every workout, newest first — how the table opens.
+    public func allItems() throws -> [WorkoutListItem] {
         var descriptor = FetchDescriptor<WorkoutRecord>()
-        descriptor.sortBy = [SortDescriptor(\.start, order: newestFirst ? .reverse : .forward)]
+        descriptor.sortBy = [SortDescriptor(\.start, order: .reverse)]
         return try modelContext.fetch(descriptor).map(WorkoutListItem.init(record:))
     }
 
@@ -279,17 +280,6 @@ public actor WorkoutStore {
         }
     }
 
-    /// Workouts whose detail has not been fetched, oldest-listed first — the backlog for the lazy
-    /// second pass.
-    public func itemsNeedingDetail(limit: Int? = nil) throws -> [WorkoutListItem] {
-        var descriptor = FetchDescriptor<WorkoutRecord>(
-            predicate: #Predicate { $0.hasDetail == false }
-        )
-        descriptor.sortBy = [SortDescriptor(\.start, order: .reverse)]
-        if let limit { descriptor.fetchLimit = limit }
-        return try modelContext.fetch(descriptor).map(WorkoutListItem.init(record:))
-    }
-
     /// Workouts with a coarse start whose place still needs resolving, newest first.
     ///
     /// That means **either** no name yet **or** search terms built by an older
@@ -425,12 +415,6 @@ public actor WorkoutStore {
         try modelContext.save()
     }
 
-    public func setThumbnailFileName(_ name: String?, for workoutID: String) throws {
-        guard let record = try record(id: workoutID) else { return }
-        record.thumbnailFileName = name
-        try modelContext.save()
-    }
-
     /// Marks workouts whose stored heart rate is too sparse (``WorkoutSeries/heartRateIsSparse``)
     /// as needing detail again, so the next detail download re-fetches them — now with the dense
     /// heart rate. Only workouts that had a heart rate at all (an average in the summary); the rest
@@ -503,12 +487,6 @@ public actor WorkoutStore {
         for record in records { modelContext.delete(record) }
         try modelContext.save()
         return records.count
-    }
-
-    public func delete(id: String) throws {
-        guard let record = try record(id: id) else { return }
-        modelContext.delete(record)
-        try modelContext.save()
     }
 
     private func record(id: String) throws -> WorkoutRecord? {

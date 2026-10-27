@@ -155,8 +155,7 @@ public enum SampleData {
                 return IngestedWorkout(workout: workout, series: WorkoutSeries(workoutID: workout.id))
             }
             // A workout arriving *with* a route reports it, as a real detail fetch would.
-            var withRoute = workout
-            withRoute = Workout(
+            let withRoute = Workout(
                 id: workout.id, kind: workout.kind, start: workout.start, end: workout.end,
                 duration: workout.duration, distanceMeters: workout.distanceMeters,
                 activeEnergyKilocalories: workout.activeEnergyKilocalories,

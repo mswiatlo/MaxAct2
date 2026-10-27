@@ -10,9 +10,9 @@ import SwiftData
 /// Fields divide into two kinds, and the distinction is the whole point of ``WorkoutStore/upsert``:
 ///
 /// * **Imported** — from Health Auto Export. Overwritten freely on every re-sync.
-/// * **Local** — `stravaState`, `stravaActivityID`, `stravaUploadID`, `lastUploadedAt`,
-///   `placeLabel`, `thumbnailFileName`, `hasDetail`, `tagNames`. Earned by this app and never derivable from
-///   a payload, so a re-sync must not clobber them. Losing `stravaActivityID` in particular would
+/// * **Local** — `stravaState`, `stravaActivityID`, `stravaUploadID`, `lastUploadedAt`, the place
+///   fields, `hasDetail`, `tagNames`, `stravaFlagsPending`, `routeColoringKey`. Earned by this app
+///   and never derivable from a payload, so a re-sync must not clobber them. Losing `stravaActivityID` in particular would
 ///   mean re-uploading a workout that is already on Strava.
 @Model
 public final class WorkoutRecord {
@@ -85,6 +85,8 @@ public final class WorkoutRecord {
     /// instead of re-uploading.
     public var stravaUploadID: Int?
     public var lastUploadedAt: Date?
+    /// Unused: thumbnails are keyed by workout id. Kept only so the store's schema doesn't change
+    /// under the user's library.
     public var thumbnailFileName: String?
     /// Whether the second-resolution series with routes has been fetched. Distinct from
     /// `hasRoute`, which only says the workout *has* a route to fetch.
@@ -235,7 +237,6 @@ public struct WorkoutListItem: Identifiable, Hashable, Sendable {
     public let stravaState: StravaState
     public let stravaActivityID: Int?
     public let hasDetail: Bool
-    public let thumbnailFileName: String?
     public let routeColoring: RouteColoring
 
     public var id: String { workout.id }
@@ -249,7 +250,6 @@ public struct WorkoutListItem: Identifiable, Hashable, Sendable {
         stravaState = record.stravaState
         stravaActivityID = record.stravaActivityID
         hasDetail = record.hasDetail
-        thumbnailFileName = record.thumbnailFileName
         routeColoring = RouteColoring(storageKey: record.routeColoringKey)
     }
 }

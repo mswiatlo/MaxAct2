@@ -164,11 +164,6 @@ public actor StravaClient {
         )
     }
 
-    /// Sets the sport, which the upload itself can't: the TCX format only knows three.
-    public func updateActivity(id: Int, sportType: String) async throws {
-        try await updateActivity(id: id, StravaActivityUpdate(sportType: sportType))
-    }
-
     /// An activity's current `workout_type`, or `nil` if it has none — one read request. Needed
     /// before clearing a race, so a Long Run or Workout set on Strava isn't reset to default.
     public func workoutType(ofActivity id: Int) async throws -> Int? {

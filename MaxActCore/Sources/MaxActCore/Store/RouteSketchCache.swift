@@ -62,14 +62,6 @@ public actor RouteSketchCache {
         return workoutIDs.compactMap { digests[$0] }
     }
 
-    /// Just the route sketches, for workouts that have one.
-    public func sketches(
-        for workoutIDs: [String], seriesStore: SeriesStore,
-        progress: @Sendable (Int, Int) async -> Void = { _, _ in }
-    ) async -> [RouteSketch] {
-        await digests(for: workoutIDs, seriesStore: seriesStore, progress: progress).compactMap(\.sketch)
-    }
-
     /// Forget these workouts' digests — for when their series has been downloaded again.
     public func invalidate(_ workoutIDs: some Sequence<String>) {
         loadIfNeeded()

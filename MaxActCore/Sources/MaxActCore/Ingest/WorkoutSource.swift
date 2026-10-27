@@ -65,8 +65,6 @@ public enum SyncPlanner {
         return windows
     }
 
-    /// Newest first. A multi-year backfill should surface recent workouts immediately rather than
-    /// starting seven years ago and showing nothing useful for an hour.
     /// One calendar month, in `calendar`'s time zone, for importing a specific month (issue 17).
     /// Ends at `now` for the month in progress; `nil` for a month that hasn't started.
     public static func month(_ month: Int, of year: Int, calendar: Calendar, now: Date = .now) -> DateInterval? {
@@ -77,48 +75,13 @@ public enum SyncPlanner {
         return DateInterval(start: interval.start, end: min(interval.end, now))
     }
 
+    /// Newest first. A multi-year backfill should surface recent workouts immediately rather than
+    /// starting seven years ago and showing nothing useful for an hour.
     public static func windowsNewestFirst(
         from start: Date,
         to end: Date,
         chunk: TimeInterval = 7 * 24 * 3600
     ) -> [SyncWindow] {
         windows(from: start, to: end, chunk: chunk).reversed()
-    }
-}
-
-/// Which windows have been listed and which workouts have detail — the resumable part of sync.
-///
-/// Pure value logic here; Phase 3 persists it. Resume is possible at all because MCP requests are
-/// independent date windows with no server-side cursor, and because upsert is keyed on the stable
-/// workout UUID, so re-listing a partially-completed window is idempotent rather than duplicating.
-public struct SyncFrontier: Sendable, Codable, Equatable {
-    public private(set) var completedWindows: Set<SyncWindow>
-    public private(set) var workoutsWithDetail: Set<String>
-
-    public init(completedWindows: Set<SyncWindow> = [], workoutsWithDetail: Set<String> = []) {
-        self.completedWindows = completedWindows
-        self.workoutsWithDetail = workoutsWithDetail
-    }
-
-    public func pending(_ windows: [SyncWindow]) -> [SyncWindow] {
-        windows.filter { !completedWindows.contains($0) }
-    }
-
-    public mutating func markListed(_ window: SyncWindow) {
-        completedWindows.insert(window)
-    }
-
-    public mutating func markDetailFetched(_ workoutID: String) {
-        workoutsWithDetail.insert(workoutID)
-    }
-
-    public func needsDetail(_ workoutID: String) -> Bool {
-        !workoutsWithDetail.contains(workoutID)
-    }
-
-    /// Fraction of the given plan already listed, for progress reporting.
-    public func progress(over windows: [SyncWindow]) -> Double {
-        guard !windows.isEmpty else { return 1 }
-        return Double(windows.count - pending(windows).count) / Double(windows.count)
     }
 }

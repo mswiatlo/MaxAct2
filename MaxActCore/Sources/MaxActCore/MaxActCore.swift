@@ -1,7 +1,8 @@
 /// Shared model, ingest, format and Strava logic for MaxAct.
 ///
-/// This package deliberately knows nothing about SwiftUI or SwiftData, so its contents can be
-/// exercised with `swift test` without launching the app.
+/// This package knows nothing about SwiftUI, so its contents can be exercised with `swift test`
+/// without launching the app. It does use SwiftData, for the store (`WorkoutStore`), which runs
+/// in memory under test.
 public enum MaxActCore {
     /// The date format Health Auto Export uses for every timestamp it emits, in every transport.
     ///

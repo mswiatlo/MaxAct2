@@ -21,7 +21,7 @@ public enum WorkoutFormatting {
             : String(format: "%d:%02d", minutes, secs)
     }
 
-    /// Kilometres with one decimal, switching to metres below 1 km so a 400 m walk isn't "0.4 km".
+    /// Kilometres with two decimals, switching to metres below 1 km so a 400 m walk isn't "0.4 km".
     public static func distance(_ meters: Double?) -> String {
         guard let meters, meters.isFinite, meters > 0 else { return missing }
         if meters < 1000 { return "\(Int(meters.rounded())) m" }
