@@ -262,6 +262,15 @@ domain plus an in-memory database when launched with `--ui-testing`. **Every** `
 must set `app.launchArguments = ["--ui-testing"]` before `launch()`. It also makes the tests
 deterministic, since they no longer depend on whatever happens to be synced.
 
+**"[Internal] Thread running at User-interactive quality-of-service class waiting on a lower QoS
+thread" is XCTest's own, not ours** *(traced 2026-10-27)*. Two UI tests raise it on every run
+(`testHTTPSNeedsTheCertificateBeforeSyncing`, `testTrainingLoadAsksForHeartRateThenShowsFitness`).
+The session log in the result's diagnostics (`xcresulttool export diagnostics`) shows the test
+runner, not the app, recording it, while XCUIAutomation looks up screens ("getting screen bounds",
+`[DisplayManager]`) for a key press or a typed field. "[Internal]" marks an issue in Apple's frameworks;
+no stack is saved anywhere. Left alone by the user's choice. Turning off the Thread Performance
+Checker for the Test action would hide it, and also stop the checker watching the app during tests.
+
 **Starting configured** *(issue 49)*: the sync panel has no connection fields, so a test that
 needs a working connection launches with one. Pass the address as a default (`-syncHost`, via
 `launchMaxAct(defaults:)`) and the token as `--ui-testing-token=<value>`, which seeds the

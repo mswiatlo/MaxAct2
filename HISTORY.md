@@ -1462,6 +1462,10 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-27** — **Two UI-test warnings traced to XCTest.** The priority-inversion warnings on
+  two UI tests are raised in the test runner during XCUIAutomation's screen lookups, not in MaxAct
+  or the test code. Left as they are, by the user's choice; noted in the Xcode reference.
+
 - **2026-10-27** — **Issue 49 closed.** Checked by the user. Full suite: 91 passed, 4 skipped,
   1 expected failure.
 
