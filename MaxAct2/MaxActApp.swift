@@ -55,6 +55,9 @@ struct MaxActApp: App {
         return Int(argument.dropFirst(prefix.count))
     }
 
+    /// `--ui-testing-showcase` seeds the README's realistic library instead (issue 36).
+    static var uiTestingShowcase: Bool { ProcessInfo.processInfo.arguments.contains("--ui-testing-showcase") }
+
     init() {
         // Always open the library window at launch. macOS otherwise restores the previous
         // session's *windows*, and a session that ended with the window closed relaunched with no
@@ -103,6 +106,7 @@ struct MaxActApp: App {
             _model = State(initialValue: AppModel.inMemoryFallback(
                 settings: settings,
                 seedCount: Self.uiTestingSeedCount,
+                seedsShowcase: Self.uiTestingShowcase,
                 resolvesPlaces: false,
                 // Memory, not the Keychain. A UI test must never be able to sign the real Strava
                 // account out, and — since every build is a new ad-hoc signature — any Keychain

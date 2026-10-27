@@ -162,6 +162,8 @@ final class AppModel {
     /// Number of synthetic workouts to plant on first load, for UI tests and previews. `nil` in
     /// normal use.
     let seedCount: Int?
+    /// Seed ``ShowcaseData`` instead: the README's library (issue 36).
+    let seedsShowcase: Bool
 
     /// Whether to reverse-geocode place names. Off under UI testing: it is a network call, and a
     /// test suite that depends on Apple's geocoder is a test suite that fails on a train.
@@ -208,6 +210,7 @@ final class AppModel {
         thumbnails: RouteThumbnailRenderer,
         settings: AppSettings,
         seedCount: Int? = nil,
+        seedsShowcase: Bool = false,
         resolvesPlaces: Bool = true,
         stravaSecrets: any AppSecretStore = KeychainSecretStore(),
         stravaTransport: any StravaTransport = URLSessionStravaTransport()
@@ -222,6 +225,7 @@ final class AppModel {
         sidebarSelection = SidebarSelection(storageKey: settings.sidebarSelectionKey) ?? .filter(.all)
         sortOrder = TableSort.order(storageKey: settings.tableSortKey) ?? TableSort.default
         self.seedCount = seedCount
+        self.seedsShowcase = seedsShowcase
         self.resolvesPlaces = resolvesPlaces
         placeResolver = PlaceResolver(store: store)
     }
@@ -253,7 +257,7 @@ final class AppModel {
     /// Used when the on-disk stores can't be opened, and by tests. Everything works; nothing
     /// persists.
     static func inMemoryFallback(
-        settings: AppSettings, seedCount: Int? = nil, resolvesPlaces: Bool = true,
+        settings: AppSettings, seedCount: Int? = nil, seedsShowcase: Bool = false, resolvesPlaces: Bool = true,
         // No defaults (issue 47): a test that left these out would have reached the real
         // Keychain and the real Strava. Every caller says which it means.
         stravaSecrets: any AppSecretStore,
@@ -275,6 +279,7 @@ final class AppModel {
             ),
             settings: settings,
             seedCount: seedCount,
+            seedsShowcase: seedsShowcase,
             resolvesPlaces: resolvesPlaces,
             stravaSecrets: stravaSecrets,
             stravaTransport: stravaTransport
@@ -660,11 +665,24 @@ final class AppModel {
     /// first frame the tests see is already populated — a test that races the seed is worse than
     /// no test.
     private func seedIfRequested() async throws {
-        guard let seedCount, !hasSeeded else { return }
+        guard seedCount != nil || seedsShowcase, !hasSeeded else { return }
         hasSeeded = true
-        try await store.upsert(
-            SampleData.ingested(count: seedCount), seriesStore: seriesStore
-        )
+        guard seedsShowcase else {
+            try await store.upsert(SampleData.ingested(count: seedCount ?? 0), seriesStore: seriesStore)
+            return
+        }
+        // Places, tags and Strava state as a real library has them. Tags before Strava state, so
+        // Commute isn't queued as a change to push.
+        let library = ShowcaseData.library(endingAt: .now)
+        try await store.upsert(library.map(\.ingested), seriesStore: seriesStore)
+        for entry in library {
+            let id = entry.ingested.workout.id
+            if let label = entry.placeLabel { try await store.setPlace(label: label, parts: entry.place, for: id) }
+            for tag in entry.tags { _ = try await store.addTag(tag, to: [id]) }
+            if let activity = entry.stravaActivityID {
+                try await store.setStravaState(.uploaded, activityID: activity, for: id, now: entry.ingested.workout.end)
+            }
+        }
     }
 
     // Selecting everything is deliberately *not* here: Edit ▸ Select All is standard and SwiftUI

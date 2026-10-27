@@ -1060,17 +1060,6 @@ final class SeededTableUITests: XCTestCase {
         add(attachment)
     }
 
-    /// Scrolls until `element` is wholly inside the window. `isHittable` isn't enough: it was true
-    /// for a chart with only its top 16 of 120 pt on screen (measured), and clicks below that
-    /// missed the app.
-    @MainActor
-    private func scrollFullyIntoView(_ element: XCUIElement, scrolling area: XCUICoordinate, in window: XCUIElement) {
-        for _ in 0..<15 where !(element.exists && element.frame.maxY <= window.frame.maxY - 4) {
-            area.scroll(byDeltaX: 0, deltaY: -150)
-        }
-        XCTAssertLessThanOrEqual(element.frame.maxY, window.frame.maxY, "\(element) is still below the window.")
-    }
-
     /// Where a date cell starts, reading only a copy that's laid out. The table recycles cells,
     /// and `firstMatch` alternated between the visible cell (x 1516) and a recycled one with an
     /// empty frame (x 0) across two reads a moment apart (measured).
