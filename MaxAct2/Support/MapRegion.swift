@@ -23,3 +23,10 @@ extension MKCoordinateRegion {
         self.init(fitting: bounds, headroom: headroom, minimumSpan: minimumSpan)
     }
 }
+
+extension CLLocationCoordinate2D {
+    /// MapKit's coordinate for one of ours. `nonisolated`, so detached work can build map data.
+    nonisolated init(_ coordinate: Coordinate) {
+        self.init(latitude: coordinate.latitude, longitude: coordinate.longitude)
+    }
+}

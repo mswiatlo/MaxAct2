@@ -119,27 +119,6 @@ struct StatisticsView: View {
 
 // MARK: - Shared
 
-private struct SectionHeader: View {
-    let title: String
-    let systemImage: String
-
-    var body: some View {
-        Label(title, systemImage: systemImage)
-            .font(.title3.weight(.semibold))
-    }
-}
-
-private struct Footnote: View {
-    let text: String
-
-    var body: some View {
-        Text(text)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-}
-
 extension StatisticsPeriod {
     var title: String {
         switch self {
@@ -579,11 +558,8 @@ struct ConsistencySection: View {
 
     private func stat(_ title: String, days: Int? = nil, weeks: Int? = nil) -> some View {
         let value = days.map { "\($0) day\($0 == 1 ? "" : "s")" } ?? weeks.map { "\($0) week\($0 == 1 ? "" : "s")" } ?? ""
-        return VStack(alignment: .leading, spacing: 2) {
-            Text(title).font(.caption).foregroundStyle(.secondary)
-            Text(value).font(.title3.monospacedDigit())
-        }
-        .accessibilityElement(children: .combine)
+        return StatCell(label: title, value: value)
+            .accessibilityElement(children: .combine)
     }
 }
 

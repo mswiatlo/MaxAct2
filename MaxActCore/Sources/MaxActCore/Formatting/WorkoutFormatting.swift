@@ -21,6 +21,17 @@ public enum WorkoutFormatting {
             : String(format: "%d:%02d", minutes, secs)
     }
 
+    /// A stretch of time in at most two units, as "27s", "4m 30s" or "1h 12m".
+    public static func span(_ seconds: TimeInterval) -> String {
+        Duration.seconds(seconds.rounded())
+            .formatted(.units(allowed: [.hours, .minutes, .seconds], width: .abbreviated, maximumUnitCount: 2))
+    }
+
+    /// Hours and minutes only, as "1h 12m".
+    public static func hoursAndMinutes(_ seconds: TimeInterval) -> String {
+        Duration.seconds(seconds.rounded()).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated))
+    }
+
     /// Kilometres with two decimals, switching to metres below 1 km so a 400 m walk isn't "0.4 km".
     public static func distance(_ meters: Double?) -> String {
         guard let meters, meters.isFinite, meters > 0 else { return missing }

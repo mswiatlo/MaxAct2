@@ -75,8 +75,7 @@ struct TrainingLoadSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("Training Load", systemImage: "waveform.path.ecg")
-                .font(.title3.weight(.semibold))
+            SectionHeader(title: "Training Load", systemImage: "waveform.path.ecg")
 
             if let profile = settings.heartRateProfile {
                 content(profile)
@@ -131,10 +130,7 @@ struct TrainingLoadSection: View {
             .accessibilityValue("Fitness \(Int(today.fitness.rounded())), fatigue \(Int(today.fatigue.rounded())), "
                                 + "form \(Int(today.form.rounded()))")
 
-            Text(footnote(days: model.days.count, uncounted: model.uncounted))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            Footnote(text: footnote(days: model.days.count, uncounted: model.uncounted))
         } else {
             Text("No workouts with heart rate yet.").foregroundStyle(.secondary)
         }

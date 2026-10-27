@@ -34,8 +34,7 @@ struct HeartRateZonesSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("Heart-Rate Zones", systemImage: "heart")
-                .font(.title3.weight(.semibold))
+            SectionHeader(title: "Heart-Rate Zones", systemImage: "heart")
 
             if let profile = model.settings.heartRateProfile {
                 content(profile)
@@ -90,13 +89,10 @@ struct HeartRateZonesSection: View {
             .accessibilityLabel("Time in heart-rate zones per \(period.rawValue)")
             .accessibilityValue("\(buckets.count) \(period.title.lowercased())")
 
-        Text(verbatim: "From \(measured.count) of \(workouts.count) workouts — those with detail downloaded. "
-             + "Zones are shares of heart-rate reserve, between resting (\(Int(profile.resting))) and maximum "
-             + "(\(Int(profile.maximum))) bpm. Each reading counts until the next; gaps over "
-             + "\(Int(HeartRateHistogram.maxGap)) s, such as pauses, count nothing.")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
+        Footnote(text: "From \(measured.count) of \(workouts.count) workouts — those with detail downloaded. "
+                 + "Zones are shares of heart-rate reserve, between resting (\(Int(profile.resting))) and maximum "
+                 + "(\(Int(profile.maximum))) bpm. Each reading counts until the next; gaps over "
+                 + "\(Int(HeartRateHistogram.maxGap)) s, such as pauses, count nothing.")
     }
 
     private func chart(_ buckets: [(interval: DateInterval, times: [HeartRateZone: TimeInterval])]) -> some View {
@@ -187,6 +183,6 @@ struct HeartRateZoneBreakdown: View {
 
     /// "3 hrs, 20 mins", or "45 mins".
     static func describe(_ seconds: TimeInterval) -> String {
-        Duration.seconds(seconds.rounded()).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated))
+        WorkoutFormatting.hoursAndMinutes(seconds)
     }
 }

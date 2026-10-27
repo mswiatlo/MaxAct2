@@ -45,8 +45,7 @@ struct RouteHeatmapSection: View {
 
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label("Routes", systemImage: "map")
-                    .font(.title3.weight(.semibold))
+                SectionHeader(title: "Routes", systemImage: "map")
                 Spacer()
                 if regions.count > 1, let region {
                     Picker("Place", selection: Binding(get: { region.id }, set: { show($0, in: regions) })) {
@@ -136,9 +135,9 @@ struct RouteHeatmapSection: View {
                 ForEach(Array(RouteHeatmap.tiles(sketches)), id: \.self) { tile in
                     let corners = tile.corners
                     MapPolygon(coordinates: [
-                        CLLocationCoordinate2D(latitude: corners.northWest.latitude, longitude: corners.northWest.longitude),
+                        CLLocationCoordinate2D(corners.northWest),
                         CLLocationCoordinate2D(latitude: corners.northWest.latitude, longitude: corners.southEast.longitude),
-                        CLLocationCoordinate2D(latitude: corners.southEast.latitude, longitude: corners.southEast.longitude),
+                        CLLocationCoordinate2D(corners.southEast),
                         CLLocationCoordinate2D(latitude: corners.southEast.latitude, longitude: corners.northWest.longitude),
                     ])
                     .foregroundStyle(Color.blue.opacity(0.12))
@@ -148,7 +147,7 @@ struct RouteHeatmapSection: View {
             // Faint lines, so where routes overlap the colour builds up — that's the heat.
             ForEach(sketches) { sketch in
                 MapPolyline(coordinates: sketch.coordinates.map {
-                    CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
+                    CLLocationCoordinate2D($0)
                 })
                 .stroke(routeColor.opacity(0.35), lineWidth: 2)
             }
@@ -179,12 +178,9 @@ struct RouteHeatmapSection: View {
                 Toggle("Show squares", isOn: $showsSquares)
                     .toggleStyle(.checkbox)
             }
-            Text(verbatim: "Squares are map tiles at zoom 14 — about "
-                 + Self.tileWidth(at: region).formatted(.number.precision(.fractionLength(1)))
-                 + " km across here — that any route has passed through, as counted by VeloViewer and StatsHunters.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            Footnote(text: "Squares are map tiles at zoom 14 — about "
+                     + Self.tileWidth(at: region).formatted(.number.precision(.fractionLength(1)))
+                     + " km across here — that any route has passed through, as counted by VeloViewer and StatsHunters.")
         }
     }
 

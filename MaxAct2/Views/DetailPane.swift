@@ -154,7 +154,7 @@ struct WorkoutDetailView: View {
             self.series = series
             self.simplified = simplified
             self.route = route
-            coordinates = simplified.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
+            coordinates = simplified.map(CLLocationCoordinate2D.init)
             discardedFixes = series.route.count - route.count
             movingSpeedMetersPerSecond = workout.movingSpeedMetersPerSecond(using: series)
             estimatedAscent = workout.elevationAscendedMeters == nil ? ElevationEstimate.ascent(route: route) : nil
@@ -187,7 +187,7 @@ struct WorkoutDetailView: View {
                     }
                     if let fill = series.series.provenance.routeFromStrava {
                         repairNote("Route from Strava — Health Auto Export sent only "
-                                   + Self.span(fill.exportedSeconds) + " of " + Self.span(workout.duration) + ".")
+                                   + WorkoutFormatting.span(fill.exportedSeconds) + " of " + WorkoutFormatting.span(workout.duration) + ".")
                     }
                 } else if workout.hasRoute && !item.hasDetail {
                     notDownloadedNotice
@@ -441,7 +441,7 @@ struct WorkoutDetailView: View {
         coloredRoute = ColoredRoute(
             identity: identity,
             runs: (result?.1 ?? []).map { run in
-                (run.coordinates.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) },
+                (run.coordinates.map(CLLocationCoordinate2D.init),
                  run.shade.color)
             },
             gradient: result?.0)
@@ -544,18 +544,11 @@ struct WorkoutDetailView: View {
     }
 
     /// "27 secs.", "42 mins", "1 hr, 30 mins".
-    private static func span(_ seconds: TimeInterval) -> String {
-        Duration.seconds(seconds.rounded())
-            .formatted(.units(allowed: [.hours, .minutes, .seconds], width: .abbreviated, maximumUnitCount: 2))
-    }
-
     /// Health Auto Export sent only part of this route (issue 19). Linked workouts are filled from
     /// Strava automatically, so this shows for the rest — or if that failed.
     private func incompleteRouteNote(_ series: WorkoutSeries) -> some View {
-        let sent = Duration.seconds(series.routeSpan.rounded())
-            .formatted(.units(allowed: [.hours, .minutes, .seconds], width: .abbreviated, maximumUnitCount: 2))
-        let whole = Duration.seconds(workout.duration.rounded())
-            .formatted(.units(allowed: [.hours, .minutes], width: .abbreviated))
+        let sent = WorkoutFormatting.span(series.routeSpan)
+        let whole = WorkoutFormatting.hoursAndMinutes(workout.duration)
         return Label {
             Text(verbatim: "Route incomplete — Health Auto Export sent \(sent) of \(whole)."
                  + (item.stravaActivityID == nil ? "" : " The Strava activity has all of it; MaxAct fills it in while Strava is connected."))
@@ -640,10 +633,7 @@ struct WorkoutDetailView: View {
     }
 
     private func stat(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label).font(.caption).foregroundStyle(.secondary)
-            Text(value).font(.title3.monospacedDigit())
-        }
+        StatCell(label: label, value: value)
     }
 
     /// Health's figure when it has one; otherwise an estimate, marked "≈" and explained — Health
@@ -706,9 +696,6 @@ struct SelectionSummaryView: View {
     }
 
     private func stat(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label).font(.caption).foregroundStyle(.secondary)
-            Text(value).font(.title3.monospacedDigit())
-        }
+        StatCell(label: label, value: value)
     }
 }

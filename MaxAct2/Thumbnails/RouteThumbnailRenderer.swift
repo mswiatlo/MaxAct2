@@ -247,7 +247,7 @@ final class RouteThumbnailRenderer {
         image.lockFocus()
         snapshot.image.draw(in: NSRect(origin: .zero, size: size))
         stroke(strokes) { coordinate in
-            snapshot.point(for: CLLocationCoordinate2D(latitude: coordinate.latitude, longitude: coordinate.longitude))
+            snapshot.point(for: CLLocationCoordinate2D(coordinate))
         }
         image.unlockFocus()
         return image
