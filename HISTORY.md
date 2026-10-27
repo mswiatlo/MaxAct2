@@ -1233,6 +1233,11 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-27** — **39 built: one owner for running jobs.** Measured with the old Stop: after
+  Stop, the status went back to "running, week 1" when the request in flight returned. The
+  double-start test first passed even with the guard removed, because the second job's status
+  masked the first. It now counts connections to the phone instead.
+
 - **2026-10-26** — **Issue 38 closed**, confirmed by the user. Full suite: 70 passed, 3 skipped, after one heatmap-sweep flake in the first run (noted under 43).
 
 - **2026-10-26** — **38 built: the audit's bugs.** Two findings while fixing:

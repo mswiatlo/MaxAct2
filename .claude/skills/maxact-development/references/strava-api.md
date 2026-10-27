@@ -48,6 +48,11 @@ recorded as already-uploaded rather than surfaced as a failure.
 - Store client ID, secret, access token, refresh token and expiry in the Keychain
   (`kSecClassGenericPassword`, `.whenUnlocked`). Refresh proactively on expiry and reactively on a
   `401`.
+- **Only one refresh at a time, even inside an actor.** Strava rotates the refresh token on every
+  refresh. An actor's methods interleave at each `await`, so two requests that both find the token
+  stale would each refresh, and the second would spend a token the first had already used.
+  `StravaClient` shares one refresh task, and starts none if the stored token was already
+  refreshed by another request.
 
 ## Program constraints
 

@@ -13,7 +13,8 @@ import SwiftUI
 final class AppModel {
     // MARK: Data
 
-    private(set) var items: [WorkoutListItem] = []
+    /// Written here and by the passes in the `AppModel+` extensions.
+    var items: [WorkoutListItem] = []
     private(set) var isLoading = false
     private(set) var loadError: String?
 
@@ -106,114 +107,8 @@ final class AppModel {
 
     // MARK: Sync
 
-    private(set) var syncStatus: SyncStatus = .idle
-
-    /// Which job the progress refers to. Without this the banner said "Syncing week 3 of 8"
-    /// during a detail backfill, which counts workouts rather than weeks.
-    enum SyncActivity: Equatable {
-        case listing
-        /// "Everything" (issue 24): a list pass with no fixed start, reporting how far back it has
-        /// reached rather than "week n of m".
-        case listingEverything(reachedBack: Date)
-        case fillingDetail
-        case uploadingToStrava
-        case checkingStrava
-    }
-
-    enum SyncStatus: Equatable {
-        case idle
-        case running(SyncActivity, completed: Int, total: Int, found: Int)
-        case finished(SyncActivity, found: Int)
-        /// Paused for Strava's rate limit, still running. Distinct from a failure: the batch
-        /// resumes on its own at `until`, and the user should see when rather than a spinner.
-        case waiting(SyncActivity, until: Date)
-        /// The sync-status check, which reports two counts rather than one.
-        case checkedStrava(StravaCheckResult)
-        /// A list sync that ran to the end: how many workouts arrived, and how many of those
-        /// couldn't be read. Its own case because both "nothing arrived" and "some couldn't be
-        /// read" are worth a warning rather than a quiet success.
-        case listed(found: Int, unreadable: Int)
-        case failed(String)
-
-        /// "Found 2 workouts already on Strava · 1 was deleted there", or either half alone.
-        static func describe(_ result: StravaCheckResult) -> String {
-            var parts: [String] = []
-            if result.found > 0 {
-                parts.append("Found \(result.found) workout\(result.found == 1 ? "" : "s") already on Strava")
-            }
-            if result.removed > 0 {
-                parts.append(result.removed == 1
-                             ? "1 was deleted on Strava and is marked not uploaded"
-                             : "\(result.removed) were deleted on Strava and are marked not uploaded")
-            }
-            return parts.isEmpty ? "Nothing new found on Strava" : parts.joined(separator: " · ")
-        }
-
-        var isRunning: Bool {
-            switch self {
-            case .running, .waiting: true
-            case .idle, .finished, .checkedStrava, .listed, .failed: false
-            }
-        }
-
-        /// Finished, but with something the user should look at.
-        var isWarning: Bool {
-            if case .listed(let found, let unreadable) = self { return found == 0 || unreadable > 0 }
-            return false
-        }
-
-        var message: String? {
-            switch self {
-            case .idle:
-                nil
-            case .running(.listing, let done, let total, let found):
-                "Syncing week \(done + 1) of \(total) — \(found) workouts so far"
-            case .running(.listingEverything(let reachedBack), _, _, let found):
-                "Syncing everything — back to \(reachedBack.formatted(.dateTime.month(.wide).year())) — \(found) workouts so far"
-            case .running(.fillingDetail, let done, let total, _):
-                "Downloading detail — \(done) of \(total)"
-            case .finished(.listing, let found), .finished(.listingEverything, let found):
-                found == 0 ? "No new workouts" : "Synced \(found) workouts"
-            case .finished(.fillingDetail, let found):
-                found == 0 ? "Nothing left to download" : "Downloaded detail for \(found) workouts"
-            case .running(.uploadingToStrava, let done, let total, _):
-                "Uploading to Strava — \(done) of \(total)"
-            case .finished(.uploadingToStrava, let found):
-                found == 0 ? "Nothing was uploaded" : "Uploaded \(found) workouts to Strava"
-            case .running(.checkingStrava, _, _, _):
-                "Checking Strava for workouts already there…"
-            case .finished(.checkingStrava, let found):
-                found == 0 ? "Nothing new found on Strava"
-                    : "Found \(found) workout\(found == 1 ? "" : "s") already on Strava"
-            case .checkedStrava(let result):
-                Self.describe(result)
-            case .waiting(_, let until):
-                "Paused for Strava's rate limit — resumes at "
-                    + until.formatted(date: .omitted, time: .shortened)
-            case .listed(0, 0):
-                SyncProblem.nothingReturned.message
-            case .listed(0, let unreadable):
-                "None of the \(unreadable) workouts Health Auto Export sent could be read. It may be "
-                    + "a newer version than MaxAct knows."
-            case .listed(let found, 0):
-                "Synced \(found) workouts"
-            case .listed(let found, let unreadable):
-                "Synced \(found) workouts · \(unreadable) couldn't be read and were skipped"
-            case .failed(let reason):
-                reason
-            }
-        }
-    }
-
-    /// What a detail backfill should cover.
-    enum BackfillScope: Hashable, CaseIterable, Identifiable {
-        /// Everything in the library.
-        case everything
-        /// Only what the sidebar filter and search currently show.
-        case visible
-
-        var id: Self { self }
-    }
+    /// Set by the job runner and the passes in `AppModel+Sync` and `AppModel+Strava`; views read it.
+    var syncStatus: SyncStatus = .idle
 
     // MARK: Dependencies
 
@@ -235,8 +130,8 @@ final class AppModel {
     /// Time at each heart rate by workout id, read in the same pass as the sketches — the
     /// heart-rate zones' data (issue 15).
     private(set) var heartRateHistograms: [String: HeartRateHistogram] = [:]
-    @ObservationIgnored private var isRepairingHeartRate = false
-    @ObservationIgnored private var isFillingRoutes = false
+    @ObservationIgnored var isRepairingHeartRate = false
+    @ObservationIgnored var isFillingRoutes = false
     /// (done, total) while sketches are being built for the first time.
     private(set) var routeSketchProgress: (done: Int, total: Int)?
     let thumbnails: RouteThumbnailRenderer
@@ -251,9 +146,9 @@ final class AppModel {
     let resolvesPlaces: Bool
 
     /// The one job at a time against Health Auto Export or Strava (issue 39). See `startJob`.
-    @ObservationIgnored private var job: Task<Void, Never>?
+    @ObservationIgnored var job: Task<Void, Never>?
     /// Stop was asked for, and the job is finishing what it had in flight.
-    private(set) var isStopping = false
+    var isStopping = false
     private var hasSeeded = false
 
     // MARK: Strava
@@ -264,13 +159,13 @@ final class AppModel {
     let strava: StravaClient
 
     /// Whether a client ID and secret have been entered, and whose account is connected.
-    private(set) var isStravaConfigured = false
-    private(set) var stravaAthlete: String?
+    var isStravaConfigured = false
+    var stravaAthlete: String?
     var isStravaConnected: Bool { stravaAthlete != nil }
-    private var hasResumedUploads = false
-    private var flagPushTask: Task<Void, Never>?
+    var hasResumedUploads = false
+    var flagPushTask: Task<Void, Never>?
     /// The quiet resume of uploads a previous run left in flight.
-    @ObservationIgnored private var resumeTask: Task<Void, Never>?
+    @ObservationIgnored var resumeTask: Task<Void, Never>?
 
     /// The redirect Strava sends the browser back to. Strava only checks the *host* against the
     /// app's "Authorization Callback Domain", so that has to be set to `localhost` on
@@ -572,46 +467,6 @@ final class AppModel {
         }
     }
 
-    /// Once (with Strava connected): routes Health Auto Export sent only part of — some
-    /// interval-style Apple Workout-app recordings, measured 3 of 418 — are replaced by the
-    /// linked Strava activity's full track. Reads every linked series (~7 s), off the main actor.
-    private func fillIncompleteRoutesIfNeeded() async {
-        guard !settings.hasFilledIncompleteRoutes, !isFillingRoutes, isStravaConnected, !syncStatus.isRunning else { return }
-        isFillingRoutes = true
-        defer { isFillingRoutes = false }
-        do {
-            let filled = try await fillIncompleteRoutes(in: items)
-            settings.hasFilledIncompleteRoutes = true
-            if filled > 0 { items = (try? await store.allItems()) ?? items }
-        } catch {
-            // Tried again next launch; said now, since a route stays incomplete until it works.
-            reportQuietly("Couldn't fill incomplete routes from Strava: \(Self.describeUpload(error)). "
-                          + "MaxAct will try again next time it opens.")
-        }
-    }
-
-    /// Replaces each of `candidates`' stored routes that covers under half its workout with the
-    /// linked Strava activity's track, when that's longer. Returns how many were replaced.
-    @discardableResult
-    private func fillIncompleteRoutes(in candidates: [WorkoutListItem]) async throws -> Int {
-        var filled = 0
-        for item in candidates {
-            guard let activityID = item.stravaActivityID,
-                  let series = await seriesStore.loadIfAvailable(item.id),
-                  series.routeIsIncomplete(duration: item.workout.duration)
-            else { continue }
-            let route = try await strava.route(ofActivity: activityID)
-            guard let last = route.last, let first = route.first,
-                  last.timestamp.timeIntervalSince(first.timestamp) > series.routeSpan
-            else { continue }
-            try await seriesStore.save(series.replacingRoute(route, fromStravaActivity: activityID))
-            await routeSketchCache?.invalidate([item.id])
-            thumbnails.delete(workoutID: item.id)
-            filled += 1
-        }
-        return filled
-    }
-
     /// Once per library: workouts whose heart rate the workout export averaged into a few readings
     /// (Apple Workout app recordings, measured 17 of 418) are marked as needing detail, so the
     /// Download Detail action re-fetches them — the detail fetch now fills in the dense heart rate.
@@ -645,8 +500,6 @@ final class AppModel {
         }
     }
 
-    // MARK: Strava
-
     // MARK: Route colouring
 
     /// Colours one workout's route (issue 31): per workout, so only its own thumbnail redraws.
@@ -676,338 +529,8 @@ final class AppModel {
         }
     }
 
-    /// Sends Commute/Trainer edits on already-synced workouts to Strava. One write each.
-    ///
-    /// Quiet unless it fails: tagging shouldn't light up a progress banner. If anything else is
-    /// running it simply waits — the edits stay marked pending, and the next check or upload batch
-    /// pushes them first, so nothing is lost and no stale value can overwrite them meanwhile.
-    func pushPendingStravaFlags() {
-        guard isStravaConnected, !syncStatus.isRunning, flagPushTask == nil else { return }
-        flagPushTask = Task {
-            defer { flagPushTask = nil }
-            if let error = await sendPendingStravaFlags() { reportQuietly(error) }
-            await refreshItems()
-        }
-    }
-
-    /// Returns a description of the first failure, if any; everything that succeeded is cleared.
-    private func sendPendingStravaFlags() async -> String? {
-        guard let pending = try? await store.pendingStravaFlags() else { return nil }
-        for entry in pending {
-            do {
-                var update = StravaActivityUpdate(commute: entry.flags.commute, trainer: entry.flags.trainer)
-                // Race (issue 16), for sports that have it on Strava. Setting one needs no read;
-                // clearing one checks Strava's current type first, so a Long Run or Workout set
-                // there isn't reset — one extra read, only for runs and rides without the tag.
-                if StravaRace.raceValue(for: entry.kind) != nil {
-                    let race = entry.flags.race == true
-                    let current = race ? nil : try await strava.workoutType(ofActivity: entry.activityID)
-                    update.workoutType = StravaRace.value(toSend: race, for: entry.kind, current: current)
-                }
-                try await strava.updateActivity(id: entry.activityID, update)
-                try? await store.clearStravaFlagsPending(entry.workoutID)
-            } catch {
-                return "Couldn't update tags on Strava: \(Self.describeUpload(error)). "
-                    + "They'll be sent again with the next check or upload."
-            }
-        }
-        return nil
-    }
-
-    /// Re-reads what the Keychain holds, for the Settings pane and for enabling Upload.
-    func refreshStravaConnection() async {
-        let credentials = await stravaSecrets.credentials()
-        isStravaConfigured = credentials?.isComplete ?? false
-        let tokens = await stravaSecrets.tokens()
-        // A connection with no name still counts — the name is cosmetic, the token isn't.
-        stravaAthlete = tokens.map { $0.athleteName?.isEmpty == false ? $0.athleteName! : "Strava athlete" }
-    }
-
-    func saveStravaCredentials(clientID: String, clientSecret: String) async throws {
-        let credentials = StravaCredentials(clientID: clientID, clientSecret: clientSecret)
-        try await stravaSecrets.save(credentials: credentials.isComplete ? credentials : nil)
-        await refreshStravaConnection()
-    }
-
-    /// The approval page, with a fresh `state` the callback must echo back.
-    func stravaAuthorizationRequest() async -> (url: URL, state: String)? {
-        guard let credentials = await stravaSecrets.credentials(), credentials.isComplete else { return nil }
-        let state = UUID().uuidString
-        return (StravaClient.authorizationURL(
-            clientID: credentials.clientID, redirectURI: Self.stravaRedirectURI, state: state
-        ), state)
-    }
-
-    /// Finishes connecting from the URL the browser was redirected to.
-    ///
-    /// Checks `state` against the one sent, so a stray or forged callback can't connect someone
-    /// else's account, and checks the granted scope: Strava lets the user untick permissions on
-    /// the approval page, and without `activity:write` every upload would fail later with a
-    /// confusing 401 instead of now with a clear reason.
-    func completeStravaConnection(callback: URL, expectedState: String) async throws {
-        let items = URLComponents(url: callback, resolvingAgainstBaseURL: false)?.queryItems ?? []
-        let query = Dictionary(items.map { ($0.name, $0.value ?? "") }, uniquingKeysWith: { a, _ in a })
-        if let error = query["error"] {
-            throw StravaError.authorizationRejected(error == "access_denied" ? "access was declined" : error)
-        }
-        guard query["state"] == expectedState else {
-            throw StravaError.authorizationRejected("the reply didn't match the request")
-        }
-        guard query["scope"]?.contains("activity:write") == true else {
-            throw StravaError.authorizationRejected(
-                "upload permission wasn't granted — leave \"Upload your activities\" ticked")
-        }
-        // Required too, since the sync check learned to notice deletions. Without it Strava hides
-        // "Only You" activities from both the listing and a direct lookup, so a private ride would
-        // be indistinguishable from a deleted one and get marked not uploaded.
-        guard query["scope"]?.contains("activity:read_all") == true else {
-            throw StravaError.authorizationRejected(
-                "private-activity access wasn't granted — leave \"View data about your private "
-                + "activities\" ticked, so MaxAct can tell a private activity from a deleted one")
-        }
-        guard let code = query["code"] else {
-            throw StravaError.invalidResponse("no authorisation code in the callback")
-        }
-        try await strava.exchange(code: code)
-        await refreshStravaConnection()
-        // The library has years of workouts the watch already put on Strava. Find them now, so
-        // the first thing the user sees isn't hundreds of rows offering to upload duplicates.
-        startStravaCheck()
-    }
-
-    /// Looks for every workout in the library on Strava, and marks the ones already there.
-    func startStravaCheck() {
-        guard isStravaConnected, !items.isEmpty else { return }
-        let workouts = items.map(\.workout)
-        let linkedBefore = Set(items.filter { $0.stravaActivityID != nil }.map(\.id))
-        startJob(.checkingStrava) { [self] in
-            do {
-                // A quiet flag push or upload resume may be under way; let it finish first.
-                await waitForQuietStravaWork()
-                // Local edits go first, so the import below sees them as settled rather than
-                // overwriting them with Strava's stale value.
-                _ = await sendPendingStravaFlags()
-                let result = try await markWorkoutsAlreadyOnStrava(workouts)
-                // Newly linked workouts may have a route Health Auto Export sent only part of
-                // (issue 19); the activity just found has all of it.
-                await refreshItems()
-                let newlyLinked = items.filter { $0.stravaActivityID != nil && !linkedBefore.contains($0.id) }
-                if try await fillIncompleteRoutes(in: newlyLinked) > 0 { await refreshItems() }
-                return .checkedStrava(result)
-            } catch let error as StravaError {
-                return .failed(error.description)
-            } catch {
-                return .failed(Self.describeUpload(error))
-            }
-        }
-    }
-
-    /// Lists Strava's activities over the workouts' span, and brings the library into line with
-    /// it in both directions: workouts found there are marked synced, and synced workouts whose
-    /// activity was **deleted** on Strava go back to "not on Strava". It also mirrors Strava's
-    /// commute/trainer flags — the same listing carries them, so they cost nothing extra. One read
-    /// request per 200 activities: about a dozen for seven years.
-    @discardableResult
-    private func markWorkoutsAlreadyOnStrava(_ workouts: [Workout]) async throws -> StravaCheckResult {
-        guard let earliest = workouts.map(\.start).min(), let latest = workouts.map(\.end).max() else {
-            return StravaCheckResult(found: 0, removed: 0)
-        }
-        // A day's margin either side: a workout near the edge must still see an activity that
-        // started a few minutes before it.
-        let span = DateInterval(start: earliest.addingTimeInterval(-86_400), end: latest.addingTimeInterval(86_400))
-        let activities = try await strava.activities(in: span)
-
-        // Deletions first, so a workout whose activity is gone is free to match another one —
-        // say, the same ride re-uploaded by the watch — in the pass below. Absence from the
-        // listing only nominates; Strava has to confirm each with a 404 before anything changes.
-        // Only workouts inside the *unpadded* range are candidates: they are the ones the listing
-        // is certain to have covered.
-        let missing = try await store.syncedActivities(
-            missingFrom: Set(activities.map(\.id)),
-            startingWithin: DateInterval(start: earliest, end: latest)
-        )
-        let deleted = missing.isEmpty ? [] : try await strava.deletedActivities(among: Array(missing.keys))
-        let removed = try await store.markRemovedFromStrava(deleted.compactMap { missing[$0] })
-        if removed > 0 { await refreshItems() }
-
-        let onStrava = Set(items.filter { $0.stravaState.isOnStrava }.map(\.id))
-        let matches = StravaActivityMatcher.match(
-            workouts.filter { !onStrava.contains($0.id) }, against: activities
-        )
-        let marked = try await store.markAlreadyOnStrava(matches)
-        try await store.applyStravaFlags(Dictionary(
-            activities.map { ($0.id, $0.flags) }, uniquingKeysWith: { first, _ in first }
-        ))
-        await refreshItems()
-        return StravaCheckResult(found: marked, removed: removed)
-    }
-
-    struct StravaCheckResult: Equatable {
-        let found: Int
-        let removed: Int
-    }
-
-    func disconnectStrava() async {
-        try? await strava.disconnect()
-        await refreshStravaConnection()
-    }
-
-    /// Uploads the selection, one at a time. Skips anything already on Strava, and anything with
-    /// no stored detail — a summary-only file would arrive with no route and no heart rate, which
-    /// is worse than not uploading it.
-    func startStravaUpload(for items: [WorkoutListItem]) {
-        guard isStravaConnected else { return }
-        let pending = items.filter { !$0.stravaState.isOnStrava && $0.hasDetail }
-        guard !pending.isEmpty else { return }
-        startJob(.checkingStrava) { await self.uploadToStrava(pending) }
-    }
-
-    /// What the Upload action would do with this selection, for its label and enabled state.
-    func stravaUploadCount(_ items: [WorkoutListItem]) -> (ready: Int, needingDetail: Int) {
-        let notOnStrava = items.filter { !$0.stravaState.isOnStrava }
-        let ready = notOnStrava.filter(\.hasDetail).count
-        return (ready, notOnStrava.count - ready)
-    }
-
-    private func uploadToStrava(_ requested: [WorkoutListItem]) async -> SyncStatus {
-        let uploader = StravaUploader(client: strava)
-        // A resume of the same in-flight uploads, or a flag push, may be under way.
-        await waitForQuietStravaWork()
-
-        // Check first: anything the watch already put on Strava would only come back as a
-        // duplicate, after spending a write and a few polls to find that out. If the check itself
-        // fails, carry on — Strava's own duplicate detection still stands behind the upload.
-        _ = await sendPendingStravaFlags()
-        _ = try? await markWorkoutsAlreadyOnStrava(requested.map(\.workout))
-        let alreadyThere = Set(self.items.filter { $0.stravaState.isOnStrava }.map(\.id))
-        let items = requested.filter { !alreadyThere.contains($0.id) }
-        guard !items.isEmpty else { return .finished(.uploadingToStrava, found: 0) }
-
-        for item in items { try? await store.setStravaState(.queued, for: item.id) }
-        await refreshItems()
-
-        var uploaded = 0
-        var index = 0
-        while index < items.count, !Task.isCancelled {
-            let item = items[index]
-            syncStatus = .running(.uploadingToStrava, completed: index, total: items.count, found: uploaded)
-            do {
-                let result = try await uploadOne(item, with: uploader)
-                try? await store.setStravaState(
-                    result.state, activityID: result.activityID, uploadID: result.uploadID, for: item.id
-                )
-                if result.state.isOnStrava { uploaded += 1 }
-                index += 1
-            } catch StravaError.rateLimited(let until) {
-                // Not a failure of this workout. Wait visibly, then try the same one again —
-                // `uploadOne` resumes rather than re-uploads if it had already been accepted.
-                syncStatus = .waiting(.uploadingToStrava, until: until)
-                try? await Task.sleep(for: .seconds(max(1, until.timeIntervalSinceNow + 2)))
-            } catch let error as StravaError where Self.endsBatch(error) {
-                // Nothing else will succeed either; stop, and say why.
-                await requeue(items[index...])
-                await refreshItems()
-                return .failed(error.description)
-            } catch {
-                // Stopped mid-request: not this workout's failure (issue 38; it was marked
-                // "failed: cancelled"). Left as it was — still queued, it goes back to not
-                // uploaded below; already accepted, it stays uploading and is resumed later.
-                if Task.isCancelled { break }
-                try? await store.setStravaState(.failed(reason: Self.describeUpload(error)), for: item.id)
-                index += 1
-            }
-            await refreshItems()
-        }
-
-        if Task.isCancelled { await requeue(items[index...]) }
-        await refreshItems()
-        return .finished(.uploadingToStrava, found: uploaded)
-    }
-
-    /// Sends one workout — or, if a previous attempt got as far as an upload id, follows that
-    /// instead. Re-uploading an accepted workout would only earn a "duplicate" and spend a write.
-    private func uploadOne(_ item: WorkoutListItem, with uploader: StravaUploader) async throws -> UploadResult {
-        let options = UploadOptions(flags: StravaFlags(tags: item.tags), muted: settings.muteStravaUploads)
-        if let inFlight = try? await store.itemsUploadingToStrava().first(where: { $0.id == item.id }) {
-            return try await uploader.resume(uploadID: inFlight.uploadID, workout: item.workout, options: options)
-        }
-        guard let series = await seriesStore.loadIfAvailable(item.id) else {
-            return UploadResult(state: .failed(reason: "No route or heart rate stored — download detail first"),
-                                activityID: nil, uploadID: nil, warning: nil)
-        }
-        let store = store
-        let id = item.id
-        return try await uploader.send(item.workout, series: series, options: options) { uploadID in
-            // Persisted before polling starts, so a quit mid-wait resumes instead of re-uploading.
-            try? await store.setStravaState(.uploading, uploadID: uploadID, for: id)
-        }
-    }
-
-    /// Uploads a previous run accepted but didn't see finish. Quiet: no banner, because the user
-    /// didn't just ask for anything, but every outcome is persisted and visible in the table.
-    private func resumeStravaUploads() {
-        guard !hasResumedUploads, isStravaConnected else { return }
-        hasResumedUploads = true
-        resumeTask = Task {
-            defer { resumeTask = nil }
-            guard let inFlight = try? await store.itemsUploadingToStrava(), !inFlight.isEmpty else { return }
-            let uploader = StravaUploader(client: strava)
-            for entry in inFlight {
-                guard let item = items.first(where: { $0.id == entry.id }) else { continue }
-                let options = UploadOptions(flags: StravaFlags(tags: item.tags),
-                                            muted: settings.muteStravaUploads)
-                if let result = try? await uploader.resume(uploadID: entry.uploadID, workout: item.workout,
-                                                           options: options) {
-                    try? await store.setStravaState(
-                        result.state, activityID: result.activityID, uploadID: result.uploadID, for: entry.id
-                    )
-                }
-            }
-            await refreshItems()
-        }
-    }
-
-    /// Until a quiet flag push or upload resume has finished, so a job doesn't send the same
-    /// edit or poll the same upload alongside it.
-    private func waitForQuietStravaWork() async {
-        await flagPushTask?.value
-        await resumeTask?.value
-    }
-
-    /// A background pass's failure. Shown in the banner unless a job is using it — overwriting a
-    /// running job's status hid its Stop button and let a second job start (issue 39) — and
-    /// logged either way.
-    private func reportQuietly(_ message: String) {
-        Self.log.error("\(message, privacy: .public)")
-        if !syncStatus.isRunning { syncStatus = .failed(message) }
-    }
-
-    /// Anything still merely queued goes back to not-uploaded, so a stopped batch doesn't leave
-    /// rows claiming to be waiting for something that will never come.
-    private func requeue(_ items: ArraySlice<WorkoutListItem>) async {
-        let current = (try? await store.allItems()) ?? []
-        for item in items where current.first(where: { $0.id == item.id })?.stravaState == .queued {
-            try? await store.setStravaState(.notUploaded, for: item.id)
-        }
-    }
-
-    private static func endsBatch(_ error: StravaError) -> Bool {
-        switch error {
-        case .notConfigured, .notAuthorized, .authorizationRejected: true
-        case .rateLimited, .http, .invalidResponse: false
-        }
-    }
-
-    private static func describeUpload(_ error: any Error) -> String {
-        if let strava = error as? StravaError { return strava.description }
-        if let url = error as? URLError {
-            return url.code == .notConnectedToInternet ? "No internet connection" : url.localizedDescription
-        }
-        return error.localizedDescription
-    }
-
     /// Cheaper than `load()`: no place resolution, no Strava resume.
-    private func refreshItems() async {
+    func refreshItems() async {
         if let fresh = try? await store.allItems() { items = fresh }
     }
 
@@ -1051,100 +574,7 @@ final class AppModel {
         selection.removeAll()
     }
 
-    // MARK: Sync
-
-    /// Runs the list pass over a span, newest week first, writing each chunk as it lands.
-    ///
-    /// Chunks are committed individually rather than batched at the end: a sync that is
-    /// interrupted — which is likely, since it needs HAE foregrounded for the duration — keeps
-    /// everything it had already fetched.
-    func sync(source: HAEWorkoutSource, from start: Date, to end: Date = .now) async {
-        let windows = SyncPlanner.windowsNewestFirst(from: start, to: end)
-        await startJob(.listing, total: windows.count) {
-            await self.listWeeks(windows, source: source) { _ in .listing }
-        }?.value
-    }
-
-    /// "Everything" (issue 24): the list pass back to `SyncPlanner.everythingStart`, weekly and
-    /// newest first like any sync, reporting how far back it has reached rather than "week n of
-    /// m" with a time estimate — most of those weeks are empty and nearly free, so a count of
-    /// weeks says nothing about the time left.
-    func syncEverything(source: HAEWorkoutSource, end: Date = .now) async {
-        let windows = SyncPlanner.windowsNewestFirst(from: SyncPlanner.everythingStart, to: end)
-        await startJob(.listingEverything(reachedBack: end), total: windows.count) {
-            await self.listWeeks(windows, source: source) { .listingEverything(reachedBack: $0.start) }
-        }?.value
-    }
-
-    /// The list pass's walk, shared by both syncs. The table is reloaded only after weeks that
-    /// brought something — most of an "Everything" walk is empty weeks — and once at the end.
-    private func listWeeks(
-        _ windows: [SyncWindow], source: HAEWorkoutSource,
-        activity: (SyncWindow) -> SyncActivity
-    ) async -> SyncStatus {
-        var found = 0, unreadable = 0
-        do {
-            try await source.connect()
-            for (index, window) in windows.enumerated() {
-                if Task.isCancelled { break }
-                let result = try await source.listWorkouts(in: window)
-                try await store.upsert(result.workouts)
-                found += result.workouts.count
-                // Counted and logged rather than dropped: these used to vanish without a trace.
-                unreadable += result.failures.count
-                for failure in result.failures {
-                    Self.log.error("Unreadable workout \(failure.workoutID ?? "?", privacy: .public): \(String(describing: failure.underlying), privacy: .public)")
-                }
-                syncStatus = .running(activity(window), completed: index + 1, total: windows.count, found: found)
-                if !result.workouts.isEmpty { await load() }
-            }
-            await load()
-            return .listed(found: found, unreadable: unreadable)
-        } catch {
-            // Partial progress is kept: every completed week is already committed.
-            await load()
-            return .failed(Self.describe(error))
-        }
-    }
-
-    /// Fetches routes and second-resolution series for specific workouts.
-    func fetchDetail(for workouts: [WorkoutListItem], source: HAEWorkoutSource) async {
-        let pending = workouts.filter { !$0.hasDetail }
-        await startJob(.fillingDetail, total: pending.count) {
-            await self.downloadDetail(pending, source: source)
-        }?.value
-    }
-
-    private func downloadDetail(_ pending: [WorkoutListItem], source: HAEWorkoutSource) async -> SyncStatus {
-        do {
-            try await source.connect()
-            var fetched = 0
-            for (index, item) in pending.enumerated() {
-                if Task.isCancelled { break }
-                if let detail = try await source.fetchDetail(for: item.workout) {
-                    try await store.upsert([detail], seriesStore: seriesStore)
-                    // A re-download replaces the series; its cached digest would be stale.
-                    await routeSketchCache?.invalidate([item.id])
-                    // A partial route comes back with every re-download; refill it from Strava.
-                    if isStravaConnected, detail.series.routeIsIncomplete(duration: item.workout.duration) {
-                        _ = try? await fillIncompleteRoutes(in: [item])
-                    }
-                    fetched += 1
-                }
-                syncStatus = .running(
-                    .fillingDetail, completed: index + 1, total: pending.count, found: fetched
-                )
-                // Refresh periodically rather than only at the end: a long backfill should fill
-                // the table in visibly, and an interruption keeps whatever already landed.
-                if index.isMultiple(of: 5) { await load() }
-            }
-            await load()
-            return .finished(.fillingDetail, found: fetched)
-        } catch {
-            await load()
-            return .failed(Self.describe(error))
-        }
-    }
+    // MARK: Route sketches
 
     /// Sketches and heart-rate histograms for every workout with detail, newest first, building only the ones not yet cached.
     /// The first run over a full library takes a while (measured 9 s for 418 routes, debug), so
@@ -1232,83 +662,5 @@ final class AppModel {
         }
     }
 
-    // MARK: Task lifecycle
-
-    /// Starts a list-pass sync of `start`…`end` — by default back from now.
-    ///
-    /// The span is a parameter rather than a stored preference: it's a per-sync decision, since a
-    /// daily top-up wants a week, the initial import wants everything, and a single past month
-    /// (issue 17) wants neither.
-    func startSync(from start: Date, to end: Date = .now, source: HAEWorkoutSource? = nil) {
-        guard let source = source ?? settings.makeSource() else { return }
-        let windows = SyncPlanner.windowsNewestFirst(from: start, to: end)
-        startJob(.listing, total: windows.count) {
-            await self.listWeeks(windows, source: source) { _ in .listing }
-        }
-    }
-
-    func startSyncEverything() {
-        guard let source = settings.makeSource() else { return }
-        let end = Date.now
-        let windows = SyncPlanner.windowsNewestFirst(from: SyncPlanner.everythingStart, to: end)
-        startJob(.listingEverything(reachedBack: end), total: windows.count) {
-            await self.listWeeks(windows, source: source) { .listingEverything(reachedBack: $0.start) }
-        }
-    }
-
-    /// Walks the whole backlog for a scope, newest first.
-    func startDetailBackfill(scope: BackfillScope) {
-        startDetailFetch(for: backlog(scope))
-    }
-
-    func startDetailFetch(for items: [WorkoutListItem]) {
-        guard let source = settings.makeSource() else { return }
-        let pending = items.filter { !$0.hasDetail }
-        startJob(.fillingDetail, total: pending.count) { await self.downloadDetail(pending, source: source) }
-    }
-
-    /// Starts `work` as the job, unless one is already running; returns its task, or `nil` if
-    /// refused (issue 39).
-    ///
-    /// The status is set **before** returning, so a second call in the same turn — a double
-    /// click, or the Strava connection starting a check while the menu fires — is refused rather
-    /// than starting a second job. The job's own result becomes the status when it ends, unless
-    /// it was stopped: then it ends idle, not with a "Synced N" that appears after Stop.
-    @discardableResult
-    func startJob(_ activity: SyncActivity, total: Int = 1,
-                  _ work: @escaping () async -> SyncStatus) -> Task<Void, Never>? {
-        guard job == nil, !syncStatus.isRunning else { return nil }
-        syncStatus = .running(activity, completed: 0, total: total, found: 0)
-        let task = Task {
-            let outcome = await work()
-            syncStatus = Task.isCancelled ? .idle : outcome
-            job = nil
-            isStopping = false
-        }
-        job = task
-        return task
-    }
-
-    /// Asks the job to stop. Cancellation is cooperative: the job finishes what it has in flight
-    /// — each completed weekly chunk is already committed, so at most that chunk is lost — and
-    /// stays running (the banner says "Stopping…") until it has, so nothing new can start
-    /// alongside it. Health Auto Export serves one client at a time.
-    func cancelSync() {
-        guard let job, !isStopping else { return }
-        isStopping = true
-        job.cancel()
-    }
-
-    /// Until the current job, if any, has ended. For tests.
-    func waitForJob() async {
-        await job?.value
-    }
-
-    /// A Health Auto Export failure in terms the user can act on — see `SyncProblem`, which tells
-    /// "the server isn't running" from "the phone can't be reached" from "the token was rejected".
-    private static func describe(_ error: any Error) -> String {
-        SyncProblem(error: error).message
-    }
-
-    private static let log = Logger(subsystem: "com.swiatlowski.MaxAct", category: "sync")
+    static let log = Logger(subsystem: "com.swiatlowski.MaxAct", category: "sync")
 }

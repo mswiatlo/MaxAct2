@@ -26,8 +26,8 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ## 1. Where things stand — 2026-10-24
 
-All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 377 in
-`MaxActCore` (`swift test`), 73 app and UI tests (`RunAllTests` — ask first, then leave the Mac
+All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 379 in
+`MaxActCore` (`swift test`), 76 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~15 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
 
@@ -86,17 +86,30 @@ is unmeasured: the recording's own zone, or the phone's zone at export. (The fix
 `make_fixture.py` moves dates but keeps the offset.) Next time the phone is connected, fetch a
 winter workout. If it reads `-0800`, the offset is the recording's: store it and name by it.
 
-**39. One owner for running jobs** — Stop doesn't stop:
-- `cancelSync` marks the sync idle at once, but the task later writes "Synced N".
-- A second sync can start meanwhile, and both talk to HAE at once.
-- Background passes can overwrite a running status with an error.
-- Strava check and upload can each start twice.
-- Delete All Data isn't blocked during a sync.
-- `RouteSketchCache` re-adds digests after `clear()`/`invalidate()`.
-- Two Strava token refreshes, and two rate-limit waiters, can overlap (actor reentrancy).
+**39. One owner for running jobs** *(built 2026-10-27 on `job-runner`, awaiting the user's check)* —
+- **One job at a time.** `startJob` (in `AppModel+Sync.swift`) sets the status before it returns,
+  so a second start in the same turn is refused. Before, a double click or a check fired by
+  connecting could start two jobs, and Stop cancelled the wrong one.
+- **Stop waits for the request in flight.** The banner says "Stopping…" until it is done, then goes
+  idle. It used to mark the sync idle at once, let a new sync start alongside, and then the old one
+  wrote "Synced N" (or "week 1") back.
+- **Background passes don't overwrite a running job's status.** A route fill or flag push that fails
+  logs the error, and shows it only when no job is running.
+- **Strava jobs wait for quiet work first.** A Strava check or upload waits for a quiet flag push
+  or upload resume to finish.
+- **Delete All is disabled during a job,** and waits for background work.
+- **Core fixes:**
+  - one shared Strava token refresh;
+  - the rate-limit wait re-checks after sleeping;
+  - `RouteSketchCache` drops a build that a `clear()` or `invalidate()` overtook.
+- **`AppModel` split:** 1,314 lines became 664, plus `AppModel+Sync.swift` (287) and
+  `AppModel+Strava.swift` (379). `sync` and `syncEverything` now share one list walk.
 
-Fix with one job runner owning `syncStatus`/`syncTask`. Split the sync and Strava parts out of
-`AppModel` (1,226 lines) with it.
+Tests: 3 app tests and 2 package tests, each mutation-checked. The second job test needed
+strengthening first: it passed with the guard removed. To check:
+- Stop a sync and see "Stopping…", then a quiet banner.
+- Delete All is greyed out during a sync.
+- Syncing, downloading detail and a Strava check behave as before.
 
 **40. Silent failures** — these `try?` calls ignore errors:
 - route colouring, tags and Strava disconnect;
@@ -121,7 +134,6 @@ matters.
 **42. Structure, duplication and dead code** (no change in behaviour):
 - Split `DetailPane`, `StatisticsView` and `WorkoutStore`.
 - Move `AppSettings`/`SettingsView` out of `WorkoutActions.swift`.
-- `sync` and `syncEverything` are near-copies.
 - Shared stat cell, section header, duration text and coordinate conversion.
 - Core maths in one place: cumulative distance (5 copies), thinning (2), by-period buckets (2),
   metres-per-degree (two values).
