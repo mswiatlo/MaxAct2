@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed or closed known issues (1–20, 22, 23, 25–32, 34, 35, 37–48)
+## 2. Fixed or closed known issues (1–20, 22, 23, 25–32, 34, 35, 37–49)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -518,6 +518,19 @@ other in order, and ranking by time. Checked on a copy: the newest commute 92 ti
 times, 3rd. Extended the next day: pointing at an attempt shows its exact date, time and
 duration, and clicking it opens that workout and scrolls the table to it (`AppModel.reveal`). If
 a search or filter hides it, the table goes back to All Workouts. Going back is issue 32.
+
+**49. ~~Connection settings live in Settings only.~~ — done 2026-10-27, checked by the user.** —
+Raised by the user after 48: the connection was edited in three places, and the same switch was a
+checkbox in the sync panel. Now:
+- **Settings** edits it, with the resolved address, what's missing, and Test Connection
+  (`ConnectionStatus`).
+- **The welcome sheet** keeps its fields (the user's choice: first-run setup in one place).
+- **The sync panel** only reports: "Connects to …" with a padlock, or what's missing, plus
+  **Connection Settings…**. That status line is what stops this repeating the old dead end
+  (Settings with no word on what was missing, so the address silently stayed empty).
+- "What's missing" is one property, `AppSettings.missingConnectionDescription`, unit-tested.
+- **UI tests** that need a connection start configured (`--ui-testing-token=`); the editing tests
+  type in Settings. The panel test was mutation-checked by putting the fields back.
 
 **48. ~~HTTPS to Health Auto Export.~~ — done 2026-10-27, checked by the user (Test Connection
 over HTTPS passes; the token moved to the Keychain without a prompt).** — The user's idea, from the
@@ -1448,6 +1461,10 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-27** — **49: the connection is edited in Settings (and the welcome sheet) only.**
+  Measured on the way: in a grouped `Form`, the address field exposes only its prompt and the
+  HTTPS switch no name, so tests use identifiers. Recorded as a follow-up for VoiceOver.
 
 - **2026-10-27** — **Issue 48 closed.** Checked by the user. Full suite: 90 passed, 4 skipped,
   1 expected failure. The HTTP warning now names its cause ("HTTPS is off, …"), after the user found

@@ -262,6 +262,11 @@ domain plus an in-memory database when launched with `--ui-testing`. **Every** `
 must set `app.launchArguments = ["--ui-testing"]` before `launch()`. It also makes the tests
 deterministic, since they no longer depend on whatever happens to be synced.
 
+**Starting configured** *(issue 49)*: the sync panel has no connection fields, so a test that
+needs a working connection launches with one. Pass the address as a default (`-syncHost`, via
+`launchMaxAct(defaults:)`) and the token as `--ui-testing-token=<value>`, which seeds the
+in-memory token store. The connection is plain HTTP unless `--ui-testing-https` is given.
+
 The full UI suite is mildly flaky when several tests launch the same app at once — a run once had
 every test fail on "no window appeared" and passed unchanged on a retry. Re-run before believing a
 sweeping UI-test failure.
@@ -376,6 +381,12 @@ Two things that cost a debugging round each, both found by printing `app.debugDe
 - **Modifiers on a `GridRow` apply to each cell, not the row.** `.accessibilityElement` plus an
   identifier on a five-cell row gave 30 matches for 6 rows. Put the row's label and identifier on
   its first cell and `.accessibilityHidden(true)` the rest (the zones breakdown does this).
+
+- **In a grouped `Form`, a field's title is a separate static text** *(measured, issue 49)*.
+  `TextField("iPhone address", …, prompt: Text("required"))` exposed only
+  `placeholderValue: 'required'`, and a `.switch` toggle a bare `Switch` with no label, so
+  `app.textFields["iPhone address"]` and `app.switches["Use HTTPS"]` match nothing. Give them an
+  `.accessibilityIdentifier` (`SettingsHost`, `UseHTTPS`).
 
 When a query doesn't match, dump the hierarchy instead of guessing — a throwaway test that prints
 `app.debugDescription` answers it in one run.

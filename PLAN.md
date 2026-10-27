@@ -27,14 +27,14 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 ## 1. Where things stand — 2026-10-24
 
 All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 398 in
-`MaxActCore` (`swift test`), 95 app and UI tests (`RunAllTests` — ask first, then leave the Mac
+`MaxActCore` (`swift test`), 96 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~15 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
 
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** 49 (connection settings in Settings only) or 36 (README)
+**Next:** 36 (README)
 (README). 24's live run waits for HAE's fix (21). Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
@@ -44,7 +44,7 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–20, 22, 23, 25, 26, 27, 29–32, 34, 35, 28, 37–48 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–20, 22, 23, 25, 26, 27, 29–32, 34, 35, 28, 37–49 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
 **21. Health Auto Export bug report** *(sent by the user 2026-10-14; HAE acknowledged it and asked
@@ -129,13 +129,10 @@ Checked and fine in 28:
 - TCX escaping;
 - health data never leaves the sandbox container.
 
-**49. Connection settings live in Settings only** *(requested 2026-10-27)* — the iPhone address,
-token, HTTPS and certificate are edited in three places: Settings, the sync panel and the welcome
-sheet (all but Settings through `ConnectionFields`). The same control looks different in each: "Use
-HTTPS" is a switch in Settings' grouped form and a checkbox in the panel. Strava is configured only
-in Settings. Proposal: the sync panel keeps only syncing, plus a status line and a "Connection
-Settings…" button when not configured. To decide: whether the welcome sheet keeps the fields (it's
-first-run guidance) or opens Settings, and where Test Connection lives.
+**Follow-up from 49 — Settings' fields have no accessible names.** In the grouped form the address
+field announces only its prompt ("required"), and the Use HTTPS switch has no name of its own; their
+titles are separate texts. The tests find them by identifier. Check with VoiceOver, and label them
+if it reads them badly (the Strava and heart-rate fields look the same).
 
 **36. A visual README** *(requested 2026-10-26; after the audits)* — a `README.md` at the root that
 introduces MaxAct and shows its features: what it is (a Mac browser for Apple Health workouts
