@@ -276,7 +276,7 @@ Turning on HTTPS in HAE's server settings offers to **export a CA certificate**.
   maximum temporal validity period" (825 days). `GuardedSession` therefore evaluates with
   `SecPolicyCreateBasicX509` (chain to the pinned CA, dates, signatures) and no name check.
 - **HTTPS and HTTP can't be mixed.** An HTTPS client against HAE on HTTP hangs: each waits for the
-  other. (The other way round: not yet measured.) `HAEWorkoutSource.connect` has a 10 s
+  other. The other way round fails at once (0.28 s, `networkConnectionLost`). `HAEWorkoutSource.connect` has a 10 s
   deadline for this.
 - TLS adds nothing measurable: the phone's ~2.4 s per workout dominates.
 - `LiveTLSTests` (`MAXACT_LIVE_HOST=https://…`, `MAXACT_LIVE_CA=<pem>`) times a week's sync, and

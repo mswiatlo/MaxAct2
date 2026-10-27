@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** finish 48 (the user's check, the full UI run, merge), then 36
+**Next:** finish 48 (the full UI run, merge), then 49 or 36
 (README). 24's live run waits for HAE's fix (21). Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
@@ -112,7 +112,8 @@ replaces in about 0.5 s. Unexplained. Next ideas: whether `Table` builds row vie
 6.5 s on every growth before 44.
 
 **48. HTTPS to Health Auto Export** (S4; the user's idea) — *built on `hae-https` 2026-10-27;
-waiting on the user's check in the real app and the full UI run.* MaxAct pins HAE's own CA
+checked by the user (Test Connection over HTTPS passes; the token moved to the Keychain); waiting on
+the full UI run.* MaxAct pins HAE's own CA
 (loaded from the file HAE exports, fingerprint shown), trusts nothing else for the phone, and keeps
 plain HTTP as an option labelled less safe. The token moved from the preferences to the Keychain.
 Measured: TLS costs nothing noticeable. Diagnosis and numbers in `HISTORY.md` §2 once merged.
@@ -134,6 +135,14 @@ Checked and fine in 28:
 - system TLS for Strava;
 - TCX escaping;
 - health data never leaves the sandbox container.
+
+**49. Connection settings live in Settings only** *(requested 2026-10-27)* — the iPhone address,
+token, HTTPS and certificate are edited in three places: Settings, the sync panel and the welcome
+sheet (all but Settings through `ConnectionFields`). The same control looks different in each: "Use
+HTTPS" is a switch in Settings' grouped form and a checkbox in the panel. Strava is configured only
+in Settings. Proposal: the sync panel keeps only syncing, plus a status line and a "Connection
+Settings…" button when not configured. To decide: whether the welcome sheet keeps the fields (it's
+first-run guidance) or opens Settings, and where Test Connection lives.
 
 **36. A visual README** *(requested 2026-10-26; after the audits)* — a `README.md` at the root that
 introduces MaxAct and shows its features: what it is (a Mac browser for Apple Health workouts

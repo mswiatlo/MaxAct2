@@ -1429,7 +1429,8 @@ and remove over a selection; and that a workout with no flag changes issues no `
     HTTP. One detail (3,214 points): 6.0 s against 6.1 s. Handshake 0.1–0.3 s either way.
   - MaxAct on HTTPS against HAE on HTTP hung, each side waiting for the other to speak. It was
     still waiting after 5 minutes. The handshake now has a 10 s deadline (10.6 s measured), and the
-    advice says to check HTTPS matches.
+    advice says to check HTTPS matches. The other way round, HTTP against HAE on HTTPS, fails in
+    0.28 s ("network connection lost").
   - A bad token is rejected at the handshake (HTTP 401 to `initialize`), which settles a known
     limitation.
 

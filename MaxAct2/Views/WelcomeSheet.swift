@@ -36,7 +36,8 @@ struct HTTPSFields: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             } else {
-                Label("Less safe: anyone on this network can read the token and your workouts as they sync.",
+                // Names the cause — HTTPS being off — so it can't read as a warning about the toggle.
+                Label("HTTPS is off, which is less safe: anyone on this network can read the token and your workouts as they sync.",
                       systemImage: "exclamationmark.triangle")
                     .font(.caption)
                     .foregroundStyle(.orange)

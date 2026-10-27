@@ -288,7 +288,7 @@ final class MaxAct2UITests: XCTestCase {
         let token = app.secureTextFields.firstMatch
         token.click(); token.typeText("test-token")
         XCTAssertTrue(startSync.isEnabled, "Plain HTTP (the UI-test default) needs no certificate.")
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "value BEGINSWITH %@", "Less safe")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "value BEGINSWITH %@", "HTTPS is off")).firstMatch.exists)
 
         app.checkBoxes["Use HTTPS"].click()
         XCTAssertTrue(app.buttons["Load Certificate…"].waitForExistence(timeout: 3))
