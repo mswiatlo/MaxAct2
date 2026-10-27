@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** the security fixes 45–48 in order, then 36
+**Next:** the security fixes 47 and 48, then 36
 (README). 24's live run waits for HAE's fix (21). Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
@@ -44,7 +44,7 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–20, 22, 23, 25, 26, 27, 29–32, 34, 35, 28, 37–44 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–20, 22, 23, 25, 26, 27, 29–32, 34, 35, 28, 37–46 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
 **21. Health Auto Export bug report** *(sent by the user 2026-10-14; HAE acknowledged it and asked
@@ -110,30 +110,6 @@ runs), or a later big insertion if recorded at load (1.9 s). A table built durin
 replaces in about 0.5 s. Unexplained. Next ideas: whether `Table` builds row views for every row
 (Instruments, SwiftUI template), and what tearing one down costs. It's once per session, against
 6.5 s on every growth before 44.
-
-**45. Validate input from the phone** *(built 2026-10-27 on `input-validation`, awaiting the full UI
-run; nothing visible changes)* — `InputLimits` (new) holds the rules:
-- **Fails the workout** (reported like any unreadable one):
-  - an id that isn't letters, digits and hyphens (up to 64);
-  - a duration outside 0–7 days.
-- **Dropped, keeping the workout:**
-  - optional figures beyond a ceiling per unit (10,000 km, 10⁶ kcal, 1,000 m/s, 300 bpm);
-  - route points outside ±90/±180, and impossible altitude, speed or accuracy readings;
-  - heart-rate readings over 300.
-- **File names:** series, thumbnail and upload file names go through `InputLimits.fileComponent`,
-  which escapes anything else. Valid ids keep their names, so no existing file moves.
-- **No more traps:** formatters, TCX and heatmap tiles use `Int(saturating:)` instead of `Int(…)`,
-  which trapped on 1e300.
-
-Tests: `InputValidationTests`, 7 (19 cases); the id, path and range guards are each
-mutation-checked.
-
-**46. Revoke on Disconnect** *(built 2026-10-27 on `strava-revoke`)* — Disconnect now asks Strava
-to revoke access (`POST /oauth/deauthorize`, refreshing a stale token first), then deletes the
-tokens here either way. If Strava doesn't confirm, the banner says so and points to
-strava.com/settings/apps. Settings ▸ Strava says what Disconnect does. Tests: 2, mutation-checked.
-**Not yet seen against the live API:** the next real Disconnect should leave the app gone from
-strava.com/settings/apps.
 
 **47. Hardening** —
 - a hidden field (`SecureField`) for the HAE token;

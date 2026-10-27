@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed or closed known issues (1–20, 22, 23, 25–32, 34, 35, 37–44)
+## 2. Fixed or closed known issues (1–20, 22, 23, 25–32, 34, 35, 37–46)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -518,6 +518,29 @@ other in order, and ranking by time. Checked on a copy: the newest commute 92 ti
 times, 3rd. Extended the next day: pointing at an attempt shows its exact date, time and
 duration, and clicking it opens that workout and scrolls the table to it (`AppModel.reveal`). If
 a search or filter hides it, the table goes back to All Workouts. Going back is issue 32.
+
+**45. ~~Validate input from the phone.~~ — done 2026-10-27.** — `InputLimits` (new) holds the rules:
+- **Fails the workout** (reported like any unreadable one):
+  - an id that isn't letters, digits and hyphens (up to 64);
+  - a duration outside 0–7 days.
+- **Dropped, keeping the workout:**
+  - optional figures beyond a ceiling per unit (10,000 km, 10⁶ kcal, 1,000 m/s, 300 bpm);
+  - route points outside ±90/±180, and impossible altitude, speed or accuracy readings;
+  - heart-rate readings over 300.
+- **File names:** series, thumbnail and upload file names go through `InputLimits.fileComponent`,
+  which escapes anything else. Valid ids keep their names, so no existing file moves.
+- **No more traps:** formatters, TCX and heatmap tiles use `Int(saturating:)` instead of `Int(…)`,
+  which trapped on 1e300.
+
+Tests: `InputValidationTests`, 7 (19 cases); the id, path and range guards are each
+mutation-checked.
+
+**46. ~~Revoke on Disconnect.~~ — done 2026-10-27.** — Disconnect now asks Strava
+to revoke access (`POST /oauth/deauthorize`, refreshing a stale token first), then deletes the
+tokens here either way. If Strava doesn't confirm, the banner says so and points to
+strava.com/settings/apps. Settings ▸ Strava says what Disconnect does. Tests: 2, mutation-checked.
+**Not yet seen against the live API:** the next real Disconnect should leave the app gone from
+strava.com/settings/apps.
 
 **28. ~~Security audit.~~ — done 2026-10-27, triaged with the user.** — three read-only reviews
 (secrets, logging and test isolation; the network links and OAuth; untrusted input and data at
@@ -1376,6 +1399,8 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-27** — **Issues 45 and 46 closed**, with the correction to 44. Full suite: 84 passed, 4 skipped, 1 expected failure.
 
 - **2026-10-27** — **44 corrected.** The attempt-jump UI test failed twice. Its trace showed the
   row scrolled away after the jump: a same-value write from the sidebar list or the search field
