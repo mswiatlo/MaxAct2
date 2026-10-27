@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed or closed known issues (1–20, 22, 23, 25–32, 34, 35, 37–46)
+## 2. Fixed or closed known issues (1–20, 22, 23, 25–32, 34, 35, 37–47)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -518,6 +518,22 @@ other in order, and ranking by time. Checked on a copy: the newest commute 92 ti
 times, 3rd. Extended the next day: pointing at an attempt shows its exact date, time and
 duration, and clicking it opens that workout and scrolls the table to it (`AppModel.reveal`). If
 a search or filter hides it, the table goes back to All Workouts. Going back is issue 32.
+
+**47. ~~Hardening.~~ — done 2026-10-27, checked by the user (no Keychain prompt under Hardened Runtime).** —
+- **The HAE token is a `SecureField`** in Settings and in the connection fields; UI tests type into
+  `secureTextFields`.
+- **Private logs:** HAE error replies, decoder failures and the heart-rate lookup failure.
+- **`GuardedSession` (new), shared by both transports:**
+  - refuses redirects. Measured: without it, the request really did go on to the redirect's host.
+  - abandons replies over 256 MB, whether or not the length is declared.
+  - gathers the reply in chunks. `bytes(for:)` was ruled out: 35 s for 5 MB in debug, against
+    0.02 s.
+- **Build settings:** the user-selected-files entitlement removed; Hardened Runtime on. The signed
+  app shows the runtime flag; its entitlements are now sandbox and network client, plus
+  `get-task-allow` in Debug.
+- **`inMemoryFallback`** has no default secret store; the production fallback passes the Keychain
+  explicitly.
+- **Tests:** `GuardedSessionTests`, 3, mutation-checked (redirect, size).
 
 **45. ~~Validate input from the phone.~~ — done 2026-10-27.** — `InputLimits` (new) holds the rules:
 - **Fails the workout** (reported like any unreadable one):
@@ -1399,6 +1415,11 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-27** — **Issue 47 closed.** The full suite failed 3 tests that still typed the token
+  into a plain text field (missed when the first three were updated). They were fixed and rerun:
+  3 passed. The other 81 had passed in the same run against the same app code, plus 4 skipped and
+  1 expected failure.
 
 - **2026-10-27** — **47 built: hardening.** Measured on the way: `URLSession` followed the stub's
   redirect and sent the request on, confirming audit finding S7. Reading a reply byte by byte with

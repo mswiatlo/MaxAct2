@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** the security fixes 47 and 48, then 36
+**Next:** 48 (HTTPS to HAE; needs the phone), then 36
 (README). 24's live run waits for HAE's fix (21). Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
@@ -44,7 +44,7 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–20, 22, 23, 25, 26, 27, 29–32, 34, 35, 28, 37–46 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–20, 22, 23, 25, 26, 27, 29–32, 34, 35, 28, 37–47 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
 **21. Health Auto Export bug report** *(sent by the user 2026-10-14; HAE acknowledged it and asked
@@ -110,24 +110,6 @@ runs), or a later big insertion if recorded at load (1.9 s). A table built durin
 replaces in about 0.5 s. Unexplained. Next ideas: whether `Table` builds row views for every row
 (Instruments, SwiftUI template), and what tearing one down costs. It's once per session, against
 6.5 s on every growth before 44.
-
-**47. Hardening** *(built 2026-10-27 on `hardening`, awaiting the user's check)* —
-- **The HAE token is a `SecureField`** in Settings and in the connection fields; UI tests type into
-  `secureTextFields`.
-- **Private logs:** HAE error replies, decoder failures and the heart-rate lookup failure.
-- **`GuardedSession` (new), shared by both transports:**
-  - refuses redirects. Measured: without it, the request really did go on to the redirect's host.
-  - abandons replies over 256 MB, whether or not the length is declared.
-  - gathers the reply in chunks. `bytes(for:)` was ruled out: 35 s for 5 MB in debug, against
-    0.02 s.
-- **Build settings:** the user-selected-files entitlement removed; Hardened Runtime on. The signed
-  app shows the runtime flag; its entitlements are now sandbox and network client, plus
-  `get-task-allow` in Debug.
-- **`inMemoryFallback`** has no default secret store; the production fallback passes the Keychain
-  explicitly.
-- **Tests:** `GuardedSessionTests`, 3, mutation-checked (redirect, size).
-- **To check:** the app launches; Strava still shows connected; the token field shows dots and
-  takes a paste.
 
 **48. HTTPS to Health Auto Export** (S4; the user's idea) — HAE's MCP server has an HTTPS option.
 Plain HTTP lets anyone on the same Wi-Fi read the token and the workouts, or impersonate the phone.

@@ -325,7 +325,7 @@ final class MaxAct2UITests: XCTestCase {
         let address = app.textFields.element(boundBy: 0)
         XCTAssertTrue(address.waitForExistence(timeout: 5))
         address.click(); address.typeText("10.255.255.1")
-        let token = app.textFields.element(boundBy: 1)
+        let token = app.secureTextFields.firstMatch   // the token, hidden (issue 47)
         token.click(); token.typeText("irrelevant")
 
         app.popUpButtons["Import"].click()
@@ -360,7 +360,7 @@ final class MaxAct2UITests: XCTestCase {
         XCTAssertTrue(address.waitForExistence(timeout: 5))
         address.click()
         address.typeText("127.0.0.1")     // this Mac, where nothing listens on 9000: refused at once
-        let token = app.textFields.element(boundBy: 1)
+        let token = app.secureTextFields.firstMatch   // the token, hidden (issue 47)
         token.click()
         token.typeText("irrelevant")
         app.buttons["Start Sync"].click()
@@ -390,7 +390,7 @@ final class MaxAct2UITests: XCTestCase {
         address.click()
         address.typeText("10.255.255.1")     // unroutable: the sync stays "running"
 
-        let token = app.textFields.element(boundBy: 1)
+        let token = app.secureTextFields.firstMatch   // the token, hidden (issue 47)
         token.click()
         token.typeText("irrelevant")
 
