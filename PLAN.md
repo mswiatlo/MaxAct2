@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** the code-quality fixes 41–43 in order, then 28 (security audit), then 36
+**Next:** the code-quality fixes 42 and 43, then 28 (security audit), then 36
 (README). 24's live run waits for HAE's fix (21). Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
@@ -44,7 +44,7 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–20, 22, 23, 25, 26, 27, 29–32, 34, 35, 37–40 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–20, 22, 23, 25, 26, 27, 29–32, 34, 35, 37–41 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
 **21. Health Auto Export bug report** *(sent by the user 2026-10-14; HAE acknowledged it and asked
@@ -92,27 +92,6 @@ morning run abroad can be named "Night Run". The fix depends on what HAE's UTC o
 is unmeasured: the recording's own zone, or the phone's zone at export. (The fixtures can't tell:
 `make_fixture.py` moves dates but keeps the offset.) Next time the phone is connected, fetch a
 winter workout. If it reads `-0800`, the offset is the recording's: store it and name by it.
-
-**41. Performance** *(built 2026-10-27 on `performance`, awaiting the user's check)* — measured
-first on a copy of the library (481 workouts with routes, up to 12,992 points), in a debug build:
-
-| | Before | Now |
-|---|---|---|
-| Heatmap places, on every Statistics redraw | 238 ms | 0.1 ms when cached; 78 ms when the routes shown change |
-| Opening a workout (derivation) | 27 ms median, 72 p95, 194 max, main actor | the same, but detached |
-| Preparing a thumbnail | 4–8 ms median, 64 max, main actor | the same, but detached |
-
-- **Heatmap:** the framing box is now worked out from at most 4,000 evenly spaced points. The
-  places are cached in `AppModel.heatmapRegions`, keyed on the routes shown, the sketches and the
-  place names.
-- **Finished thumbnails are kept** even if scrolling cancelled their task.
-- **Measured and left alone:** everything else Statistics computes, about 20 ms per redraw in all
-  (totals, history, year, training load, consistency, bests twice); sorting the library, 0.4 ms;
-  one `cleanedRoute`, 1.2 ms. The per-week reload in `sync` was already fixed in 39.
-- **`PerformanceProbeTests`** (`MAXACT_PERF_LIBRARY=<copy>`) re-runs all of this.
-
-Tests: 2 app tests guard the cache against staleness; both fail with the cache key ignored. To
-check: Statistics, especially hovering charts, and arrowing quickly down the table.
 
 **42. Structure, duplication and dead code** (no change in behaviour):
 - Split `DetailPane`, `StatisticsView` and `WorkoutStore`.

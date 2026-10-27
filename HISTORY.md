@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed or closed known issues (1–20, 22, 23, 25–27, 29–32, 34, 35, 37–40)
+## 2. Fixed or closed known issues (1–20, 22, 23, 25–27, 29–32, 34, 35, 37–41)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -518,6 +518,26 @@ other in order, and ranking by time. Checked on a copy: the newest commute 92 ti
 times, 3rd. Extended the next day: pointing at an attempt shows its exact date, time and
 duration, and clicking it opens that workout and scrolls the table to it (`AppModel.reveal`). If
 a search or filter hides it, the table goes back to All Workouts. Going back is issue 32.
+
+**41. ~~Performance.~~ — done 2026-10-27, confirmed by the user ("both feel much better").** — measured
+first on a copy of the library (481 workouts with routes, up to 12,992 points), in a debug build:
+
+| | Before | Now |
+|---|---|---|
+| Heatmap places, on every Statistics redraw | 238 ms | 0.1 ms when cached; 78 ms when the routes shown change |
+| Opening a workout (derivation) | 27 ms median, 72 p95, 194 max, main actor | the same, but detached |
+| Preparing a thumbnail | 4–8 ms median, 64 max, main actor | the same, but detached |
+
+- **Heatmap:** the framing box is now worked out from at most 4,000 evenly spaced points. The
+  places are cached in `AppModel.heatmapRegions`, keyed on the routes shown, the sketches and the
+  place names.
+- **Finished thumbnails are kept** even if scrolling cancelled their task.
+- **Measured and left alone:** everything else Statistics computes, about 20 ms per redraw in all
+  (totals, history, year, training load, consistency, bests twice); sorting the library, 0.4 ms;
+  one `cleanedRoute`, 1.2 ms. The per-week reload in `sync` was already fixed in 39.
+- **`PerformanceProbeTests`** (`MAXACT_PERF_LIBRARY=<copy>`) re-runs all of this.
+
+Tests: 2 app tests guard the cache against staleness; both fail with the cache key ignored.
 
 **40. ~~Silent failures.~~ — done 2026-10-27, confirmed by the user.** —
 - **Your own changes that fail are shown in the error banner and logged.** This covers route
@@ -1278,6 +1298,8 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-27** — **Issue 41 closed**, confirmed by the user. Full suite, with Do Not Disturb on: 78 passed, 3 skipped.
 
 - **2026-10-27** — **41 built: performance, measured first.** Of the audit's eight suspects, three
   showed:
