@@ -184,30 +184,41 @@ public enum WorkoutStatistics {
     public static func byPeriod(
         _ period: StatisticsPeriod, of workouts: [Workout], through now: Date, calendar: Calendar
     ) -> [PeriodTotals] {
-        guard let first = workouts.map(\.start).min() else { return [] }
-        let last = max(now, workouts.map(\.start).max() ?? now)
+        var buckets = periods(period, covering: workouts.map(\.start), through: now, calendar: calendar)
+            .map { PeriodTotals(interval: $0) }
+        let starts = buckets.map(\.interval.start)
+        for workout in workouts {
+            if let index = bucket(of: workout.start, starts: starts) { buckets[index].add(workout) }
+        }
+        return buckets
+    }
 
-        var buckets: [PeriodTotals] = []
+    /// Every period from the one holding the earliest of `dates` through the one containing
+    /// `now` (or the latest date, if later), empty ones included.
+    static func periods(
+        _ period: StatisticsPeriod, covering dates: [Date], through now: Date, calendar: Calendar
+    ) -> [DateInterval] {
+        guard let first = dates.min() else { return [] }
+        let last = max(now, dates.max() ?? now)
+        var intervals: [DateInterval] = []
         var cursor = interval(of: period, containing: first, calendar: calendar)
         while cursor.start <= last {
-            buckets.append(PeriodTotals(interval: cursor))
+            intervals.append(cursor)
             // Step from the interval's end rather than adding a component to its start, which
             // drifts across DST changes and month lengths.
             cursor = interval(of: period, containing: cursor.end, calendar: calendar)
         }
+        return intervals
+    }
 
-        let starts = buckets.map(\.interval.start)
-        for workout in workouts {
-            // Binary search for the last bucket starting at or before the workout.
-            var low = 0, high = starts.count
-            while low < high {
-                let mid = (low + high) / 2
-                if starts[mid] <= workout.start { low = mid + 1 } else { high = mid }
-            }
-            guard low > 0 else { continue }
-            buckets[low - 1].add(workout)
+    /// The index of the last of `starts` (ascending) at or before `date`, by binary search.
+    static func bucket(of date: Date, starts: [Date]) -> Int? {
+        var low = 0, high = starts.count
+        while low < high {
+            let mid = (low + high) / 2
+            if starts[mid] <= date { low = mid + 1 } else { high = mid }
         }
-        return buckets
+        return low > 0 ? low - 1 : nil
     }
 
     /// Running totals for this year, last year and the best year, like HealthFit's comparison.

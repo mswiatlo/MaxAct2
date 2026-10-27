@@ -110,9 +110,7 @@ public struct RouteGradient: Sendable, Equatable {
     public func simplified(fittingPixels pixels: Int) -> [Run] {
         let all = runs.flatMap(\.coordinates)
         guard pixels > 0, let bounds = CoordinateBounds(all) else { return runs }
-        let scale = cos(bounds.centre.latitude * .pi / 180)
-        let span = max(bounds.latitudeSpan, bounds.longitudeSpan * scale)
-        let tolerance = span / Double(pixels) / 2
+        let tolerance = RouteSimplifier.tolerance(for: bounds, fittingPixels: pixels)
         return runs.map { Run(coordinates: RouteSimplifier.simplify($0.coordinates, tolerance: tolerance), shade: $0.shade) }
     }
 
@@ -152,10 +150,7 @@ public struct RouteGradient: Sendable, Equatable {
     /// Speed at each fix: distance over ±`window` seconds, divided by the time. `nil` inside a
     /// pause, where there's no honest speed.
     static func speeds(_ route: [RoutePoint], window: TimeInterval) -> [Double?] {
-        var cumulative = [0.0]
-        for (a, b) in zip(route, route.dropFirst()) {
-            cumulative.append(cumulative[cumulative.count - 1] + WorkoutSplits.distance(from: a.coordinate, to: b.coordinate))
-        }
+        let cumulative = WorkoutSplits.cumulativeDistances(route)
         var result: [Double?] = []
         var lo = 0, hi = 0
         for i in route.indices {
@@ -174,10 +169,7 @@ public struct RouteGradient: Sendable, Equatable {
     /// one-sided (measured); a fit stays true there and still averages out height noise.
     /// `nil` without heights, or where the window covers under 20 m (no honest slope).
     static func grades(_ route: [RoutePoint], halfWindow: Double = 50) -> [Double?] {
-        var cumulative = [0.0]
-        for (a, b) in zip(route, route.dropFirst()) {
-            cumulative.append(cumulative[cumulative.count - 1] + WorkoutSplits.distance(from: a.coordinate, to: b.coordinate))
-        }
+        let cumulative = WorkoutSplits.cumulativeDistances(route)
         var result: [Double?] = []
         var lo = 0, hi = 0
         for i in route.indices {

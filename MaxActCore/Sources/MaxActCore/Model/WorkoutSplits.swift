@@ -82,7 +82,7 @@ public enum WorkoutSplits {
         let route = series.cleanedRoute
         guard route.count >= 2 else { return [] }
 
-        let steps = zip(route, route.dropFirst()).map { distance(from: $0.coordinate, to: $1.coordinate) }
+        let steps = stepDistances(route)
         let measured = steps.reduce(0, +)
         guard measured > 0 else { return [] }
         let scale = totalDistance / measured
@@ -235,6 +235,19 @@ public enum WorkoutSplits {
         let a = sin(deltaLat / 2) * sin(deltaLat / 2)
             + cos(lat1) * cos(lat2) * sin(deltaLon / 2) * sin(deltaLon / 2)
         return 2 * earthRadius * asin(min(1, sqrt(a)))
+    }
+
+    /// The distance between each pair of consecutive fixes, in metres: one fewer than `route`.
+    public static func stepDistances(_ route: [RoutePoint]) -> [Double] {
+        zip(route, route.dropFirst()).map { distance(from: $0.coordinate, to: $1.coordinate) }
+    }
+
+    /// The distance along `route` to each fix, in metres, starting at 0.
+    public static func cumulativeDistances(_ route: [RoutePoint]) -> [Double] {
+        var cumulative = [0.0]
+        cumulative.reserveCapacity(route.count)
+        for step in stepDistances(route) { cumulative.append(cumulative[cumulative.count - 1] + step) }
+        return route.isEmpty ? [] : cumulative
     }
 }
 

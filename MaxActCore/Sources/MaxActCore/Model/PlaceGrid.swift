@@ -17,6 +17,8 @@ public enum PlaceGrid {
 
     /// Metres per degree of latitude. Constant enough for this: the variation from equator to pole
     /// is under 1%, which is nothing against a kilometre-sized cell.
+    /// Not `RouteMatcher.metresPerDegree` (111,195, the mean): changing this moves every snapped
+    /// cell, so every stored place would be looked up again.
     private static let metersPerDegreeLatitude: Double = 111_320
 
     /// Snaps to the nearest node of a roughly square grid.

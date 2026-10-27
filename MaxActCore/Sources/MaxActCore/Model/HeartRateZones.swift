@@ -92,16 +92,11 @@ extension HeartRateZone {
         _ workouts: [(start: Date, histogram: HeartRateHistogram)], profile: HeartRateProfile,
         period: StatisticsPeriod, through now: Date, calendar: Calendar
     ) -> [(interval: DateInterval, times: [HeartRateZone: TimeInterval])] {
-        guard let first = workouts.map(\.start).min() else { return [] }
-        var buckets: [(interval: DateInterval, histogram: HeartRateHistogram)] = []
-        var cursor = WorkoutStatistics.interval(of: period, containing: first, calendar: calendar)
-        let last = max(now, workouts.map(\.start).max() ?? now)
-        while cursor.start <= last {
-            buckets.append((cursor, HeartRateHistogram()))
-            cursor = WorkoutStatistics.interval(of: period, containing: cursor.end, calendar: calendar)
-        }
+        var buckets = WorkoutStatistics.periods(period, covering: workouts.map(\.start), through: now, calendar: calendar)
+            .map { (interval: $0, histogram: HeartRateHistogram()) }
+        let starts = buckets.map(\.interval.start)
         for workout in workouts {
-            guard let index = buckets.lastIndex(where: { $0.interval.start <= workout.start }) else { continue }
+            guard let index = WorkoutStatistics.bucket(of: workout.start, starts: starts) else { continue }
             buckets[index].histogram.add(workout.histogram)
         }
         return buckets.map { ($0.interval, times($0.histogram, profile: profile)) }

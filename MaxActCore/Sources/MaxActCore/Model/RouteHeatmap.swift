@@ -172,7 +172,7 @@ public enum RouteHeatmap {
                               among sketches: some Sequence<RouteSketch>) -> [String] {
         // Flat-earth metres around the click: exact enough over the few metres to few hundred
         // metres a click tolerance spans.
-        let metresPerDegree = 111_195.0
+        let metresPerDegree = RouteMatcher.metresPerDegree
         let cosLatitude = cos(point.latitude * .pi / 180)
         func planar(_ c: Coordinate) -> (x: Double, y: Double) {
             ((c.longitude - point.longitude) * metresPerDegree * cosLatitude,

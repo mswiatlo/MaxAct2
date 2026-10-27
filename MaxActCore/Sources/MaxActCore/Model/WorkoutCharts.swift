@@ -171,10 +171,18 @@ public enum WorkoutCharts {
     /// Uniform sampling that always keeps the first and last point, so a segment still starts and
     /// ends where it really did.
     static func thinned(_ points: [ChartPoint], to limit: Int) -> [ChartPoint] {
-        guard points.count > limit, limit >= 2 else { return points }
-        let stride = Double(points.count - 1) / Double(limit - 1)
-        var sampled = (0..<(limit - 1)).map { points[Int(Double($0) * stride)] }
-        sampled.append(points[points.count - 1])
+        points.evenlySampled(to: limit)
+    }
+}
+
+extension Array {
+    /// At most `limit` elements, evenly spaced, always keeping the first and last. Unchanged when
+    /// already short enough, or when `limit` is under 2 (nothing sensible to keep).
+    func evenlySampled(to limit: Int) -> [Element] {
+        guard count > limit, limit >= 2 else { return self }
+        let stride = Double(count - 1) / Double(limit - 1)
+        var sampled = (0..<(limit - 1)).map { self[Int(Double($0) * stride)] }
+        sampled.append(self[count - 1])
         return sampled
     }
 }

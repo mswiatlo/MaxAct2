@@ -130,25 +130,29 @@ public enum RouteSimplifier {
         guard coordinates.count > 2, pixels > 0, let bounds = CoordinateBounds(coordinates) else {
             return coordinates
         }
-        let scale = cos(bounds.centre.latitude * .pi / 180)
-        let span = max(bounds.latitudeSpan, bounds.longitudeSpan * scale)
-        guard span > 0 else { return [coordinates[0], coordinates[coordinates.count - 1]] }
+        let tolerance = tolerance(for: bounds, fittingPixels: pixels)
+        guard tolerance > 0 else { return [coordinates[0], coordinates[coordinates.count - 1]] }
 
         // RDP is O(n²) in the worst case, and a 1 Hz track hits it: one pass over the full
         // 12,645-point hike measured 42 ms. Decimating first bounds that term. Sixteen samples
         // per pixel is far more than can be distinguished, so nothing visible is lost, and the
         // subsequent RDP still chooses *which* points to keep by shape rather than by index.
         let working = decimate(coordinates, to: max(cap * 4, pixels * 16))
-        let simplified = simplify(working, tolerance: span / Double(pixels) / 2)
+        let simplified = simplify(working, tolerance: tolerance)
         return decimate(simplified, to: cap)
+    }
+
+    /// Half a pixel, in degrees, when `bounds` is drawn `pixels` across: finer than that can't be
+    /// seen. Longitude is scaled by latitude, so a north–south and an east–west route of the same
+    /// length get the same tolerance.
+    static func tolerance(for bounds: CoordinateBounds, fittingPixels pixels: Int) -> Double {
+        let scale = cos(bounds.centre.latitude * .pi / 180)
+        let span = max(bounds.latitudeSpan, bounds.longitudeSpan * scale)
+        return span / Double(pixels) / 2
     }
 
     /// Uniform sampling that always keeps the first and last point.
     static func decimate(_ coordinates: [Coordinate], to limit: Int) -> [Coordinate] {
-        guard coordinates.count > limit, limit > 2 else { return coordinates }
-        let stride = Double(coordinates.count - 1) / Double(limit - 1)
-        var sampled = (0..<(limit - 1)).map { coordinates[Int(Double($0) * stride)] }
-        sampled.append(coordinates[coordinates.count - 1])
-        return sampled
+        coordinates.evenlySampled(to: limit)
     }
 }

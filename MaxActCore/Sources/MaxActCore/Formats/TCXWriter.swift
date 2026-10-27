@@ -98,9 +98,7 @@ public enum TCXWriter {
     private static func routeTracks(
         _ route: [RoutePoint], workout: Workout, heartRate: [HeartRateSample]
     ) -> [[Point]] {
-        let steps = zip(route, route.dropFirst()).map {
-            WorkoutSplits.distance(from: $0.coordinate, to: $1.coordinate)
-        }
+        let steps = WorkoutSplits.stepDistances(route)
         let measured = steps.reduce(0, +)
         let scale = (workout.distanceMeters.map { measured > 0 ? $0 / measured : 1 }) ?? 1
 
