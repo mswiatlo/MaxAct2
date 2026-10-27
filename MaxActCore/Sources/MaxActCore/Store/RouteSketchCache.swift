@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Series digests — route sketches and heart-rate histograms — kept on disk so each stored series
 /// is read once (issue 15).
@@ -24,6 +25,7 @@ public actor RouteSketchCache {
     /// interleave at every `await`: a Delete All during the first build used to have its digests
     /// written straight back, and a re-download kept the old route's.
     private var generation = 0
+    private static let log = Logger(subsystem: "com.swiatlowski.MaxAct", category: "store")
     private var invalidations: [String: Int] = [:]
 
     /// - Parameter directory: defaults to `Application Support/com.swiatlowski.MaxAct`.
@@ -90,18 +92,29 @@ public actor RouteSketchCache {
     private func loadIfNeeded() {
         guard !loaded else { return }
         loaded = true
-        guard let compressed = try? Data(contentsOf: url),
-              let json = try? (compressed as NSData).decompressed(using: .lzfse) as Data,
-              let file = try? JSONDecoder().decode(File.self, from: json),
-              file.version == Self.version
-        else { return }
-        digests = file.digests
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        do {
+            let compressed = try Data(contentsOf: url)
+            let json = try (compressed as NSData).decompressed(using: .lzfse) as Data
+            let file = try JSONDecoder().decode(File.self, from: json)
+            // An older version is expected after an update, and simply rebuilt.
+            guard file.version == Self.version else { return }
+            digests = file.digests
+        } catch {
+            // Rebuilt from the series either way; logged so a recurring failure shows (issue 40).
+            Self.log.error("Unreadable digest file, rebuilding: \(String(describing: error), privacy: .public)")
+        }
     }
 
     private func save() {
-        guard let json = try? JSONEncoder().encode(File(version: Self.version, digests: digests)),
-              let compressed = try? (json as NSData).compressed(using: .lzfse) as Data
-        else { return }
-        try? compressed.write(to: url, options: .atomic)
+        do {
+            let json = try JSONEncoder().encode(File(version: Self.version, digests: digests))
+            let compressed = try (json as NSData).compressed(using: .lzfse) as Data
+            try compressed.write(to: url, options: .atomic)
+        } catch {
+            // Not fatal — the digests are in memory, and rebuilt next launch — but every launch
+            // would then pay the full first build again, so say so (issue 40).
+            Self.log.error("Couldn't save digests: \(String(describing: error), privacy: .public)")
+        }
     }
 }

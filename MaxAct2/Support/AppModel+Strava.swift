@@ -21,7 +21,13 @@ extension AppModel {
 
     /// Returns a description of the first failure, if any; everything that succeeded is cleared.
     func sendPendingStravaFlags() async -> String? {
-        guard let pending = try? await store.pendingStravaFlags() else { return nil }
+        let pending: [(workoutID: String, activityID: Int, kind: ActivityKind, flags: StravaFlags)]
+        do {
+            pending = try await store.pendingStravaFlags()
+        } catch {
+            // Was read as "nothing pending" — a success — so the edits silently waited (issue 40).
+            return "Couldn't read the tag edits waiting for Strava: \(error.localizedDescription)"
+        }
         for entry in pending {
             do {
                 var update = StravaActivityUpdate(commute: entry.flags.commute, trainer: entry.flags.trainer)
@@ -34,7 +40,12 @@ extension AppModel {
                     update.workoutType = StravaRace.value(toSend: race, for: entry.kind, current: current)
                 }
                 try await strava.updateActivity(id: entry.activityID, update)
-                try? await store.clearStravaFlagsPending(entry.workoutID)
+                do {
+                    try await store.clearStravaFlagsPending(entry.workoutID)
+                } catch {
+                    // Harmless — the same values are sent again next time — but worth knowing.
+                    Self.log.error("Couldn't clear sent tag edits for \(entry.workoutID, privacy: .public): \(String(describing: error), privacy: .public)")
+                }
             } catch {
                 return "Couldn't update tags on Strava: \(Self.describeUpload(error)). "
                     + "They'll be sent again with the next check or upload."
@@ -48,6 +59,7 @@ extension AppModel {
         let credentials = await stravaSecrets.credentials()
         isStravaConfigured = credentials?.isComplete ?? false
         let tokens = await stravaSecrets.tokens()
+        stravaReadProblem = await stravaSecrets.readProblem()
         // A connection with no name still counts — the name is cosmetic, the token isn't.
         stravaAthlete = tokens.map { $0.athleteName?.isEmpty == false ? $0.athleteName! : "Strava athlete" }
     }
@@ -177,7 +189,11 @@ extension AppModel {
     }
 
     func disconnectStrava() async {
-        try? await strava.disconnect()
+        do {
+            try await strava.disconnect()
+        } catch {
+            reportFailedChange("Couldn't disconnect from Strava", error)
+        }
         await refreshStravaConnection()
     }
 
@@ -207,24 +223,30 @@ extension AppModel {
         // duplicate, after spending a write and a few polls to find that out. If the check itself
         // fails, carry on — Strava's own duplicate detection still stands behind the upload.
         _ = await sendPendingStravaFlags()
-        _ = try? await markWorkoutsAlreadyOnStrava(requested.map(\.workout))
+        do {
+            _ = try await markWorkoutsAlreadyOnStrava(requested.map(\.workout))
+        } catch {
+            Self.log.error("Strava check before upload failed; uploading anyway: \(String(describing: error), privacy: .public)")
+        }
         let alreadyThere = Set(self.items.filter { $0.stravaState.isOnStrava }.map(\.id))
         let items = requested.filter { !alreadyThere.contains($0.id) }
         guard !items.isEmpty else { return .finished(.uploadingToStrava, found: 0) }
 
-        for item in items { try? await store.setStravaState(.queued, for: item.id) }
+        for item in items { await recordStravaState(.queued, for: item.id) }
         await refreshItems()
 
         var uploaded = 0
+        var unrecorded = 0
         var index = 0
         while index < items.count, !Task.isCancelled {
             let item = items[index]
             syncStatus = .running(.uploadingToStrava, completed: index, total: items.count, found: uploaded)
             do {
                 let result = try await uploadOne(item, with: uploader)
-                try? await store.setStravaState(
-                    result.state, activityID: result.activityID, uploadID: result.uploadID, for: item.id
-                )
+                if !(await recordStravaState(result.state, activityID: result.activityID,
+                                             uploadID: result.uploadID, for: item.id)) {
+                    unrecorded += 1
+                }
                 if result.state.isOnStrava { uploaded += 1 }
                 index += 1
             } catch StravaError.rateLimited(let until) {
@@ -242,7 +264,7 @@ extension AppModel {
                 // "failed: cancelled"). Left as it was — still queued, it goes back to not
                 // uploaded below; already accepted, it stays uploading and is resumed later.
                 if Task.isCancelled { break }
-                try? await store.setStravaState(.failed(reason: Self.describeUpload(error)), for: item.id)
+                await recordStravaState(.failed(reason: Self.describeUpload(error)), for: item.id)
                 index += 1
             }
             await refreshItems()
@@ -250,6 +272,13 @@ extension AppModel {
 
         if Task.isCancelled { await requeue(items[index...]) }
         await refreshItems()
+        if unrecorded > 0 {
+            // The uploads happened; MaxAct just can't remember them, so the table is wrong until a
+            // Strava check puts it right (issue 40).
+            reportFailedChange("Uploaded, but couldn't save the result for \(unrecorded) workout"
+                               + (unrecorded == 1 ? "" : "s") + ". Check Strava (⌥⌘U) to put the table right",
+                               StoreWriteFailed())
+        }
         return .finished(.uploadingToStrava, found: uploaded)
     }
 
@@ -257,18 +286,29 @@ extension AppModel {
     /// instead. Re-uploading an accepted workout would only earn a "duplicate" and spend a write.
     func uploadOne(_ item: WorkoutListItem, with uploader: StravaUploader) async throws -> UploadResult {
         let options = UploadOptions(flags: StravaFlags(tags: item.tags), muted: settings.muteStravaUploads)
-        if let inFlight = try? await store.itemsUploadingToStrava().first(where: { $0.id == item.id }) {
-            return try await uploader.resume(uploadID: inFlight.uploadID, workout: item.workout, options: options)
+        let inFlight: [(id: String, uploadID: Int)]
+        do {
+            inFlight = try await store.itemsUploadingToStrava()
+        } catch {
+            // Uploading afresh is still safe — Strava rejects the duplicate — but costs a write.
+            Self.log.error("Couldn't read uploads in flight; sending \(item.id, privacy: .public) afresh: \(String(describing: error), privacy: .public)")
+            inFlight = []
+        }
+        if let entry = inFlight.first(where: { $0.id == item.id }) {
+            return try await uploader.resume(uploadID: entry.uploadID, workout: item.workout, options: options)
         }
         guard let series = await seriesStore.loadIfAvailable(item.id) else {
             return UploadResult(state: .failed(reason: "No route or heart rate stored — download detail first"),
                                 activityID: nil, uploadID: nil, warning: nil)
         }
-        let store = store
-        let id = item.id
+        let store = store, id = item.id, log = Self.log
         return try await uploader.send(item.workout, series: series, options: options) { uploadID in
             // Persisted before polling starts, so a quit mid-wait resumes instead of re-uploading.
-            try? await store.setStravaState(.uploading, uploadID: uploadID, for: id)
+            do {
+                try await store.setStravaState(.uploading, uploadID: uploadID, for: id)
+            } catch {
+                log.error("Couldn't save upload \(uploadID) for \(id, privacy: .public): \(String(describing: error), privacy: .public)")
+            }
         }
     }
 
@@ -279,20 +319,43 @@ extension AppModel {
         hasResumedUploads = true
         resumeTask = Task {
             defer { resumeTask = nil }
-            guard let inFlight = try? await store.itemsUploadingToStrava(), !inFlight.isEmpty else { return }
+            let inFlight: [(id: String, uploadID: Int)]
+            do {
+                inFlight = try await store.itemsUploadingToStrava()
+            } catch {
+                Self.log.error("Couldn't read uploads to resume (tried again next launch): \(String(describing: error), privacy: .public)")
+                return
+            }
+            guard !inFlight.isEmpty else { return }
             let uploader = StravaUploader(client: strava)
             for entry in inFlight {
                 guard let item = items.first(where: { $0.id == entry.id }) else { continue }
                 let options = UploadOptions(flags: StravaFlags(tags: item.tags),
                                             muted: settings.muteStravaUploads)
-                if let result = try? await uploader.resume(uploadID: entry.uploadID, workout: item.workout,
-                                                           options: options) {
-                    try? await store.setStravaState(
-                        result.state, activityID: result.activityID, uploadID: result.uploadID, for: entry.id
-                    )
+                do {
+                    let result = try await uploader.resume(uploadID: entry.uploadID, workout: item.workout,
+                                                           options: options)
+                    await recordStravaState(result.state, activityID: result.activityID,
+                                            uploadID: result.uploadID, for: entry.id)
+                } catch {
+                    // Still marked uploading, so it's resumed again next launch or with the next batch.
+                    Self.log.error("Couldn't resume upload \(entry.uploadID) for \(entry.id, privacy: .public): \(String(describing: error), privacy: .public)")
                 }
             }
             await refreshItems()
+        }
+    }
+
+    /// Saves a workout's Strava state; a failure is logged and reported back (issue 40).
+    @discardableResult
+    func recordStravaState(_ state: StravaState, activityID: Int? = nil, uploadID: Int? = nil,
+                           for workoutID: String) async -> Bool {
+        do {
+            try await store.setStravaState(state, activityID: activityID, uploadID: uploadID, for: workoutID)
+            return true
+        } catch {
+            Self.log.error("Couldn't save Strava state for \(workoutID, privacy: .public): \(String(describing: error), privacy: .public)")
+            return false
         }
     }
 
@@ -316,7 +379,7 @@ extension AppModel {
     func requeue(_ items: ArraySlice<WorkoutListItem>) async {
         let current = (try? await store.allItems()) ?? []
         for item in items where current.first(where: { $0.id == item.id })?.stravaState == .queued {
-            try? await store.setStravaState(.notUploaded, for: item.id)
+            await recordStravaState(.notUploaded, for: item.id)
         }
     }
 
@@ -376,4 +439,9 @@ extension AppModel {
         }
         return filled
     }
+}
+
+/// The store refused a write; the underlying errors are in the log.
+struct StoreWriteFailed: LocalizedError {
+    var errorDescription: String? { "the library couldn't be written" }
 }

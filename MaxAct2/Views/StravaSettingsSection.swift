@@ -42,6 +42,12 @@ struct StravaSettingsSection: View {
                           || clientSecret.trimmingCharacters(in: .whitespaces).isEmpty)
             }
 
+            if let keychain = model.stravaReadProblem {
+                Label("Couldn't read MaxAct's Strava details from the Keychain: \(keychain)",
+                      systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.orange)
+                    .font(.callout)
+            }
             if let problem {
                 Label(problem, systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.orange)

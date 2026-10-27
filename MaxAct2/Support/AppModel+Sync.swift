@@ -188,7 +188,12 @@ extension AppModel {
                     await routeSketchCache?.invalidate([item.id])
                     // A partial route comes back with every re-download; refill it from Strava.
                     if isStravaConnected, detail.series.routeIsIncomplete(duration: item.workout.duration) {
-                        _ = try? await fillIncompleteRoutes(in: [item])
+                        do {
+                            _ = try await fillIncompleteRoutes(in: [item])
+                        } catch {
+                            // The inspector still says the route is incomplete; the log says why.
+                            Self.log.error("Couldn't fill \(item.id, privacy: .public)'s route from Strava: \(String(describing: error), privacy: .public)")
+                        }
                     }
                     fetched += 1
                 }

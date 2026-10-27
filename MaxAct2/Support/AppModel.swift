@@ -16,6 +16,7 @@ final class AppModel {
     /// Written here and by the passes in the `AppModel+` extensions.
     var items: [WorkoutListItem] = []
     private(set) var isLoading = false
+    /// A failure loading or changing the library, shown in a banner until dismissed.
     private(set) var loadError: String?
 
     // MARK: View state
@@ -161,6 +162,8 @@ final class AppModel {
     /// Whether a client ID and secret have been entered, and whose account is connected.
     var isStravaConfigured = false
     var stravaAthlete: String?
+    /// Why the Keychain couldn't be read, when that's why Strava looks disconnected (issue 40).
+    var stravaReadProblem: String?
     var isStravaConnected: Bool { stravaAthlete != nil }
     var hasResumedUploads = false
     var flagPushTask: Task<Void, Never>?
@@ -459,7 +462,13 @@ final class AppModel {
     /// Download Detail re-fetches them and records exactly what was repaired (issue 22).
     private func markRepairsForRedownloadIfNeeded() async {
         guard !settings.hasMarkedRepairsForRedownload, items.contains(where: \.hasDetail) else { return }
-        guard let marked = try? await store.markRepairedSourcesForRedownload(seriesStore: seriesStore) else { return }
+        let marked: [String]
+        do {
+            marked = try await store.markRepairedSourcesForRedownload(seriesStore: seriesStore)
+        } catch {
+            Self.log.error("Couldn't mark repaired workouts for re-download (tried again next launch): \(String(describing: error), privacy: .public)")
+            return
+        }
         settings.hasMarkedRepairsForRedownload = true
         if !marked.isEmpty {
             await routeSketchCache?.invalidate(marked)
@@ -475,7 +484,13 @@ final class AppModel {
         guard !settings.hasRepairedSparseHeartRate, !isRepairingHeartRate, items.contains(where: \.hasDetail) else { return }
         isRepairingHeartRate = true
         defer { isRepairingHeartRate = false }
-        guard let marked = try? await store.markSparseHeartRateForRedownload(seriesStore: seriesStore) else { return }
+        let marked: [String]
+        do {
+            marked = try await store.markSparseHeartRateForRedownload(seriesStore: seriesStore)
+        } catch {
+            Self.log.error("Couldn't mark sparse heart rate for re-download (tried again next launch): \(String(describing: error), privacy: .public)")
+            return
+        }
         settings.hasRepairedSparseHeartRate = true
         if !marked.isEmpty {
             await routeSketchCache?.invalidate(marked)
@@ -505,7 +520,11 @@ final class AppModel {
     /// Colours one workout's route (issue 31): per workout, so only its own thumbnail redraws.
     func setRouteColoring(_ coloring: RouteColoring, for workoutID: String) {
         Task {
-            try? await store.setRouteColoring(coloring, for: workoutID)
+            do {
+                try await store.setRouteColoring(coloring, for: workoutID)
+            } catch {
+                reportFailedChange("Couldn't change the route's colouring", error)
+            }
             await refreshItems()
         }
     }
@@ -515,7 +534,12 @@ final class AppModel {
     func addTag(_ name: String, to ids: Set<String>) {
         guard let name = WorkoutTag.normalized(name, existing: allTags) else { return }
         Task {
-            let needsPush = (try? await store.addTag(name, to: Array(ids))) ?? []
+            var needsPush: [String] = []
+            do {
+                needsPush = try await store.addTag(name, to: Array(ids))
+            } catch {
+                reportFailedChange("Couldn't add the tag \"\(name)\"", error)
+            }
             await refreshItems()
             if !needsPush.isEmpty { pushPendingStravaFlags() }
         }
@@ -523,7 +547,12 @@ final class AppModel {
 
     func removeTag(_ name: String, from ids: Set<String>) {
         Task {
-            let needsPush = (try? await store.removeTag(name, from: Array(ids))) ?? []
+            var needsPush: [String] = []
+            do {
+                needsPush = try await store.removeTag(name, from: Array(ids))
+            } catch {
+                reportFailedChange("Couldn't remove the tag \"\(name)\"", error)
+            }
             await refreshItems()
             if !needsPush.isEmpty { pushPendingStravaFlags() }
         }
@@ -531,7 +560,19 @@ final class AppModel {
 
     /// Cheaper than `load()`: no place resolution, no Strava resume.
     func refreshItems() async {
-        if let fresh = try? await store.allItems() { items = fresh }
+        do {
+            items = try await store.allItems()
+        } catch {
+            // The table keeps what it showed; the next load reports a lasting failure.
+            Self.log.error("Couldn't refresh the table: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    /// A change the user asked for that didn't take (issue 40): shown, since otherwise it looks as
+    /// if it worked until the next launch, and logged.
+    func reportFailedChange(_ what: String, _ error: any Error) {
+        Self.log.error("\(what, privacy: .public): \(String(describing: error), privacy: .public)")
+        loadError = "\(what): \(error.localizedDescription)"
     }
 
     /// Fills in the Place column in the background.
@@ -545,7 +586,11 @@ final class AppModel {
         placeTask = Task {
             // Workouts synced before Phase 6 have a route on disk but no snapped start, so they
             // would never appear in the pending query without this.
-            _ = try? await store.backfillPlaceCoordinates(seriesStore: seriesStore)
+            do {
+                _ = try await store.backfillPlaceCoordinates(seriesStore: seriesStore)
+            } catch {
+                Self.log.error("Couldn't backfill place coordinates: \(String(describing: error), privacy: .public)")
+            }
 
             let stored = await placeResolver.resolvePending()
             if stored > 0, !Task.isCancelled {

@@ -27,7 +27,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 ## 1. Where things stand — 2026-10-24
 
 All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 379 in
-`MaxActCore` (`swift test`), 76 app and UI tests (`RunAllTests` — ask first, then leave the Mac
+`MaxActCore` (`swift test`), 79 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~15 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
 
@@ -86,15 +86,30 @@ is unmeasured: the recording's own zone, or the phone's zone at export. (The fix
 `make_fixture.py` moves dates but keeps the offset.) Next time the phone is connected, fetch a
 winter workout. If it reads `-0800`, the offset is the recording's: store it and name by it.
 
-**40. Silent failures** — these `try?` calls ignore errors:
-- route colouring, tags and Strava disconnect;
-- the route fill during detail fetch;
-- saving an upload result;
-- `RouteSketchCache.save`;
-- the MCP `initialized` notice.
+**40. Silent failures** *(built 2026-10-27 on `silent-failures`, awaiting the user's check)* —
+- **Your own changes that fail are shown in the error banner and logged.** This covers route
+  colouring, adding or removing a tag, and disconnecting Strava.
+- **Uploads whose result can't be saved** end with a banner that names the count and points to
+  ⌥⌘U to put the table right.
+- **A failed read of pending tag edits** is reported as a failure. It used to count as "nothing
+  pending".
+- **A Keychain that can't be read** is named in Settings ▸ Strava. Before, it looked exactly like
+  "not connected". `AppSecretStore.readProblem()` keeps one entry per item.
+- **Logged and otherwise unchanged:**
+  - every Strava state write, including the upload id saved before polling;
+  - the upload resume;
+  - the route fill during a download;
+  - the pre-upload check;
+  - the repair and place passes;
+  - table refreshes;
+  - the digest file (unreadable, or failed to save);
+  - the MCP `initialized` notice.
 
-A Keychain read error also looks the same as "not connected". Log every one; tell the user where it
-matters.
+  Everything goes to the unified log, subsystem `com.swiatlowski.MaxAct`.
+
+Tests: 3 app tests, one of them mutation-checked. Store write failures can't be injected yet, so
+the paths they take are untested; see 43. To check: tags, route colouring and Settings ▸ Strava
+behave as before.
 
 **41. Performance** — measure on a library copy first, and fix only what shows:
 - detail load and thumbnail preparation run on the main actor;
@@ -125,7 +140,9 @@ matters.
   - `AppModel`'s Strava pipeline;
   - the repair passes, backfill and delete;
   - `itemsUploadingToStrava`;
-  - `PlaceResolver` and `WorkoutFilter`.
+  - `PlaceResolver` and `WorkoutFilter`;
+  - store write failures: there's no way to make `WorkoutStore` fail on demand, so 40's reporting
+    paths are untested.
 - `testClickingTheHeatmapOpensAWorkoutOrOffersAChoice` failed once in a full run (2026-10-26).
   The sweep found a single route but not the shared loop. It passed alone and in the next full run.
 - Split the 1,873-line UI test file by class, and share test helpers (store factory ×8, date

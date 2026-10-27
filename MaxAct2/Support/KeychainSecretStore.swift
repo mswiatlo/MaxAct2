@@ -1,11 +1,20 @@
 import Foundation
 import MaxActCore
 import Security
+import os
 
 /// What the app needs from a secret store: the client's needs, plus saving the user's API
 /// application credentials from Settings.
-protocol AppSecretStore: StravaSecretStore {
+nonisolated protocol AppSecretStore: StravaSecretStore {
     func save(credentials: StravaCredentials?) async throws
+    /// Why the last read found nothing, when it wasn't simply that nothing is stored — a locked
+    /// or refused Keychain, or an unreadable item. Otherwise it looked like "not connected"
+    /// (issue 40).
+    func readProblem() async -> String?
+}
+
+nonisolated extension AppSecretStore {
+    func readProblem() async -> String? { nil }
 }
 
 /// Secrets held in memory only, for UI tests.
@@ -52,16 +61,41 @@ actor KeychainSecretStore: AppSecretStore {
 
     // MARK: - Keychain
 
+    /// Per item, so a good read of one doesn't hide a failed read of the other.
+    private var readProblems: [Account: String] = [:]
+
+    func readProblem() async -> String? {
+        readProblems.isEmpty ? nil : readProblems.sorted { $0.key.rawValue < $1.key.rawValue }.map(\.value).joined(separator: "; ")
+    }
+
     private func read<T: Decodable>(_ account: Account) -> T? {
         var query = baseQuery(account)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
-              let data = result as? Data
-        else { return nil }
-        return try? JSONDecoder().decode(T.self, from: data)
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess, let data = result as? Data else {
+            if status == errSecItemNotFound {
+                readProblems[account] = nil
+            } else {
+                let problem = KeychainError(status: status).description
+                readProblems[account] = problem
+                Self.log.error("Reading \(account.rawValue, privacy: .public): \(problem, privacy: .public)")
+            }
+            return nil
+        }
+        do {
+            let value = try JSONDecoder().decode(T.self, from: data)
+            readProblems[account] = nil
+            return value
+        } catch {
+            readProblems[account] = "the saved Strava \(account.rawValue) couldn't be read"
+            Self.log.error("Decoding \(account.rawValue, privacy: .public): \(String(describing: error), privacy: .public)")
+            return nil
+        }
     }
+
+    private nonisolated static let log = Logger(subsystem: "com.swiatlowski.MaxAct", category: "keychain")
 
     private func write<T: Encodable>(_ value: T?, as account: Account) throws {
         let query = baseQuery(account)

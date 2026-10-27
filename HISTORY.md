@@ -1255,6 +1255,11 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-27** — **40 built: silent failures.** Found while doing it: the Keychain store reported
+  only the last read's problem, so a failed credentials read was hidden by the tokens read that
+  followed. It now keeps one entry per item. The secret-store protocol had to become `nonisolated`
+  before a test could conform to it.
+
 - **2026-10-27** — **Issue 39 closed**, confirmed by the user. Full suite: 73 passed, 3 skipped.
 
 - **2026-10-27** — **39 built: one owner for running jobs.** Measured with the old Stop: after

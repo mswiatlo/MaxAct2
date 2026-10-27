@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 public enum MCPError: Error, CustomStringConvertible, Equatable {
     case transport(String)
@@ -33,6 +34,8 @@ public enum MCPError: Error, CustomStringConvertible, Equatable {
 /// An actor because the session id is mutable state shared across concurrent calls, and because
 /// serialising requests is desirable anyway: the phone answers one query at a time.
 public actor MCPClient {
+    private static let log = Logger(subsystem: "com.swiatlowski.MaxAct", category: "sync")
+
     private let transport: any MCPTransport
     private let token: String?
     private var sessionID: String?
@@ -71,8 +74,14 @@ public actor MCPClient {
         )
         guard let sessionID, !sessionID.isEmpty else { throw MCPError.missingSessionID }
 
-        // A notification: no id, no response expected.
-        _ = try? await send(method: "notifications/initialized", params: [:], isNotification: true)
+        // A notification: no id, no response expected. Not fatal if it fails — the server may
+        // still answer — but logged, because a server that missed it then rejects `tools/list`
+        // with a bare -32600 that otherwise points nowhere (issue 40).
+        do {
+            _ = try await send(method: "notifications/initialized", params: [:], isNotification: true)
+        } catch {
+            Self.log.error("The initialized notice failed: \(String(describing: error), privacy: .public)")
+        }
 
         let info = response as? [String: Any]
         let server = info?["serverInfo"] as? [String: Any]
