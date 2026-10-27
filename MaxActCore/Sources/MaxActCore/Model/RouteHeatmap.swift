@@ -17,8 +17,8 @@ public struct ExplorerTile: Hashable, Codable, Sendable {
     public init(_ coordinate: Coordinate) {
         let n = Double(1 << Self.zoom)
         let latitude = coordinate.latitude * .pi / 180
-        x = Int(((coordinate.longitude + 180) / 360 * n).rounded(.down))
-        y = Int(((1 - asinh(tan(latitude)) / .pi) / 2 * n).rounded(.down))
+        x = Int(saturating: ((coordinate.longitude + 180) / 360 * n).rounded(.down))
+        y = Int(saturating: ((1 - asinh(tan(latitude)) / .pi) / 2 * n).rounded(.down))
     }
 
     /// The tile's north-west and south-east corners, for drawing it.

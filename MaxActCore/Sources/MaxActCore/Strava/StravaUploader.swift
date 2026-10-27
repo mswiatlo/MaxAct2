@@ -86,7 +86,7 @@ public struct StravaUploader: WorkoutDestination {
         let document = TCXWriter.document(for: workout, series: series)
         let response = try await client.upload(
             file: Data(document.utf8),
-            fileName: "\(workout.id).tcx",
+            fileName: "\(InputLimits.fileComponent(workout.id)).tcx",   // never a raw id in a header (issue 45)
             name: Self.activityName(for: workout, in: timeZone),
             description: nil,
             externalID: workout.id,

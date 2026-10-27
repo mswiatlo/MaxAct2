@@ -49,7 +49,8 @@ final class RouteThumbnailRenderer {
         static let drawingVersion = 3
 
         var fileName: String {
-            "\(workoutID)-\(width)x\(height)-\(isDark ? "dark" : "light")"
+            // Escaped: an id must never name a path outside the folder (issue 45).
+            "\(InputLimits.fileComponent(workoutID))-\(width)x\(height)-\(isDark ? "dark" : "light")"
                 + "-\(routeColor.cacheToken)" + coloringToken + "-v\(Self.drawingVersion).png"
         }
         private var coloringToken: String {

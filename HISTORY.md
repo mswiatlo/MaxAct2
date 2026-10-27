@@ -1377,6 +1377,9 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-27** — **45 built: input validation.** Measured first: `appending(path: "../../x")`
+  resolves outside its folder once standardised.
+
 - **2026-10-27** — **Issue 28 closed: security audit.** Findings triaged into 45–48.
 
 - **2026-10-27** — **Issue 44 closed**, confirmed by the user. Full suite, with Do Not Disturb on: 84 passed, 4 skipped, 1 expected failure.

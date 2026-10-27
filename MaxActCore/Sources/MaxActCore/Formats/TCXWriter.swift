@@ -45,7 +45,7 @@ public enum TCXWriter {
 
         """
         if let calories = workout.activeEnergyKilocalories {
-            xml += "        <Calories>\(Int(calories.rounded()))</Calories>\n"
+            xml += "        <Calories>\(Int(saturating: calories.rounded()))</Calories>\n"
         } else {
             // Required by the schema, so zero rather than omitted when HAE had nothing.
             xml += "        <Calories>0</Calories>\n"
@@ -140,7 +140,7 @@ public enum TCXWriter {
                 tracks.append([])
             }
             tracks[tracks.count - 1].append(Point(
-                time: time, heartRate: Int(sample.average.rounded())
+                time: time, heartRate: Int(saturating: sample.average.rounded())
             ))
             lastTime = time
             lastDate = sample.date
@@ -161,7 +161,7 @@ public enum TCXWriter {
             abs(samples[$0].date.timeIntervalSince(date)) < abs(samples[$1].date.timeIntervalSince(date))
         }) else { return nil }
         guard abs(samples[best].date.timeIntervalSince(date)) <= heartRateTolerance else { return nil }
-        return Int(samples[best].average.rounded())
+        return Int(saturating: samples[best].average.rounded())
     }
 
     private static func trackpoint(_ point: Point) -> String {
@@ -190,7 +190,7 @@ public enum TCXWriter {
 
     private static func heartRateElement(_ name: String, _ bpm: Double, indent: Int) -> String {
         let pad = String(repeating: " ", count: indent)
-        return "\(pad)<\(name)><Value>\(Int(bpm.rounded()))</Value></\(name)>\n"
+        return "\(pad)<\(name)><Value>\(Int(saturating: bpm.rounded()))</Value></\(name)>\n"
     }
 
     /// TCX only knows three sports, and Strava infers the activity type from this attribute — the

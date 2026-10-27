@@ -26,7 +26,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ## 1. Where things stand — 2026-10-24
 
-All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 378 in
+All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 386 in
 `MaxActCore` (`swift test`), 89 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~15 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
@@ -104,16 +104,22 @@ winter workout. If it reads `-0800`, the offset is the recording's: store it and
 
 **From the security audit (28, 2026-10-27; agreed with the user, in this order):**
 
-**45. Validate input from the phone** —
-- **S1:** a workout id is used as a file name unchecked. A spoofed `../../x` writes outside
-  `Series/` and `Thumbnails/` (measured: it resolves out of the folder), and goes unescaped into
-  the upload's `filename=` header.
-- **S2:** a huge but finite number (a duration of `1e300`) traps `Int(…)` in the formatters. Once
-  stored, the app would crash on every launch.
-- **Fix:** ids must look like HAE's (letters, digits, hyphens; up to 64); numbers range-checked in
-  the decoder (duration up to 7 days, valid latitude and longitude, heart rate 0–300, quantities
-  bounded); formatters clamp rather than trap; `SeriesStore` checks paths stay inside its folder;
-  a fixed upload file name. Each with a test.
+**45. Validate input from the phone** *(built 2026-10-27 on `input-validation`, awaiting the full UI
+run; nothing visible changes)* — `InputLimits` (new) holds the rules:
+- **Fails the workout** (reported like any unreadable one):
+  - an id that isn't letters, digits and hyphens (up to 64);
+  - a duration outside 0–7 days.
+- **Dropped, keeping the workout:**
+  - optional figures beyond a ceiling per unit (10,000 km, 10⁶ kcal, 1,000 m/s, 300 bpm);
+  - route points outside ±90/±180, and impossible altitude, speed or accuracy readings;
+  - heart-rate readings over 300.
+- **File names:** series, thumbnail and upload file names go through `InputLimits.fileComponent`,
+  which escapes anything else. Valid ids keep their names, so no existing file moves.
+- **No more traps:** formatters, TCX and heatmap tiles use `Int(saturating:)` instead of `Int(…)`,
+  which trapped on 1e300.
+
+Tests: `InputValidationTests`, 7 (19 cases); the id, path and range guards are each
+mutation-checked.
 
 **46. Revoke on Disconnect** (S3) — Disconnect only deletes the tokens locally. Call Strava's
 `POST /oauth/deauthorize` first (best effort), and say in Settings that access can also be revoked

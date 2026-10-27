@@ -81,12 +81,15 @@ public struct HAEWorkoutDecoder: Sendable {
         for metric in metrics where metric["name"] as? String == "heart_rate" {
             let unit = metric["units"] as? String
             for point in (metric["data"] as? [[String: Any]]) ?? [] {
-                guard let date = point["date"] as? String, let avg = point["Avg"] as? Double else { continue }
+                let bpm = InputLimits.ceiling(for: .rate)
+                guard let date = point["date"] as? String,
+                      let avg = InputLimits.plausible(point["Avg"] as? Double, within: bpm), avg >= 0 else { continue }
                 if let unit { _ = try Units.value(avg, in: unit, as: .rate, field: "heart_rate") }
                 result.append((
                     HeartRateSample(date: try parser.date(from: date, field: "heart_rate.date"),
-                                    minimum: point["Min"] as? Double ?? avg, average: avg,
-                                    maximum: point["Max"] as? Double ?? avg),
+                                    minimum: InputLimits.plausible(point["Min"] as? Double, within: bpm) ?? avg,
+                                    average: avg,
+                                    maximum: InputLimits.plausible(point["Max"] as? Double, within: bpm) ?? avg),
                     point["source"] as? String
                 ))
             }
@@ -104,10 +107,17 @@ public struct HAEWorkoutDecoder: Sendable {
         }
 
         let workoutID = try required("id", id)
+        // An id becomes a file name; a forged `../../x` would name a path (issue 45).
+        guard InputLimits.isValidID(workoutID) else {
+            throw ImplausibleValueError(field: "id", value: String(workoutID.prefix(80)))
+        }
         let name = try required("name", entry["name"] as? String)
         let start = try parser.date(from: try required("start", entry["start"] as? String), field: "start")
         let end = try parser.date(from: try required("end", entry["end"] as? String), field: "end")
         let duration = try required("duration", entry["duration"] as? Double)
+        guard duration.isFinite, (0...InputLimits.longestWorkout).contains(duration) else {
+            throw ImplausibleValueError(field: "duration", value: "\(duration)")
+        }
 
         let heartRateSummary = entry["heartRate"] as? [String: Any]
         let route = try decodeRoute(entry["route"] as? [[String: Any]] ?? [], parser: parser)
@@ -164,7 +174,9 @@ public struct HAEWorkoutDecoder: Sendable {
             // A bare qty with no unit is not safe to guess at.
             throw UnknownUnitError(field: field, unit: "<missing>", dimension: dimension)
         }
-        return try Units.value(qty, in: unit, as: dimension, field: field)
+        // Out of range is dropped, not fatal: one absurd figure shouldn't cost the workout.
+        return InputLimits.plausible(try Units.value(qty, in: unit, as: dimension, field: field),
+                                     within: InputLimits.ceiling(for: dimension))
     }
 
     /// `isIndoor` is a bool; `location` is the HealthKit session type as a string. Prefer the
@@ -187,20 +199,24 @@ public struct HAEWorkoutDecoder: Sendable {
 
     private func decodeRoute(_ points: [[String: Any]], parser: HAEDateParser) throws -> [RoutePoint] {
         try points.compactMap { point in
-            guard let latitude = point["latitude"] as? Double,
-                  let longitude = point["longitude"] as? Double,
+            guard let latitude = InputLimits.plausible(point["latitude"] as? Double, within: 90),
+                  let longitude = InputLimits.plausible(point["longitude"] as? Double, within: 180),
                   let timestamp = point["timestamp"] as? String
-            else { return nil }  // a fix without a position or a time is unusable, not fatal
+            else { return nil }  // a fix without a (possible) position or a time is unusable, not fatal
+            // The rest are optional; an impossible reading is dropped (issue 45).
+            func reading(_ key: String, within ceiling: Double) -> Double? {
+                InputLimits.plausible(point[key] as? Double, within: ceiling)
+            }
             return RoutePoint(
                 coordinate: Coordinate(latitude: latitude, longitude: longitude),
                 timestamp: try parser.date(from: timestamp, field: "route.timestamp"),
-                altitudeMeters: point["altitude"] as? Double,
-                speedMetersPerSecond: point["speed"] as? Double,
-                courseDegrees: point["course"] as? Double,
-                horizontalAccuracyMeters: point["horizontalAccuracy"] as? Double,
-                verticalAccuracyMeters: point["verticalAccuracy"] as? Double,
-                speedAccuracy: point["speedAccuracy"] as? Double,
-                courseAccuracy: point["courseAccuracy"] as? Double
+                altitudeMeters: reading("altitude", within: 20_000),
+                speedMetersPerSecond: reading("speed", within: 1_000),
+                courseDegrees: reading("course", within: 360),
+                horizontalAccuracyMeters: reading("horizontalAccuracy", within: 1e5),
+                verticalAccuracyMeters: reading("verticalAccuracy", within: 1e5),
+                speedAccuracy: reading("speedAccuracy", within: 1e3),
+                courseAccuracy: reading("courseAccuracy", within: 360)
             )
         }
     }
@@ -210,17 +226,18 @@ public struct HAEWorkoutDecoder: Sendable {
     ) throws -> [HeartRateSample] {
         guard let samples = value as? [[String: Any]] else { return [] }
         return try samples.compactMap { sample in
+            let bpm = InputLimits.ceiling(for: .rate)
             guard let date = sample["date"] as? String,
-                  let avg = sample["Avg"] as? Double
+                  let avg = InputLimits.plausible(sample["Avg"] as? Double, within: bpm), avg >= 0
             else { return nil }
             if let unit = sample["units"] as? String {
                 _ = try Units.value(avg, in: unit, as: .rate, field: field)  // validate, bpm is canonical
             }
             return HeartRateSample(
                 date: try parser.date(from: date, field: "\(field).date"),
-                minimum: sample["Min"] as? Double ?? avg,
+                minimum: InputLimits.plausible(sample["Min"] as? Double, within: bpm) ?? avg,
                 average: avg,
-                maximum: sample["Max"] as? Double ?? avg
+                maximum: InputLimits.plausible(sample["Max"] as? Double, within: bpm) ?? avg
             )
         }
     }
@@ -234,10 +251,9 @@ public struct HAEWorkoutDecoder: Sendable {
             guard let unit = sample["units"] as? String else {
                 throw UnknownUnitError(field: field, unit: "<missing>", dimension: dimension)
             }
-            return SeriesSample(
-                date: try parser.date(from: date, field: "\(field).date"),
-                value: try Units.value(qty, in: unit, as: dimension, field: field)
-            )
+            let value = try Units.value(qty, in: unit, as: dimension, field: field)
+            guard let value = InputLimits.plausible(value, within: InputLimits.ceiling(for: dimension)) else { return nil }
+            return SeriesSample(date: try parser.date(from: date, field: "\(field).date"), value: value)
         }
     }
 }

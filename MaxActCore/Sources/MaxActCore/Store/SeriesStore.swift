@@ -65,8 +65,10 @@ public actor SeriesStore {
         try fileManager.createDirectory(at: self.directory, withIntermediateDirectories: true)
     }
 
+    /// Escaped, so even an id that got past the decoder can't name a path outside the folder
+    /// (issue 45). Valid ids are unchanged, so existing files keep their names.
     public func fileName(for workoutID: String) -> String {
-        "\(workoutID).json.lzfse"
+        "\(InputLimits.fileComponent(workoutID)).json.lzfse"
     }
 
     /// Public so the app can reveal a blob in Finder, and so tests can damage one on purpose.

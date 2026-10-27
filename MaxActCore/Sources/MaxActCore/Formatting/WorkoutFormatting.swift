@@ -14,7 +14,7 @@ public enum WorkoutFormatting {
     /// read as clock times, and a column of mixed "1 hr 23 min" and "45 min" is hard to scan.
     public static func duration(_ seconds: TimeInterval?) -> String {
         guard let seconds, seconds.isFinite, seconds >= 0 else { return missing }
-        let total = Int(seconds.rounded())
+        let total = Int(saturating: seconds.rounded())
         let (hours, minutes, secs) = (total / 3600, (total % 3600) / 60, total % 60)
         return hours > 0
             ? String(format: "%d:%02d:%02d", hours, minutes, secs)
@@ -35,7 +35,7 @@ public enum WorkoutFormatting {
     /// Kilometres with two decimals, switching to metres below 1 km so a 400 m walk isn't "0.4 km".
     public static func distance(_ meters: Double?) -> String {
         guard let meters, meters.isFinite, meters > 0 else { return missing }
-        if meters < 1000 { return "\(Int(meters.rounded())) m" }
+        if meters < 1000 { return "\(Int(saturating: meters.rounded())) m" }
         return String(format: "%.2f km", meters / 1000)
     }
 
@@ -57,7 +57,7 @@ public enum WorkoutFormatting {
     /// labelled with an em dash.
     public static func paceLabel(secondsPerKilometer seconds: Double?) -> String {
         guard let seconds, seconds.isFinite, seconds > 0 else { return missing }
-        let total = Int(seconds.rounded())
+        let total = Int(saturating: seconds.rounded())
         return String(format: "%d:%02d /km", total / 60, total % 60)
     }
 
@@ -80,17 +80,17 @@ public enum WorkoutFormatting {
 
     public static func energy(kilocalories: Double?) -> String {
         guard let kilocalories, kilocalories.isFinite, kilocalories > 0 else { return missing }
-        return "\(Int(kilocalories.rounded())) kcal"
+        return "\(Int(saturating: kilocalories.rounded())) kcal"
     }
 
     public static func heartRate(_ bpm: Double?) -> String {
         guard let bpm, bpm.isFinite, bpm > 0 else { return missing }
-        return "\(Int(bpm.rounded())) bpm"
+        return "\(Int(saturating: bpm.rounded())) bpm"
     }
 
     public static func elevation(meters: Double?) -> String {
         guard let meters, meters.isFinite, meters != 0 else { return missing }
-        return "\(Int(meters.rounded())) m"
+        return "\(Int(saturating: meters.rounded())) m"
     }
 
     /// Height gained, where **zero is a fact rather than a gap**.
@@ -100,7 +100,7 @@ public enum WorkoutFormatting {
     /// climbed nothing, and an em dash there reads as "we don't know".
     public static func elevationGain(meters: Double?) -> String {
         guard let meters, meters.isFinite, meters >= 0 else { return missing }
-        return "\(Int(meters.rounded())) m"
+        return "\(Int(saturating: meters.rounded())) m"
     }
 }
 
@@ -215,16 +215,16 @@ extension WorkoutFormatting {
             let km = value / 1000
             return "\(km.formatted(.number.precision(.fractionLength(km < 100 ? 1 : 0)).locale(locale))) km"
         case .duration:
-            let minutes = Int((value / 60).rounded())
+            let minutes = Int(saturating: (value / 60).rounded())
             return minutes < 60
                 ? "\(minutes) min"
                 : "\((minutes / 60).formatted(.number.locale(locale))) h \(String(format: "%02d", minutes % 60)) min"
         case .elevation:
-            return "\(Int(value.rounded()).formatted(.number.locale(locale))) m"
+            return "\(Int(saturating: value.rounded()).formatted(.number.locale(locale))) m"
         case .energy:
-            return "\(Int(value.rounded()).formatted(.number.locale(locale))) kcal"
+            return "\(Int(saturating: value.rounded()).formatted(.number.locale(locale))) kcal"
         case .count:
-            return Int(value.rounded()).formatted(.number.locale(locale))
+            return Int(saturating: value.rounded()).formatted(.number.locale(locale))
         }
     }
 }
