@@ -1462,6 +1462,9 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-27** — **Issue 49 closed.** Checked by the user. Full suite: 91 passed, 4 skipped,
+  1 expected failure.
+
 - **2026-10-27** — **49: the connection is edited in Settings (and the welcome sheet) only.**
   Measured on the way: in a grouped `Form`, the address field exposes only its prompt and the
   HTTPS switch no name, so tests use identifiers. Recorded as a follow-up for VoiceOver.
