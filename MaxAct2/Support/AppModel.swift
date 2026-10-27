@@ -124,7 +124,17 @@ final class AppModel {
     /// The heat map's route sketches (issue 15), cached beside the series they come from.
     let routeSketchCache: RouteSketchCache?
     /// Built sketches by workout id, once `loadRouteSketches` has run.
-    private(set) var routeSketches: [String: RouteSketch] = [:]
+    private(set) var routeSketches: [String: RouteSketch] = [:] {
+        didSet { sketchGeneration += 1 }
+    }
+    @ObservationIgnored private var sketchGeneration = 0
+    @ObservationIgnored private var regionsMemo: (key: RegionsKey, regions: [RouteRegion])?
+
+    private struct RegionsKey: Equatable {
+        let workoutIDs: [String]
+        let placeNames: [String: String]
+        let sketchGeneration: Int
+    }
     /// The same sketches prepared for matching routes (issue 23), built alongside them: preparing
     /// the library takes longer than one lookup, so it isn't redone per selection.
     private(set) var preparedRoutes: [String: RouteMatcher.Prepared] = [:]
@@ -639,6 +649,18 @@ final class AppModel {
             sketches.compactMapValues { RouteMatcher.Prepared($0.coordinates) }
         }.value
         routeSketchProgress = nil
+    }
+
+    /// The heatmap's places for these sketches, worked out again only when the routes shown, the
+    /// sketches themselves or the place names change (issue 41). Measured on the user's library:
+    /// 238 ms each time, and it ran on every Statistics redraw — every hover, every model change.
+    func heatmapRegions(_ sketches: [RouteSketch], placeNames: [String: String]) -> [RouteRegion] {
+        let key = RegionsKey(workoutIDs: sketches.map(\.workoutID), placeNames: placeNames,
+                             sketchGeneration: sketchGeneration)
+        if let regionsMemo, regionsMemo.key == key { return regionsMemo.regions }
+        let regions = RouteHeatmap.regions(sketches, placeNames: placeNames)
+        regionsMemo = (key, regions)
+        return regions
     }
 
     /// Every time `item`'s route has been done (issue 23), or `nil` if it hasn't been done before

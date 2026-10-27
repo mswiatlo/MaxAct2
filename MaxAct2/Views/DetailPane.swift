@@ -108,9 +108,12 @@ struct WorkoutDetailView: View {
 
     /// The series plus everything derived from it, computed once per selection instead of on every
     /// body evaluation.
-    private struct LoadedSeries {
+    /// `nonisolated` and `Sendable` so it can be derived off the main actor (issue 41).
+    private nonisolated struct LoadedSeries: Sendable {
         let id: String
         let series: WorkoutSeries
+        /// The drawn track, simplified, for framing the map.
+        let simplified: [Coordinate]
         /// The full cleaned route, for linking: never the simplified drawing below.
         let route: [RoutePoint]
         let coordinates: [CLLocationCoordinate2D]
@@ -131,6 +134,41 @@ struct WorkoutDetailView: View {
         let pace: [ChartSegment]
         /// One time axis for all of the charts above, so they align.
         let timeDomain: ClosedRange<Date>
+
+        /// Everything the pane shows that walks the series. Derived once rather than in `body`
+        /// (each walks thousands of points, and body runs on every hover, resize and scroll),
+        /// and off the main actor: measured on the user's library, 27 ms median, 72 ms p95 and
+        /// 194 ms at worst per workout, which stalled arrowing down the table (issue 41).
+        init(id: String, series: WorkoutSeries, workout: Workout) {
+            // Cleaned before anything else looks at it: one bad fix draws a kilometres-long spike
+            // across the map, and the stored blob keeps the raw recording either way.
+            let route = series.cleanedRoute
+            // Simplified for display too: drawing 12,645 points into a few hundred on-screen
+            // pixels costs a great deal and shows nothing extra.
+            let simplified = RouteSimplifier.simplify(route.map(\.coordinate), fittingPixels: 900)
+            let heartRate = WorkoutCharts.heartRate(series)
+            let elevation = WorkoutCharts.elevation(series)
+            let speed = WorkoutCharts.speed(series)
+            let pace = WorkoutCharts.pace(series, for: workout.kind)
+            self.id = id
+            self.series = series
+            self.simplified = simplified
+            self.route = route
+            coordinates = simplified.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
+            discardedFixes = series.route.count - route.count
+            movingSpeedMetersPerSecond = workout.movingSpeedMetersPerSecond(using: series)
+            estimatedAscent = workout.elevationAscendedMeters == nil ? ElevationEstimate.ascent(route: route) : nil
+            estimatedDescent = workout.elevationDescendedMeters == nil
+                ? ElevationEstimate.descent(reportedAscent: workout.elevationAscendedMeters, route: route) : nil
+            splits = WorkoutSplits.splits(for: workout, series: series)
+            self.heartRate = heartRate
+            heartRateHistogram = HeartRateHistogram(series.heartRate)
+            self.elevation = elevation
+            self.speed = speed
+            self.pace = pace
+            timeDomain = WorkoutCharts.timeDomain(
+                for: workout, charts: [heartRate, elevation, workout.kind.isPaceBased ? pace : speed])
+        }
     }
 
     var body: some View {
@@ -217,40 +255,14 @@ struct WorkoutDetailView: View {
         highlighted = nil
 
         guard let series = await model.seriesStore.loadIfAvailable(item.id) else { return }
-
-        // Cleaned before anything else looks at it: one bad fix draws a kilometres-long spike
-        // across the map, and the stored blob keeps the raw recording either way.
-        let route = series.cleanedRoute
-        // Simplified for display too: drawing 12,645 points into a few hundred on-screen pixels
-        // costs a great deal and shows nothing extra.
-        let simplified = RouteSimplifier.simplify(route.map(\.coordinate), fittingPixels: 900)
-        let heartRate = WorkoutCharts.heartRate(series)
-        let elevation = WorkoutCharts.elevation(series)
-        let speed = WorkoutCharts.speed(series)
-        let pace = WorkoutCharts.pace(series, for: workout.kind)
-        loaded = LoadedSeries(
-            id: item.id,
-            series: series,
-            route: route,
-            coordinates: simplified.map {
-                CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude)
-            },
-            discardedFixes: series.route.count - route.count,
-            movingSpeedMetersPerSecond: workout.movingSpeedMetersPerSecond(using: series),
-            estimatedAscent: workout.elevationAscendedMeters == nil ? ElevationEstimate.ascent(route: route) : nil,
-            estimatedDescent: workout.elevationDescendedMeters == nil
-                ? ElevationEstimate.descent(reportedAscent: workout.elevationAscendedMeters, route: route) : nil,
-            // Splits and chart series are derived once here rather than in `body`. Each walks
-            // thousands of points, and body runs on every hover, resize and scroll.
-            splits: WorkoutSplits.splits(for: workout, series: series),
-            heartRate: heartRate,
-            heartRateHistogram: HeartRateHistogram(series.heartRate),
-            elevation: elevation,
-            speed: speed,
-            pace: pace,
-            timeDomain: WorkoutCharts.timeDomain(
-                for: workout, charts: [heartRate, elevation, workout.kind.isPaceBased ? pace : speed])
-        )
+        let id = item.id, workout = self.workout
+        let derived = await Task.detached(priority: .userInitiated) {
+            LoadedSeries(id: id, series: series, workout: workout)
+        }.value
+        // Moved on meanwhile — arrowing down the table: this workout is no longer shown.
+        guard !Task.isCancelled, derived.id == item.id else { return }
+        loaded = derived
+        let simplified = derived.simplified
 
         // 30% headroom so the track isn't flush against the edges. Set last, once the route is
         // actually in hand — the map exists well before the series arrives.

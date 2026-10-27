@@ -16,8 +16,9 @@ import SwiftUI
 /// main-actor-isolated in the macOS 26 SDK, so an actor here would mean sending non-`Sendable`
 /// AppKit types across isolation boundaries — which Swift 6 correctly rejects. The genuinely
 /// expensive work happens elsewhere anyway: tile fetching inside MapKit, blob loading on
-/// `SeriesStore`'s actor, and simplification in a `nonisolated` function. What remains on the main
-/// actor is stroking a few hundred points into a 96×56 bitmap, which is sub-millisecond.
+/// `SeriesStore`'s actor, and cleaning, colouring and simplification in `geometry`, run detached.
+/// What remains on the main actor is stroking a few hundred points into a 96×56 bitmap, which is
+/// sub-millisecond.
 @MainActor
 final class RouteThumbnailRenderer {
     struct Key: Hashable {
@@ -134,15 +135,23 @@ final class RouteThumbnailRenderer {
         }
 
         guard let series = await seriesStore.loadIfAvailable(key.workoutID) else { return nil }
-        guard let prepared = Self.prepare(series, key: key, routeColor: key.routeColor) else {
-            return nil
+        let coloring = key.coloring, width = key.width
+        let profile = key.zoneProfile.flatMap {
+            HeartRateProfile(resting: $0.resting, maximum: $0.maximum, curve: .male)   // the curve doesn't move zones
         }
+        guard let geometry = await Task.detached(priority: .utility, operation: {
+            Self.geometry(series, coloring: coloring, profile: profile, width: width)
+        }).value else { return nil }
         if Task.isCancelled { return nil }
+        let prepared = (strokes: geometry.runs.map {
+            Stroke(coordinates: $0.coordinates, color: $0.shade.map { NSColor($0.color) } ?? NSColor(key.routeColor))
+        }, bounds: geometry.bounds)
 
         guard await acquireSlot() else { return nil }
         let rendered = await snapshotPNG(prepared.strokes, bounds: prepared.bounds, key: key)
         running -= 1
-        if Task.isCancelled { return nil }
+        // Kept even if the row scrolled away meanwhile (issue 41): the work is done, and the row
+        // asks again when it comes back. Dropping it here made every return re-render.
 
         let size = NSSize(width: key.width, height: key.height)
         // Tiles are a nicety; the shape is the point. Offline, or with the snapshotter refusing
@@ -156,8 +165,6 @@ final class RouteThumbnailRenderer {
         return image
     }
 
-    /// Simplification and bounds are pure maths on value types, so they need no isolation and can
-    /// run wherever the caller happens to be.
     /// One stretch of the line in one colour: the whole route when solid, or each shade's
     /// stretch when coloured (issue 31).
     struct Stroke {
@@ -165,23 +172,26 @@ final class RouteThumbnailRenderer {
         let color: NSColor
     }
 
-    private static func prepare(
-        _ series: WorkoutSeries, key: Key, routeColor: RouteColor
-    ) -> (strokes: [Stroke], bounds: CoordinateBounds)? {
+    /// The line's runs and the area to frame: a shade per run, or `nil` for the route colour.
+    nonisolated struct Geometry: Sendable {
+        let runs: [(coordinates: [Coordinate], shade: RouteShade?)]
+        let bounds: CoordinateBounds
+    }
+
+    /// Cleaning, colouring and simplification: pure maths on value types, so off the main actor
+    /// (issue 41). Measured on the user's library: 4 ms median per thumbnail solid, 8 ms coloured
+    /// by elevation, up to 64 ms — on the main actor, for every row scrolled into view.
+    nonisolated static func geometry(
+        _ series: WorkoutSeries, coloring: RouteColoring, profile: HeartRateProfile?, width: Int
+    ) -> Geometry? {
         let route = series.cleanedRoute
         let coordinates = route.map(\.coordinate)
         guard coordinates.count >= 2, let bounds = CoordinateBounds(coordinates) else { return nil }
-        let profile = key.zoneProfile.flatMap {
-            HeartRateProfile(resting: $0.resting, maximum: $0.maximum, curve: .male)   // the curve doesn't move zones
+        if let gradient = RouteGradient(coloring, route: route, heartRate: series.heartRate, profile: profile) {
+            return Geometry(runs: gradient.simplified(fittingPixels: width).map { ($0.coordinates, $0.shade) },
+                            bounds: bounds)
         }
-        if let gradient = RouteGradient(key.coloring, route: route, heartRate: series.heartRate, profile: profile) {
-            let strokes = gradient.simplified(fittingPixels: key.width).map {
-                Stroke(coordinates: $0.coordinates, color: NSColor($0.shade.color))
-            }
-            return (strokes, bounds)
-        }
-        return ([Stroke(coordinates: RouteSimplifier.simplify(coordinates, fittingPixels: key.width),
-                        color: NSColor(routeColor))], bounds)
+        return Geometry(runs: [(RouteSimplifier.simplify(coordinates, fittingPixels: width), nil)], bounds: bounds)
     }
 
     /// Takes the snapshot and draws the route onto it, returning **PNG bytes**.

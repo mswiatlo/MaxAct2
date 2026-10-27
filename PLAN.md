@@ -26,8 +26,8 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ## 1. Where things stand — 2026-10-24
 
-All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 379 in
-`MaxActCore` (`swift test`), 79 app and UI tests (`RunAllTests` — ask first, then leave the Mac
+All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 382 in
+`MaxActCore` (`swift test`), 81 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~15 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
 
@@ -93,15 +93,26 @@ is unmeasured: the recording's own zone, or the phone's zone at export. (The fix
 `make_fixture.py` moves dates but keeps the offset.) Next time the phone is connected, fetch a
 winter workout. If it reads `-0800`, the offset is the recording's: store it and name by it.
 
-**41. Performance** — measure on a library copy first, and fix only what shows:
-- detail load and thumbnail preparation run on the main actor;
-- `cleanedRoute` is computed five or more times per workout opened;
-- finished thumbnails are dropped when scrolling cancels their task;
-- the heatmap re-sorts everything on every render and computes its tiles three times;
-- `Date.now` in Statistics' `body`;
-- `personalBests` is computed twice;
-- `selectedItems` re-sorts the library three times per render;
-- `sync` reloads the whole model after every week.
+**41. Performance** *(built 2026-10-27 on `performance`, awaiting the user's check)* — measured
+first on a copy of the library (481 workouts with routes, up to 12,992 points), in a debug build:
+
+| | Before | Now |
+|---|---|---|
+| Heatmap places, on every Statistics redraw | 238 ms | 0.1 ms when cached; 78 ms when the routes shown change |
+| Opening a workout (derivation) | 27 ms median, 72 p95, 194 max, main actor | the same, but detached |
+| Preparing a thumbnail | 4–8 ms median, 64 max, main actor | the same, but detached |
+
+- **Heatmap:** the framing box is now worked out from at most 4,000 evenly spaced points. The
+  places are cached in `AppModel.heatmapRegions`, keyed on the routes shown, the sketches and the
+  place names.
+- **Finished thumbnails are kept** even if scrolling cancelled their task.
+- **Measured and left alone:** everything else Statistics computes, about 20 ms per redraw in all
+  (totals, history, year, training load, consistency, bests twice); sorting the library, 0.4 ms;
+  one `cleanedRoute`, 1.2 ms. The per-week reload in `sync` was already fixed in 39.
+- **`PerformanceProbeTests`** (`MAXACT_PERF_LIBRARY=<copy>`) re-runs all of this.
+
+Tests: 2 app tests guard the cache against staleness; both fail with the cache key ignored. To
+check: Statistics, especially hovering charts, and arrowing quickly down the table.
 
 **42. Structure, duplication and dead code** (no change in behaviour):
 - Split `DetailPane`, `StatisticsView` and `WorkoutStore`.

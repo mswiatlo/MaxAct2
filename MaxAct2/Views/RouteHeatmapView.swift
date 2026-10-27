@@ -40,7 +40,7 @@ struct RouteHeatmapSection: View {
         let sketches = workouts.sorted { $0.start > $1.start }.compactMap { model.routeSketches[$0.id] }
         let placeNames = Dictionary(model.items.compactMap { item in item.placeLabel.map { (item.id, $0) } },
                                     uniquingKeysWith: { first, _ in first })
-        let regions = RouteHeatmap.regions(sketches, placeNames: placeNames)
+        let regions = model.heatmapRegions(sketches, placeNames: placeNames)
         let region = regions.first { $0.id == regionID } ?? regions.first
 
         VStack(alignment: .leading, spacing: 10) {

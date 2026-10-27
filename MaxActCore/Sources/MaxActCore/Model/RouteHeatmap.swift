@@ -111,6 +111,9 @@ public enum RouteHeatmap {
     /// map on the strait between them — the user had real workouts in both.
     public static let radius: Double = 25_000
 
+    /// How many points the framing box is worked out from, at most.
+    static let focusSample = 4_000
+
     /// Groups sketches into places, biggest first. `placeNames` maps workout ids to their place
     /// labels ("Vancouver BC"); a place is named after its most common label, or "Unnamed place".
     ///
@@ -128,10 +131,10 @@ public enum RouteHeatmap {
             }
         }
         return groups.compactMap { group in
-            guard let bounds = CoordinateBounds(group.members.flatMap(\.coordinates)) else { return nil }
+            let points = group.members.flatMap(\.coordinates)
+            guard let bounds = CoordinateBounds(points) else { return nil }
             let names = group.members.compactMap { placeNames[$0.workoutID] }
             let name = Dictionary(grouping: names, by: { $0 }).max { ($0.value.count, $1.key) < ($1.value.count, $0.key) }?.key
-            let points = group.members.flatMap(\.coordinates)
             return RouteRegion(name: name ?? "Unnamed place", workoutIDs: group.members.map(\.workoutID),
                                bounds: bounds, focus: focus(of: points) ?? bounds)
         }
@@ -139,9 +142,15 @@ public enum RouteHeatmap {
     }
 
     /// The 2nd–98th percentile box of `points`, so a few outlying routes don't set the framing.
+    ///
+    /// From at most ``focusSample`` evenly spaced points (issue 41): sorting all ~83,000 of the
+    /// user's sketch points twice took most of 238 ms, on every Statistics redraw. Percentiles of
+    /// an even sample of that size move by a fraction of the map.
     static func focus(of points: [Coordinate]) -> CoordinateBounds? {
         guard !points.isEmpty else { return nil }
-        let latitudes = points.map(\.latitude).sorted(), longitudes = points.map(\.longitude).sorted()
+        let step = max(1, points.count / focusSample)
+        let sample = stride(from: 0, to: points.count, by: step).map { points[$0] }
+        let latitudes = sample.map(\.latitude).sorted(), longitudes = sample.map(\.longitude).sorted()
         func at(_ values: [Double], _ fraction: Double) -> Double {
             values[min(values.count - 1, Int(Double(values.count - 1) * fraction))]
         }

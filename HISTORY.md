@@ -1279,6 +1279,16 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-27** — **41 built: performance, measured first.** Of the audit's eight suspects, three
+  showed:
+  - the heatmap's places, 238 ms on every Statistics redraw;
+  - the detail derivation, on the main actor;
+  - thumbnail preparation, on the main actor.
+
+  The other five measured under a few milliseconds each and were left alone. One correction to
+  the probe on the way: a cache-hit timing of 0.0 ms compared a dictionary with a copy of itself,
+  which Swift short-cuts. Rebuilt the way the app builds it, it measured 0.1 ms.
+
 - **2026-10-27** — **Issue 40 closed**, confirmed by the user, with the heatmap test fix. Full suite, with Do Not Disturb on: 76 passed, 3 skipped.
 
 - **2026-10-27** — **Heatmap UI test flake found and fixed** (pulled forward from 43, by the user's

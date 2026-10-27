@@ -655,6 +655,16 @@ So for anything that needs live MapKit or real data, prefer a **gated test in `M
 what it's given. MapKit's `MKReverseGeocodingRequest` works from there. Reserve `RunCodeSnippet` on
 app files for pure code with no side effects, and never assume it is isolated.
 
+## Measuring performance on real content
+
+`PerformanceProbeTests` in `MaxActCore` times the heavy paths over a **copy** of the library
+(`default.store*` and `Series/`, copied to `/tmp`, deleted afterwards):
+`MAXACT_PERF_LIBRARY=/tmp/maxact-perf swift test --filter PerformanceProbe`. It covers opening a
+workout, thumbnail preparation, and one Statistics redraw, section by section. It runs in a debug
+build, as the app does from Xcode, where sorting is far slower than in release. When timing a
+cache hit, build both sides fresh: equality on two copies of one array or dictionary short-cuts
+and reads as 0 ms.
+
 ## Checking layout against real content, safely
 
 Seeded data has the wrong shape for layout questions — real place names, real numbers and real
