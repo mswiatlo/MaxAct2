@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed or closed known issues (1–20, 22, 23, 25–27, 29–32, 34, 35, 37–39)
+## 2. Fixed or closed known issues (1–20, 22, 23, 25–27, 29–32, 34, 35, 37–40)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -518,6 +518,30 @@ other in order, and ranking by time. Checked on a copy: the newest commute 92 ti
 times, 3rd. Extended the next day: pointing at an attempt shows its exact date, time and
 duration, and clicking it opens that workout and scrolls the table to it (`AppModel.reveal`). If
 a search or filter hides it, the table goes back to All Workouts. Going back is issue 32.
+
+**40. ~~Silent failures.~~ — done 2026-10-27, confirmed by the user.** —
+- **Your own changes that fail are shown in the error banner and logged.** This covers route
+  colouring, adding or removing a tag, and disconnecting Strava.
+- **Uploads whose result can't be saved** end with a banner that names the count and points to
+  ⌥⌘U to put the table right.
+- **A failed read of pending tag edits** is reported as a failure. It used to count as "nothing
+  pending".
+- **A Keychain that can't be read** is named in Settings ▸ Strava. Before, it looked exactly like
+  "not connected". `AppSecretStore.readProblem()` keeps one entry per item.
+- **Logged and otherwise unchanged:**
+  - every Strava state write, including the upload id saved before polling;
+  - the upload resume;
+  - the route fill during a download;
+  - the pre-upload check;
+  - the repair and place passes;
+  - table refreshes;
+  - the digest file (unreadable, or failed to save);
+  - the MCP `initialized` notice.
+
+  Everything goes to the unified log, subsystem `com.swiatlowski.MaxAct`.
+
+Tests: 3 app tests, one of them mutation-checked. Store write failures can't be injected yet, so
+the paths they take are untested; see 43.
 
 **39. ~~One owner for running jobs.~~ — done 2026-10-27, confirmed by the user.** —
 - **One job at a time.** `startJob` (in `AppModel+Sync.swift`) sets the status before it returns,
@@ -1254,6 +1278,8 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-27** — **Issue 40 closed**, confirmed by the user, with the heatmap test fix. Full suite, with Do Not Disturb on: 76 passed, 3 skipped.
 
 - **2026-10-27** — **Heatmap UI test flake found and fixed** (pulled forward from 43, by the user's
   choice). A per-click trace showed the sweep stopped hitting anything after its first hit.

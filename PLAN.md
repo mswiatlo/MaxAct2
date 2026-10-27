@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** the code-quality fixes 40–43 in order, then 28 (security audit), then 36
+**Next:** the code-quality fixes 41–43 in order, then 28 (security audit), then 36
 (README). 24's live run waits for HAE's fix (21). Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
@@ -44,7 +44,7 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–20, 22, 23, 25, 26, 27, 29–32, 34, 35, 37–39 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–20, 22, 23, 25, 26, 27, 29–32, 34, 35, 37–40 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
 **21. Health Auto Export bug report** *(sent by the user 2026-10-14; HAE acknowledged it and asked
@@ -92,31 +92,6 @@ morning run abroad can be named "Night Run". The fix depends on what HAE's UTC o
 is unmeasured: the recording's own zone, or the phone's zone at export. (The fixtures can't tell:
 `make_fixture.py` moves dates but keeps the offset.) Next time the phone is connected, fetch a
 winter workout. If it reads `-0800`, the offset is the recording's: store it and name by it.
-
-**40. Silent failures** *(built 2026-10-27 on `silent-failures`, awaiting the user's check)* —
-- **Your own changes that fail are shown in the error banner and logged.** This covers route
-  colouring, adding or removing a tag, and disconnecting Strava.
-- **Uploads whose result can't be saved** end with a banner that names the count and points to
-  ⌥⌘U to put the table right.
-- **A failed read of pending tag edits** is reported as a failure. It used to count as "nothing
-  pending".
-- **A Keychain that can't be read** is named in Settings ▸ Strava. Before, it looked exactly like
-  "not connected". `AppSecretStore.readProblem()` keeps one entry per item.
-- **Logged and otherwise unchanged:**
-  - every Strava state write, including the upload id saved before polling;
-  - the upload resume;
-  - the route fill during a download;
-  - the pre-upload check;
-  - the repair and place passes;
-  - table refreshes;
-  - the digest file (unreadable, or failed to save);
-  - the MCP `initialized` notice.
-
-  Everything goes to the unified log, subsystem `com.swiatlowski.MaxAct`.
-
-Tests: 3 app tests, one of them mutation-checked. Store write failures can't be injected yet, so
-the paths they take are untested; see 43. To check: tags, route colouring and Settings ▸ Strava
-behave as before.
 
 **41. Performance** — measure on a library copy first, and fix only what shows:
 - detail load and thumbnail preparation run on the main actor;
