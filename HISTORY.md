@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed or closed known issues (1–20, 22, 23, 25–27, 29–32, 34, 35, 37, 38)
+## 2. Fixed or closed known issues (1–20, 22, 23, 25–27, 29–32, 34, 35, 37–39)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -518,6 +518,28 @@ other in order, and ranking by time. Checked on a copy: the newest commute 92 ti
 times, 3rd. Extended the next day: pointing at an attempt shows its exact date, time and
 duration, and clicking it opens that workout and scrolls the table to it (`AppModel.reveal`). If
 a search or filter hides it, the table goes back to All Workouts. Going back is issue 32.
+
+**39. ~~One owner for running jobs.~~ — done 2026-10-27, confirmed by the user.** —
+- **One job at a time.** `startJob` (in `AppModel+Sync.swift`) sets the status before it returns,
+  so a second start in the same turn is refused. Before, a double click or a check fired by
+  connecting could start two jobs, and Stop cancelled the wrong one.
+- **Stop waits for the request in flight.** The banner says "Stopping…" until it is done, then goes
+  idle. It used to mark the sync idle at once, let a new sync start alongside, and then the old one
+  wrote "Synced N" (or "week 1") back.
+- **Background passes don't overwrite a running job's status.** A route fill or flag push that fails
+  logs the error, and shows it only when no job is running.
+- **Strava jobs wait for quiet work first.** A Strava check or upload waits for a quiet flag push
+  or upload resume to finish.
+- **Delete All is disabled during a job,** and waits for background work.
+- **Core fixes:**
+  - one shared Strava token refresh;
+  - the rate-limit wait re-checks after sleeping;
+  - `RouteSketchCache` drops a build that a `clear()` or `invalidate()` overtook.
+- **`AppModel` split:** 1,314 lines became 664, plus `AppModel+Sync.swift` (287) and
+  `AppModel+Strava.swift` (379). `sync` and `syncEverything` now share one list walk.
+
+Tests: 3 app tests and 2 package tests, each mutation-checked. The second job test needed
+strengthening first: it passed with the guard removed.
 
 **38. ~~Bugs found by the audit.~~ — done 2026-10-26, confirmed by the user.** —
 - **Pace showed a minute fast.** 299.6 s/km displayed as "4:00 /km"; it is now rounded once.
@@ -1232,6 +1254,8 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-27** — **Issue 39 closed**, confirmed by the user. Full suite: 73 passed, 3 skipped.
 
 - **2026-10-27** — **39 built: one owner for running jobs.** Measured with the old Stop: after
   Stop, the status went back to "running, week 1" when the request in flight returned. The

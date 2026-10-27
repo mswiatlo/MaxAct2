@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** the code-quality fixes 39–43 in order, then 28 (security audit), then 36
+**Next:** the code-quality fixes 40–43 in order, then 28 (security audit), then 36
 (README). 24's live run waits for HAE's fix (21). Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
@@ -44,7 +44,7 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–20, 22, 23, 25, 26, 27, 29–32, 34, 35, 37 and 38 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–20, 22, 23, 25, 26, 27, 29–32, 34, 35, 37–39 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
 **21. Health Auto Export bug report** *(sent by the user 2026-10-14; HAE acknowledged it and asked
@@ -85,31 +85,6 @@ morning run abroad can be named "Night Run". The fix depends on what HAE's UTC o
 is unmeasured: the recording's own zone, or the phone's zone at export. (The fixtures can't tell:
 `make_fixture.py` moves dates but keeps the offset.) Next time the phone is connected, fetch a
 winter workout. If it reads `-0800`, the offset is the recording's: store it and name by it.
-
-**39. One owner for running jobs** *(built 2026-10-27 on `job-runner`, awaiting the user's check)* —
-- **One job at a time.** `startJob` (in `AppModel+Sync.swift`) sets the status before it returns,
-  so a second start in the same turn is refused. Before, a double click or a check fired by
-  connecting could start two jobs, and Stop cancelled the wrong one.
-- **Stop waits for the request in flight.** The banner says "Stopping…" until it is done, then goes
-  idle. It used to mark the sync idle at once, let a new sync start alongside, and then the old one
-  wrote "Synced N" (or "week 1") back.
-- **Background passes don't overwrite a running job's status.** A route fill or flag push that fails
-  logs the error, and shows it only when no job is running.
-- **Strava jobs wait for quiet work first.** A Strava check or upload waits for a quiet flag push
-  or upload resume to finish.
-- **Delete All is disabled during a job,** and waits for background work.
-- **Core fixes:**
-  - one shared Strava token refresh;
-  - the rate-limit wait re-checks after sleeping;
-  - `RouteSketchCache` drops a build that a `clear()` or `invalidate()` overtook.
-- **`AppModel` split:** 1,314 lines became 664, plus `AppModel+Sync.swift` (287) and
-  `AppModel+Strava.swift` (379). `sync` and `syncEverything` now share one list walk.
-
-Tests: 3 app tests and 2 package tests, each mutation-checked. The second job test needed
-strengthening first: it passed with the guard removed. To check:
-- Stop a sync and see "Stopping…", then a quiet banner.
-- Delete All is greyed out during a sync.
-- Syncing, downloading detail and a Strava check behave as before.
 
 **40. Silent failures** — these `try?` calls ignore errors:
 - route colouring, tags and Strava disconnect;
