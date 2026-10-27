@@ -22,6 +22,24 @@ actor ScriptedTransport: StravaTransport {
     func paths() -> [String] { requests.map { "\($0.method) \($0.url.path)" } }
 }
 
+/// Answers by endpoint rather than in script order, and is slow to hand out tokens — so
+/// concurrent requests really do overlap while a refresh is in flight.
+actor RoutingTransport: StravaTransport {
+    private(set) var tokenRequests = 0
+    private(set) var authorizations: [String] = []
+
+    func send(_ request: StravaHTTPRequest) async throws -> StravaHTTPResponse {
+        if request.url == StravaClient.tokenEndpoint {
+            tokenRequests += 1
+            let n = tokenRequests
+            try await Task.sleep(for: .milliseconds(50))
+            return tokenResponse(access: "NEW\(n)", refresh: "R\(n)", athlete: false)
+        }
+        authorizations.append(request.headers["Authorization"] ?? "")
+        return upload(9)
+    }
+}
+
 actor MemorySecrets: StravaSecretStore {
     var storedCredentials: StravaCredentials?
     var storedTokens: StravaTokens?
@@ -62,7 +80,7 @@ private func upload(_ id: Int, status: String = "Your activity is still being pr
 private let freshTokens = StravaTokens(accessToken: "A1", refreshToken: "R1",
                                        expiresAt: clock.addingTimeInterval(3600), athleteName: "Max S")
 
-private func client(_ transport: ScriptedTransport, _ secrets: MemorySecrets) -> StravaClient {
+private func client(_ transport: any StravaTransport, _ secrets: MemorySecrets) -> StravaClient {
     StravaClient(transport: transport, secrets: secrets, now: { clock }, sleep: { _ in })
 }
 
@@ -120,6 +138,24 @@ private func client(_ transport: ScriptedTransport, _ secrets: MemorySecrets) ->
         #expect(requests.last?.headers["Authorization"] == "Bearer NEW")
         #expect(await secrets.storedTokens?.refreshToken == "R2", "Strava rotates refresh tokens")
         #expect(await secrets.storedTokens?.athleteName == "Max S")
+    }
+
+    /// Issue 39: an actor isn't enough. Its methods interleave at every `await`, so two requests
+    /// that both found the token stale both refreshed — and Strava rotates the refresh token, so
+    /// the second refresh spends one the first had already used up.
+    @Test("requests that find the token stale together share one refresh")
+    func concurrentRefreshIsShared() async throws {
+        let stale = StravaTokens(accessToken: "OLD", refreshToken: "R0",
+                                 expiresAt: clock.addingTimeInterval(60), athleteName: "Max S")
+        let transport = RoutingTransport()
+        let secrets = MemorySecrets(tokens: stale)
+        let strava = client(transport, secrets)
+        async let first = strava.uploadStatus(id: 9)
+        async let second = strava.uploadStatus(id: 9)
+        _ = try await (first, second)
+
+        #expect(await transport.tokenRequests == 1)
+        #expect(await transport.authorizations == ["Bearer NEW1", "Bearer NEW1"])
     }
 
     @Test("a 401 triggers one refresh and one retry")

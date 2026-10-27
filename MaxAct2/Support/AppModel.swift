@@ -250,7 +250,10 @@ final class AppModel {
     /// test suite that depends on Apple's geocoder is a test suite that fails on a train.
     let resolvesPlaces: Bool
 
-    private var syncTask: Task<Void, Never>?
+    /// The one job at a time against Health Auto Export or Strava (issue 39). See `startJob`.
+    @ObservationIgnored private var job: Task<Void, Never>?
+    /// Stop was asked for, and the job is finishing what it had in flight.
+    private(set) var isStopping = false
     private var hasSeeded = false
 
     // MARK: Strava
@@ -266,6 +269,8 @@ final class AppModel {
     var isStravaConnected: Bool { stravaAthlete != nil }
     private var hasResumedUploads = false
     private var flagPushTask: Task<Void, Never>?
+    /// The quiet resume of uploads a previous run left in flight.
+    @ObservationIgnored private var resumeTask: Task<Void, Never>?
 
     /// The redirect Strava sends the browser back to. Strava only checks the *host* against the
     /// app's "Authorization Callback Domain", so that has to be set to `localhost` on
@@ -580,8 +585,8 @@ final class AppModel {
             if filled > 0 { items = (try? await store.allItems()) ?? items }
         } catch {
             // Tried again next launch; said now, since a route stays incomplete until it works.
-            syncStatus = .failed("Couldn't fill incomplete routes from Strava: \(Self.describeUpload(error)). "
-                                 + "MaxAct will try again next time it opens.")
+            reportQuietly("Couldn't fill incomplete routes from Strava: \(Self.describeUpload(error)). "
+                          + "MaxAct will try again next time it opens.")
         }
     }
 
@@ -680,7 +685,7 @@ final class AppModel {
         guard isStravaConnected, !syncStatus.isRunning, flagPushTask == nil else { return }
         flagPushTask = Task {
             defer { flagPushTask = nil }
-            if let error = await sendPendingStravaFlags() { syncStatus = .failed(error) }
+            if let error = await sendPendingStravaFlags() { reportQuietly(error) }
             await refreshItems()
         }
     }
@@ -772,12 +777,13 @@ final class AppModel {
 
     /// Looks for every workout in the library on Strava, and marks the ones already there.
     func startStravaCheck() {
-        guard !syncStatus.isRunning, isStravaConnected, !items.isEmpty else { return }
+        guard isStravaConnected, !items.isEmpty else { return }
         let workouts = items.map(\.workout)
         let linkedBefore = Set(items.filter { $0.stravaActivityID != nil }.map(\.id))
-        syncTask = Task {
-            syncStatus = .running(.checkingStrava, completed: 0, total: 1, found: 0)
+        startJob(.checkingStrava) { [self] in
             do {
+                // A quiet flag push or upload resume may be under way; let it finish first.
+                await waitForQuietStravaWork()
                 // Local edits go first, so the import below sees them as settled rather than
                 // overwriting them with Strava's stale value.
                 _ = await sendPendingStravaFlags()
@@ -787,11 +793,11 @@ final class AppModel {
                 await refreshItems()
                 let newlyLinked = items.filter { $0.stravaActivityID != nil && !linkedBefore.contains($0.id) }
                 if try await fillIncompleteRoutes(in: newlyLinked) > 0 { await refreshItems() }
-                syncStatus = .checkedStrava(result)
+                return .checkedStrava(result)
             } catch let error as StravaError {
-                syncStatus = .failed(error.description)
+                return .failed(error.description)
             } catch {
-                syncStatus = .failed(Self.describeUpload(error))
+                return .failed(Self.describeUpload(error))
             }
         }
     }
@@ -850,10 +856,10 @@ final class AppModel {
     /// no stored detail — a summary-only file would arrive with no route and no heart rate, which
     /// is worse than not uploading it.
     func startStravaUpload(for items: [WorkoutListItem]) {
-        guard !syncStatus.isRunning, isStravaConnected else { return }
+        guard isStravaConnected else { return }
         let pending = items.filter { !$0.stravaState.isOnStrava && $0.hasDetail }
         guard !pending.isEmpty else { return }
-        syncTask = Task { await uploadToStrava(pending) }
+        startJob(.checkingStrava) { await self.uploadToStrava(pending) }
     }
 
     /// What the Upload action would do with this selection, for its label and enabled state.
@@ -863,21 +869,19 @@ final class AppModel {
         return (ready, notOnStrava.count - ready)
     }
 
-    private func uploadToStrava(_ requested: [WorkoutListItem]) async {
+    private func uploadToStrava(_ requested: [WorkoutListItem]) async -> SyncStatus {
         let uploader = StravaUploader(client: strava)
+        // A resume of the same in-flight uploads, or a flag push, may be under way.
+        await waitForQuietStravaWork()
 
         // Check first: anything the watch already put on Strava would only come back as a
         // duplicate, after spending a write and a few polls to find that out. If the check itself
         // fails, carry on — Strava's own duplicate detection still stands behind the upload.
-        syncStatus = .running(.checkingStrava, completed: 0, total: 1, found: 0)
         _ = await sendPendingStravaFlags()
         _ = try? await markWorkoutsAlreadyOnStrava(requested.map(\.workout))
         let alreadyThere = Set(self.items.filter { $0.stravaState.isOnStrava }.map(\.id))
         let items = requested.filter { !alreadyThere.contains($0.id) }
-        guard !items.isEmpty else {
-            syncStatus = .finished(.uploadingToStrava, found: 0)
-            return
-        }
+        guard !items.isEmpty else { return .finished(.uploadingToStrava, found: 0) }
 
         for item in items { try? await store.setStravaState(.queued, for: item.id) }
         await refreshItems()
@@ -902,9 +906,8 @@ final class AppModel {
             } catch let error as StravaError where Self.endsBatch(error) {
                 // Nothing else will succeed either; stop, and say why.
                 await requeue(items[index...])
-                syncStatus = .failed(error.description)
                 await refreshItems()
-                return
+                return .failed(error.description)
             } catch {
                 // Stopped mid-request: not this workout's failure (issue 38; it was marked
                 // "failed: cancelled"). Left as it was — still queued, it goes back to not
@@ -918,7 +921,7 @@ final class AppModel {
 
         if Task.isCancelled { await requeue(items[index...]) }
         await refreshItems()
-        syncStatus = .finished(.uploadingToStrava, found: uploaded)
+        return .finished(.uploadingToStrava, found: uploaded)
     }
 
     /// Sends one workout — or, if a previous attempt got as far as an upload id, follows that
@@ -945,7 +948,8 @@ final class AppModel {
     private func resumeStravaUploads() {
         guard !hasResumedUploads, isStravaConnected else { return }
         hasResumedUploads = true
-        Task {
+        resumeTask = Task {
+            defer { resumeTask = nil }
             guard let inFlight = try? await store.itemsUploadingToStrava(), !inFlight.isEmpty else { return }
             let uploader = StravaUploader(client: strava)
             for entry in inFlight {
@@ -961,6 +965,21 @@ final class AppModel {
             }
             await refreshItems()
         }
+    }
+
+    /// Until a quiet flag push or upload resume has finished, so a job doesn't send the same
+    /// edit or poll the same upload alongside it.
+    private func waitForQuietStravaWork() async {
+        await flagPushTask?.value
+        await resumeTask?.value
+    }
+
+    /// A background pass's failure. Shown in the banner unless a job is using it — overwriting a
+    /// running job's status hid its Stop button and let a second job start (issue 39) — and
+    /// logged either way.
+    private func reportQuietly(_ message: String) {
+        Self.log.error("\(message, privacy: .public)")
+        if !syncStatus.isRunning { syncStatus = .failed(message) }
     }
 
     /// Anything still merely queued goes back to not-uploaded, so a stopped batch doesn't leave
@@ -1040,13 +1059,32 @@ final class AppModel {
     /// interrupted — which is likely, since it needs HAE foregrounded for the duration — keeps
     /// everything it had already fetched.
     func sync(source: HAEWorkoutSource, from start: Date, to end: Date = .now) async {
-        guard !syncStatus.isRunning else { return }
         let windows = SyncPlanner.windowsNewestFirst(from: start, to: end)
-        syncStatus = .running(.listing, completed: 0, total: windows.count, found: 0)
+        await startJob(.listing, total: windows.count) {
+            await self.listWeeks(windows, source: source) { _ in .listing }
+        }?.value
+    }
 
+    /// "Everything" (issue 24): the list pass back to `SyncPlanner.everythingStart`, weekly and
+    /// newest first like any sync, reporting how far back it has reached rather than "week n of
+    /// m" with a time estimate — most of those weeks are empty and nearly free, so a count of
+    /// weeks says nothing about the time left.
+    func syncEverything(source: HAEWorkoutSource, end: Date = .now) async {
+        let windows = SyncPlanner.windowsNewestFirst(from: SyncPlanner.everythingStart, to: end)
+        await startJob(.listingEverything(reachedBack: end), total: windows.count) {
+            await self.listWeeks(windows, source: source) { .listingEverything(reachedBack: $0.start) }
+        }?.value
+    }
+
+    /// The list pass's walk, shared by both syncs. The table is reloaded only after weeks that
+    /// brought something — most of an "Everything" walk is empty weeks — and once at the end.
+    private func listWeeks(
+        _ windows: [SyncWindow], source: HAEWorkoutSource,
+        activity: (SyncWindow) -> SyncActivity
+    ) async -> SyncStatus {
+        var found = 0, unreadable = 0
         do {
             try await source.connect()
-            var found = 0, unreadable = 0
             for (index, window) in windows.enumerated() {
                 if Task.isCancelled { break }
                 let result = try await source.listWorkouts(in: window)
@@ -1057,55 +1095,27 @@ final class AppModel {
                 for failure in result.failures {
                     Self.log.error("Unreadable workout \(failure.workoutID ?? "?", privacy: .public): \(String(describing: failure.underlying), privacy: .public)")
                 }
-                syncStatus = .running(.listing, completed: index + 1, total: windows.count, found: found)
-                await load()
-            }
-            syncStatus = .listed(found: found, unreadable: unreadable)
-        } catch {
-            // Partial progress is kept: every completed chunk is already committed.
-            syncStatus = .failed(Self.describe(error))
-        }
-    }
-
-    /// "Everything" (issue 24): the list pass back to `SyncPlanner.everythingStart`, weekly and
-    /// newest first like any sync, reporting how far back it has reached rather than "week n of
-    /// m" with a time estimate — most of those weeks are empty and nearly free, so a count of
-    /// weeks says nothing about the time left.
-    func syncEverything(source: HAEWorkoutSource, end: Date = .now) async {
-        guard !syncStatus.isRunning else { return }
-        let windows = SyncPlanner.windowsNewestFirst(from: SyncPlanner.everythingStart, to: end)
-        syncStatus = .running(.listingEverything(reachedBack: end), completed: 0, total: windows.count, found: 0)
-        do {
-            try await source.connect()
-            var found = 0, unreadable = 0
-            for (index, window) in windows.enumerated() {
-                if Task.isCancelled { break }
-                let result = try await source.listWorkouts(in: window)
-                try await store.upsert(result.workouts)
-                found += result.workouts.count
-                unreadable += result.failures.count
-                for failure in result.failures {
-                    Self.log.error("Unreadable workout \(failure.workoutID ?? "?", privacy: .public): \(String(describing: failure.underlying), privacy: .public)")
-                }
-                syncStatus = .running(.listingEverything(reachedBack: window.start),
-                                      completed: index + 1, total: windows.count, found: found)
-                // Empty weeks are most of the walk; reloading the table for them is wasted work.
+                syncStatus = .running(activity(window), completed: index + 1, total: windows.count, found: found)
                 if !result.workouts.isEmpty { await load() }
             }
             await load()
-            syncStatus = .listed(found: found, unreadable: unreadable)
+            return .listed(found: found, unreadable: unreadable)
         } catch {
-            // As for any sync: every finished week is already committed.
+            // Partial progress is kept: every completed week is already committed.
             await load()
-            syncStatus = .failed(Self.describe(error))
+            return .failed(Self.describe(error))
         }
     }
 
     /// Fetches routes and second-resolution series for specific workouts.
     func fetchDetail(for workouts: [WorkoutListItem], source: HAEWorkoutSource) async {
-        guard !syncStatus.isRunning else { return }
         let pending = workouts.filter { !$0.hasDetail }
-        syncStatus = .running(.fillingDetail, completed: 0, total: pending.count, found: 0)
+        await startJob(.fillingDetail, total: pending.count) {
+            await self.downloadDetail(pending, source: source)
+        }?.value
+    }
+
+    private func downloadDetail(_ pending: [WorkoutListItem], source: HAEWorkoutSource) async -> SyncStatus {
         do {
             try await source.connect()
             var fetched = 0
@@ -1129,10 +1139,10 @@ final class AppModel {
                 if index.isMultiple(of: 5) { await load() }
             }
             await load()
-            syncStatus = .finished(.fillingDetail, found: fetched)
+            return .finished(.fillingDetail, found: fetched)
         } catch {
             await load()
-            syncStatus = .failed(Self.describe(error))
+            return .failed(Self.describe(error))
         }
     }
 
@@ -1197,6 +1207,14 @@ final class AppModel {
     /// so leaving them behind would let a later re-sync silently adopt the orphaned blobs of
     /// deleted workouts.
     func deleteAllData() async {
+        // Not while a job is writing (issue 39): the button is disabled then, and this is the
+        // backstop. Background passes are waited out instead — a route fill finishing after the
+        // delete would leave an orphan series a later re-sync adopts.
+        guard !syncStatus.isRunning else { return }
+        placeTask?.cancel()
+        await placeTask?.value
+        await waitForQuietStravaWork()
+        while isFillingRoutes || isRepairingHeartRate { try? await Task.sleep(for: .milliseconds(100)) }
         do {
             try await store.deleteAll()
             try await seriesStore.deleteAll()
@@ -1221,14 +1239,21 @@ final class AppModel {
     /// The span is a parameter rather than a stored preference: it's a per-sync decision, since a
     /// daily top-up wants a week, the initial import wants everything, and a single past month
     /// (issue 17) wants neither.
-    func startSync(from start: Date, to end: Date = .now) {
-        guard let source = settings.makeSource(), !syncStatus.isRunning else { return }
-        syncTask = Task { await sync(source: source, from: start, to: end) }
+    func startSync(from start: Date, to end: Date = .now, source: HAEWorkoutSource? = nil) {
+        guard let source = source ?? settings.makeSource() else { return }
+        let windows = SyncPlanner.windowsNewestFirst(from: start, to: end)
+        startJob(.listing, total: windows.count) {
+            await self.listWeeks(windows, source: source) { _ in .listing }
+        }
     }
 
     func startSyncEverything() {
-        guard let source = settings.makeSource(), !syncStatus.isRunning else { return }
-        syncTask = Task { await syncEverything(source: source) }
+        guard let source = settings.makeSource() else { return }
+        let end = Date.now
+        let windows = SyncPlanner.windowsNewestFirst(from: SyncPlanner.everythingStart, to: end)
+        startJob(.listingEverything(reachedBack: end), total: windows.count) {
+            await self.listWeeks(windows, source: source) { .listingEverything(reachedBack: $0.start) }
+        }
     }
 
     /// Walks the whole backlog for a scope, newest first.
@@ -1237,16 +1262,46 @@ final class AppModel {
     }
 
     func startDetailFetch(for items: [WorkoutListItem]) {
-        guard let source = settings.makeSource(), !syncStatus.isRunning else { return }
-        syncTask = Task { await fetchDetail(for: items, source: source) }
+        guard let source = settings.makeSource() else { return }
+        let pending = items.filter { !$0.hasDetail }
+        startJob(.fillingDetail, total: pending.count) { await self.downloadDetail(pending, source: source) }
     }
 
-    /// Cancellation is cooperative and safe at any point: each completed weekly chunk has already
-    /// been committed, so stopping loses at most the chunk in flight.
+    /// Starts `work` as the job, unless one is already running; returns its task, or `nil` if
+    /// refused (issue 39).
+    ///
+    /// The status is set **before** returning, so a second call in the same turn — a double
+    /// click, or the Strava connection starting a check while the menu fires — is refused rather
+    /// than starting a second job. The job's own result becomes the status when it ends, unless
+    /// it was stopped: then it ends idle, not with a "Synced N" that appears after Stop.
+    @discardableResult
+    func startJob(_ activity: SyncActivity, total: Int = 1,
+                  _ work: @escaping () async -> SyncStatus) -> Task<Void, Never>? {
+        guard job == nil, !syncStatus.isRunning else { return nil }
+        syncStatus = .running(activity, completed: 0, total: total, found: 0)
+        let task = Task {
+            let outcome = await work()
+            syncStatus = Task.isCancelled ? .idle : outcome
+            job = nil
+            isStopping = false
+        }
+        job = task
+        return task
+    }
+
+    /// Asks the job to stop. Cancellation is cooperative: the job finishes what it has in flight
+    /// — each completed weekly chunk is already committed, so at most that chunk is lost — and
+    /// stays running (the banner says "Stopping…") until it has, so nothing new can start
+    /// alongside it. Health Auto Export serves one client at a time.
     func cancelSync() {
-        syncTask?.cancel()
-        syncTask = nil
-        if syncStatus.isRunning { syncStatus = .idle }
+        guard let job, !isStopping else { return }
+        isStopping = true
+        job.cancel()
+    }
+
+    /// Until the current job, if any, has ended. For tests.
+    func waitForJob() async {
+        await job?.value
     }
 
     /// A Health Auto Export failure in terms the user can act on — see `SyncProblem`, which tells

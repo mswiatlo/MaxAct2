@@ -19,6 +19,12 @@ public actor RouteSketchCache {
     private let url: URL
     private var digests: [String: SeriesDigest] = [:]
     private var loaded = false
+    /// Bumped by `clear()`, and per workout by `invalidate(_:)`, so a build that was reading a
+    /// series meanwhile doesn't put back what was just thrown away (issue 39). Actor methods
+    /// interleave at every `await`: a Delete All during the first build used to have its digests
+    /// written straight back, and a re-download kept the old route's.
+    private var generation = 0
+    private var invalidations: [String: Int] = [:]
 
     /// - Parameter directory: defaults to `Application Support/com.swiatlowski.MaxAct`.
     public init(directory: URL? = nil) throws {
@@ -38,12 +44,17 @@ public actor RouteSketchCache {
         progress: @Sendable (Int, Int) async -> Void = { _, _ in }
     ) async -> [SeriesDigest] {
         loadIfNeeded()
+        let started = generation
         let missing = workoutIDs.filter { digests[$0] == nil }
         for (index, id) in missing.enumerated() {
+            let stamp = invalidations[id]
             if let series = try? await seriesStore.load(id) {
-                digests[id] = SeriesDigest(series: series)
+                // Cleared or invalidated while that was read: the series may be gone or replaced.
+                guard generation == started else { return [] }
+                if invalidations[id] == stamp { digests[id] = SeriesDigest(series: series) }
             }
             await progress(index + 1, missing.count)
+            guard generation == started else { return [] }
         }
         if !missing.isEmpty { save() }
         return workoutIDs.compactMap { digests[$0] }
@@ -61,12 +72,16 @@ public actor RouteSketchCache {
     public func invalidate(_ workoutIDs: some Sequence<String>) {
         loadIfNeeded()
         var changed = false
-        for id in workoutIDs where digests.removeValue(forKey: id) != nil { changed = true }
+        for id in workoutIDs {
+            invalidations[id, default: 0] += 1
+            if digests.removeValue(forKey: id) != nil { changed = true }
+        }
         if changed { save() }
     }
 
     /// Forget everything — for when the library itself is deleted.
     public func clear() {
+        generation += 1
         digests = [:]
         loaded = true
         try? FileManager.default.removeItem(at: url)

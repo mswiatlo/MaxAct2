@@ -102,6 +102,28 @@ import Testing
         #expect(digests.map(\.workoutID) == ["A", "INDOOR"])
         #expect(digests.last?.sketch == nil)
     }
+
+    /// Issue 39: a Delete All during the first build used to have the build's digests written
+    /// straight back, because the actor runs `clear()` whenever the build is awaiting a series.
+    @Test("clearing during a build leaves nothing behind")
+    func clearDuringBuild() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "RouteHeatmapTests-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let seriesStore = try SeriesStore(directory: root.appending(path: "Series"))
+        for id in ["A", "B", "C"] { try await seriesStore.save(series(id, from: vancouver, east: 3000)) }
+
+        let cache = try RouteSketchCache(directory: root)
+        _ = await cache.digests(for: ["A", "B", "C"], seriesStore: seriesStore) { done, _ in
+            if done == 1 { await cache.clear() }
+        }
+
+        // A fresh cache (as after relaunch) must have to build all three again.
+        let calls = Counter()
+        _ = await try RouteSketchCache(directory: root).digests(for: ["A", "B", "C"], seriesStore: seriesStore) { _, _ in
+            await calls.bump()
+        }
+        #expect(await calls.value == 3)
+    }
 }
 
 private actor Counter {

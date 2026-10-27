@@ -74,6 +74,9 @@ public actor StravaClient {
 
     public private(set) var rateLimit = StravaRateLimit()
 
+    /// The refresh in flight, shared by every request that finds the token stale meanwhile.
+    private var refreshing: Task<StravaTokens, any Error>?
+
     public init(
         transport: any StravaTransport = URLSessionStravaTransport(),
         secrets: any StravaSecretStore,
@@ -284,13 +287,17 @@ public actor StravaClient {
         throw StravaError.authorizationRejected("token refused after refresh")
     }
 
+    /// Asks again after every sleep: other requests run while this one waits, and may have used
+    /// the room it woke up for (issue 39).
     private func waitForRoom(_ kind: StravaRateLimit.Kind) async throws {
-        let current = now()
-        let start = rateLimit.earliestStart(for: kind, at: current)
-        let wait = start.timeIntervalSince(current)
-        guard wait > 0 else { return }
-        if wait > Self.longestQuietWait { throw StravaError.rateLimited(until: start) }
-        try await sleep(wait)
+        while true {
+            let current = now()
+            let start = rateLimit.earliestStart(for: kind, at: current)
+            let wait = start.timeIntervalSince(current)
+            guard wait > 0 else { return }
+            if wait > Self.longestQuietWait { throw StravaError.rateLimited(until: start) }
+            try await sleep(wait)
+        }
     }
 
     private func validTokens() async throws -> StravaTokens {
@@ -298,7 +305,24 @@ public actor StravaClient {
         return tokens.isFresh(at: now()) ? tokens : try await refresh(tokens)
     }
 
+    /// One refresh at a time (issue 39). Being an actor isn't enough: its methods interleave at
+    /// every `await`, so two requests that both found the token stale both refreshed, and Strava
+    /// rotates the refresh token — the second spent one the first had already used.
     private func refresh(_ tokens: StravaTokens) async throws -> StravaTokens {
+        // No `await` between the check and setting `refreshing`, or two could still start.
+        if let refreshing { return try await refreshing.value }
+        let task = Task { try await self.performRefresh(tokens) }
+        refreshing = task
+        defer { refreshing = nil }
+        return try await task.value
+    }
+
+    private func performRefresh(_ tokens: StravaTokens) async throws -> StravaTokens {
+        // Another request may have refreshed since these tokens were read: use its result rather
+        // than spend the refresh token it already rotated.
+        if let stored = await secrets.tokens(), stored.refreshToken != tokens.refreshToken, stored.isFresh(at: now()) {
+            return stored
+        }
         guard let credentials = await secrets.credentials(), credentials.isComplete else {
             throw StravaError.notConfigured
         }

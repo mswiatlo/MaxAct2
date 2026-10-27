@@ -12,12 +12,17 @@ import Testing
     actor PretendPhone: MCPTransport {
         let dates: [Date]
         let timeoutAbove: Int
+        /// How long each `get_workouts` takes. Not cut short by cancellation, like a request
+        /// already on its way to the phone.
+        let delay: Duration
         private(set) var listCalls = 0
         private(set) var timeouts = 0
+        private(set) var connections = 0
 
-        init(dates: [Date], timeoutAbove: Int) {
+        init(dates: [Date], timeoutAbove: Int, delay: Duration = .zero) {
             self.dates = dates
             self.timeoutAbove = timeoutAbove
+            self.delay = delay
         }
 
         static let format: DateFormatter = {
@@ -31,12 +36,14 @@ import Testing
             let message = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any] ?? [:]
             switch message["method"] as? String {
             case "initialize":
+                connections += 1
                 return Self.json(#"{"jsonrpc":"2.0","id":"1","result":{"protocolVersion":"2025-06-18","serverInfo":{"name":"Health Auto Export","version":"1.1.0"}}}"#,
                                  headers: ["Mcp-Session-Id": "S"])
             case "tools/list":
                 return Self.json(#"{"jsonrpc":"2.0","id":"2","result":{"tools":[{"name":"get_workouts"}]}}"#)
             case "tools/call":
                 listCalls += 1
+                if delay > .zero { await Task.detached { [delay] in try? await Task.sleep(for: delay) }.value }
                 let arguments = (message["params"] as? [String: Any])?["arguments"] as? [String: Any] ?? [:]
                 guard let start = (arguments["start"] as? String).flatMap(Self.format.date(from:)),
                       let end = (arguments["end"] as? String).flatMap(Self.format.date(from:))

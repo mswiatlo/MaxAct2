@@ -272,7 +272,7 @@ struct MaxActCommands: Commands {
                 .keyboardShortcut("r", modifiers: .command)
 
             Button("Stop Syncing") { model.cancelSync() }
-                .disabled(!model.syncStatus.isRunning)
+                .disabled(!model.syncStatus.isRunning || model.isStopping)
 
             Button("Download Detail for Selection") {
                 model.startDetailFetch(for: model.selectedItems)

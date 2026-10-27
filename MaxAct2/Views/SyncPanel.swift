@@ -285,7 +285,8 @@ struct SyncPanel: View {
             Text("Keep Health Auto Export in the foreground until this finishes.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Button("Stop Syncing") { model.cancelSync() }
+            Button(model.isStopping ? "Stopping…" : "Stop Syncing") { model.cancelSync() }
+                .disabled(model.isStopping)
         }
     }
 }

@@ -271,12 +271,13 @@ struct ContentView: View {
                 }
 
                 // Three lines: a problem's title plus its advice runs to two at typical widths.
-                Text(message).font(.callout).lineLimit(3)
+                Text(model.isStopping ? "Stopping…" : message).font(.callout).lineLimit(3)
                     .accessibilityIdentifier("SyncBannerMessage")
                 Spacer()
 
                 if model.syncStatus.isRunning {
                     Button("Stop") { model.cancelSync() }
+                        .disabled(model.isStopping)
                 } else {
                     Button("Dismiss") { model.dismissSyncStatus() }
                 }

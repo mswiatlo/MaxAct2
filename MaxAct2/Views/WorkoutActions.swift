@@ -276,7 +276,7 @@ struct SettingsView: View {
             LabeledContent("Routes and heart rate", value: storageDescription)
 
             Button("Delete All Workouts\u{2026}", role: .destructive) { isConfirmingDelete = true }
-                .disabled(model.items.isEmpty)
+                .disabled(model.items.isEmpty || model.syncStatus.isRunning)
         } header: {
             Text("Stored Data")
         } footer: {
