@@ -232,7 +232,9 @@ extension AppModel {
         let items = requested.filter { !alreadyThere.contains($0.id) }
         guard !items.isEmpty else { return .finished(.uploadingToStrava, found: 0) }
 
-        for item in items { await recordStravaState(.queued, for: item.id) }
+        // Not ones already in flight (issue 43): marking those queued hid the upload id that
+        // `uploadOne` resumes from, so they were sent again — a duplicate, and a wasted write.
+        for item in items where item.stravaState != .uploading { await recordStravaState(.queued, for: item.id) }
         await refreshItems()
 
         var uploaded = 0

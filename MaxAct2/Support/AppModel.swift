@@ -198,10 +198,11 @@ final class AppModel {
         settings: AppSettings,
         seedCount: Int? = nil,
         resolvesPlaces: Bool = true,
-        stravaSecrets: any AppSecretStore = KeychainSecretStore()
+        stravaSecrets: any AppSecretStore = KeychainSecretStore(),
+        stravaTransport: any StravaTransport = URLSessionStravaTransport()
     ) {
         self.stravaSecrets = stravaSecrets
-        strava = StravaClient(secrets: stravaSecrets)
+        strava = StravaClient(transport: stravaTransport, secrets: stravaSecrets)
         self.store = store
         self.seriesStore = seriesStore
         routeSketchCache = try? RouteSketchCache(directory: seriesStore.directory.deletingLastPathComponent())
@@ -242,7 +243,8 @@ final class AppModel {
     /// persists.
     static func inMemoryFallback(
         settings: AppSettings, seedCount: Int? = nil, resolvesPlaces: Bool = true,
-        stravaSecrets: any AppSecretStore = KeychainSecretStore()
+        stravaSecrets: any AppSecretStore = KeychainSecretStore(),
+        stravaTransport: any StravaTransport = URLSessionStravaTransport()
     ) -> AppModel {
         // Force-unwrapped deliberately: an in-memory container and a temp directory failing
         // would mean the process cannot allocate or write anywhere, and there is no recovery.
@@ -261,7 +263,8 @@ final class AppModel {
             settings: settings,
             seedCount: seedCount,
             resolvesPlaces: resolvesPlaces,
-            stravaSecrets: stravaSecrets
+            stravaSecrets: stravaSecrets,
+            stravaTransport: stravaTransport
         )
     }
 
