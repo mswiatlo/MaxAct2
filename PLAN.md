@@ -26,7 +26,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ## 1. Where things stand — 2026-10-24
 
-All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 388 in
+All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 391 in
 `MaxActCore` (`swift test`), 89 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~15 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
@@ -111,14 +111,23 @@ replaces in about 0.5 s. Unexplained. Next ideas: whether `Table` builds row vie
 (Instruments, SwiftUI template), and what tearing one down costs. It's once per session, against
 6.5 s on every growth before 44.
 
-**47. Hardening** —
-- a hidden field (`SecureField`) for the HAE token;
-- HAE error bodies logged privately;
-- no redirects followed in either transport;
-- a size cap on replies;
-- remove the unused user-selected-files entitlement;
-- Hardened Runtime, checked against Personal Team signing and Keychain prompts first;
-- no default arguments for secrets in `inMemoryFallback`.
+**47. Hardening** *(built 2026-10-27 on `hardening`, awaiting the user's check)* —
+- **The HAE token is a `SecureField`** in Settings and in the connection fields; UI tests type into
+  `secureTextFields`.
+- **Private logs:** HAE error replies, decoder failures and the heart-rate lookup failure.
+- **`GuardedSession` (new), shared by both transports:**
+  - refuses redirects. Measured: without it, the request really did go on to the redirect's host.
+  - abandons replies over 256 MB, whether or not the length is declared.
+  - gathers the reply in chunks. `bytes(for:)` was ruled out: 35 s for 5 MB in debug, against
+    0.02 s.
+- **Build settings:** the user-selected-files entitlement removed; Hardened Runtime on. The signed
+  app shows the runtime flag; its entitlements are now sandbox and network client, plus
+  `get-task-allow` in Debug.
+- **`inMemoryFallback`** has no default secret store; the production fallback passes the Keychain
+  explicitly.
+- **Tests:** `GuardedSessionTests`, 3, mutation-checked (redirect, size).
+- **To check:** the app launches; Strava still shows connected; the token field shows dots and
+  takes a paste.
 
 **48. HTTPS to Health Auto Export** (S4; the user's idea) — HAE's MCP server has an HTTPS option.
 Plain HTTP lets anyone on the same Wi-Fi read the token and the workouts, or impersonate the phone.

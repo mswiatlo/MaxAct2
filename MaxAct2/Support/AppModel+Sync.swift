@@ -154,7 +154,7 @@ extension AppModel {
                 // Counted and logged rather than dropped: these used to vanish without a trace.
                 unreadable += result.failures.count
                 for failure in result.failures {
-                    Self.log.error("Unreadable workout \(failure.workoutID ?? "?", privacy: .public): \(String(describing: failure.underlying), privacy: .public)")
+                    Self.log.error("Unreadable workout \(failure.workoutID ?? "?", privacy: .public): \(String(describing: failure.underlying), privacy: .private)")   // may quote the phone's payload (issue 47)
                 }
                 syncStatus = .running(activity(window), completed: index + 1, total: windows.count, found: found)
                 if !result.workouts.isEmpty { await load() }

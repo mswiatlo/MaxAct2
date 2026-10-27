@@ -1400,6 +1400,10 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-27** — **47 built: hardening.** Measured on the way: `URLSession` followed the stub's
+  redirect and sent the request on, confirming audit finding S7. Reading a reply byte by byte with
+  `bytes(for:)` took 35 s for 5 MB in debug, so the size cap uses a delegate.
+
 - **2026-10-27** — **Issues 45 and 46 closed**, with the correction to 44. Full suite: 84 passed, 4 skipped, 1 expected failure.
 
 - **2026-10-27** — **44 corrected.** The attempt-jump UI test failed twice. Its trace showed the

@@ -115,7 +115,8 @@ struct MaxActApp: App {
                 settings: settings
             ))
         } catch {
-            _model = State(initialValue: AppModel.inMemoryFallback(settings: settings))
+            _model = State(initialValue: AppModel.inMemoryFallback(settings: settings,
+                                                                   stravaSecrets: KeychainSecretStore()))
             _startupError = State(initialValue: error.localizedDescription)
         }
     }

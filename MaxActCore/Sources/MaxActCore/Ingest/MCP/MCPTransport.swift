@@ -21,19 +21,19 @@ public protocol MCPTransport: Sendable {
 
 public struct URLSessionMCPTransport: MCPTransport {
     private let endpoint: URL
-    private let session: URLSession
+    private let session: GuardedSession   // no redirects, bounded replies (issue 47)
 
     /// - Parameter timeout: generous by necessity. The phone answers at ~2.4 s per workout, so a
     ///   90-day window measured 234 s — far past `URLSession`'s 60 s default, which would abort
     ///   every large request.
-    public init(endpoint: MCPEndpoint, timeout: TimeInterval = 600) {
+    public init(endpoint: MCPEndpoint, timeout: TimeInterval = 600, configuration custom: URLSessionConfiguration? = nil) {
         self.endpoint = endpoint.url
 
-        let configuration = URLSessionConfiguration.ephemeral
+        let configuration = custom ?? URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = timeout
         configuration.timeoutIntervalForResource = timeout
         configuration.waitsForConnectivity = false
-        session = URLSession(configuration: configuration)
+        session = GuardedSession(configuration: configuration)
     }
 
     public func post(_ body: Data, headers: [String: String]) async throws -> MCPHTTPResponse {

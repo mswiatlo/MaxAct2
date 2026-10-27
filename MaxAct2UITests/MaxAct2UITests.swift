@@ -229,9 +229,9 @@ final class MaxAct2UITests: XCTestCase {
             addressField.waitForExistence(timeout: 5),
             "The sync panel must let you enter the iPhone address without leaving for Settings."
         )
-        XCTAssertGreaterThanOrEqual(
-            app.textFields.count, 2,
-            "Both the address and the token belong in the panel."
+        XCTAssertTrue(
+            app.secureTextFields.firstMatch.exists,
+            "Both the address and the token (hidden, issue 47) belong in the panel."
         )
         XCTAssertTrue(
             app.buttons["Start Sync"].exists,
@@ -265,7 +265,7 @@ final class MaxAct2UITests: XCTestCase {
         address.typeKey("a", modifierFlags: .command)
         address.typeText("10.0.0.158")
 
-        let token = app.textFields.element(boundBy: 1)
+        let token = app.secureTextFields.firstMatch   // hidden (issue 47)
         token.click()
         token.typeKey("a", modifierFlags: .command)
         token.typeText("test-token")
@@ -290,7 +290,7 @@ final class MaxAct2UITests: XCTestCase {
         let address = sheet.textFields.element(boundBy: 0)
         address.click()
         address.typeText("127.0.0.1")
-        let token = sheet.textFields.element(boundBy: 1)
+        let token = sheet.secureTextFields.firstMatch   // hidden (issue 47)
         token.click()
         token.typeText("irrelevant")
         XCTAssertTrue(test.isEnabled)

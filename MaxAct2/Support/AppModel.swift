@@ -254,7 +254,9 @@ final class AppModel {
     /// persists.
     static func inMemoryFallback(
         settings: AppSettings, seedCount: Int? = nil, resolvesPlaces: Bool = true,
-        stravaSecrets: any AppSecretStore = KeychainSecretStore(),
+        // No defaults (issue 47): a test that left these out would have reached the real
+        // Keychain and the real Strava. Every caller says which it means.
+        stravaSecrets: any AppSecretStore,
         stravaTransport: any StravaTransport = URLSessionStravaTransport()
     ) -> AppModel {
         // Force-unwrapped deliberately: an in-memory container and a temp directory failing

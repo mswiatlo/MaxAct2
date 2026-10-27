@@ -26,13 +26,13 @@ public protocol StravaTransport: Sendable {
 }
 
 public struct URLSessionStravaTransport: StravaTransport {
-    private let session: URLSession
+    private let session: GuardedSession   // no redirects, bounded replies (issue 47)
 
     public init() {
         let configuration = URLSessionConfiguration.ephemeral
         // An upload of a long ride is a few hundred kilobytes; generous, but not unbounded.
         configuration.timeoutIntervalForRequest = 120
-        session = URLSession(configuration: configuration)
+        session = GuardedSession(configuration: configuration)
     }
 
     public func send(_ request: StravaHTTPRequest) async throws -> StravaHTTPResponse {

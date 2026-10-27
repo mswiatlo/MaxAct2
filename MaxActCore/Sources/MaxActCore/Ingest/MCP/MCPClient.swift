@@ -80,7 +80,8 @@ public actor MCPClient {
         do {
             _ = try await send(method: "notifications/initialized", params: [:], isNotification: true)
         } catch {
-            Self.log.error("The initialized notice failed: \(String(describing: error), privacy: .public)")
+            // Private: an HTTP error carries up to 200 characters of HAE's reply (issue 47).
+            Self.log.error("The initialized notice failed: \(String(describing: error), privacy: .private)")
         }
 
         let info = response as? [String: Any]

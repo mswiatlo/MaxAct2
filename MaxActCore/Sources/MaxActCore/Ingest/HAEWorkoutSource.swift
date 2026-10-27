@@ -94,7 +94,7 @@ public struct HAEWorkoutSource: WorkoutSource {
         } catch is CancellationError {
             throw CancellationError()
         } catch {
-            Self.log.error("Dense heart rate for \(workout.id, privacy: .public) failed; keeping the export's: \(String(describing: error), privacy: .public)")
+            Self.log.error("Dense heart rate for \(workout.id, privacy: .public) failed; keeping the export's: \(String(describing: error), privacy: .private)")   // may quote HAE's reply (issue 47)
             return found
         }
         guard dense.count > found.series.heartRate.count else { return found }

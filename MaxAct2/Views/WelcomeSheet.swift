@@ -29,7 +29,8 @@ struct ConnectionFields: View {
                     .textSelection(.enabled)
             }
             LabeledContent("Token") {
-                TextField("", text: $settings.token, prompt: Text("required"))
+                // Hidden, like the Strava secret (issue 47): it grants your whole Health export.
+                SecureField("", text: $settings.token, prompt: Text("required"))
                     .textFieldStyle(.roundedBorder)
                     .font(.system(.body, design: .monospaced))
             }

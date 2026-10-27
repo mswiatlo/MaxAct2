@@ -18,7 +18,7 @@ struct SettingsView: View {
             Section {
                 // Not a sample address: one reads as filled in (see `WelcomeSheet`).
                 TextField("iPhone address", text: $settings.host, prompt: Text("required"))
-                TextField("Bearer token", text: $settings.token)
+                SecureField("Bearer token", text: $settings.token)   // hidden (issue 47)
             } header: {
                 Text("Health Auto Export")
             } footer: {
