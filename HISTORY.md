@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed or closed known issues (1–20, 22, 23, 25–27, 29–32, 34, 35, 37–44)
+## 2. Fixed or closed known issues (1–20, 22, 23, 25–32, 34, 35, 37–44)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -518,6 +518,12 @@ other in order, and ranking by time. Checked on a copy: the newest commute 92 ti
 times, 3rd. Extended the next day: pointing at an attempt shows its exact date, time and
 duration, and clicking it opens that workout and scrolls the table to it (`AppModel.reveal`). If
 a search or filter hides it, the table goes back to All Workouts. Going back is issue 32.
+
+**28. ~~Security audit.~~ — done 2026-10-27, triaged with the user.** — three read-only reviews
+(secrets, logging and test isolation; the network links and OAuth; untrusted input and data at
+rest), with the two medium bugs verified: a `../` id resolves outside `Series/` (run), and the
+formatters guard only `isFinite` before `Int(…)`. Nothing high-severity. Findings became issues
+45–48 in `PLAN.md`. 48 (HTTPS to HAE, with a pinned certificate) was the user's addition.
 
 **44. ~~Search stalled while deleting a term.~~ — done 2026-10-27, confirmed by the user.** —
 - **Measured on a library copy** (536 workouts): deleting "California" back to "Ca" took **6.5 s**,
@@ -1370,6 +1376,8 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-27** — **Issue 28 closed: security audit.** Findings triaged into 45–48.
 
 - **2026-10-27** — **Issue 44 closed**, confirmed by the user. Full suite, with Do Not Disturb on: 84 passed, 4 skipped, 1 expected failure.
 

@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** 28 (security audit), then 36
+**Next:** the security fixes 45–48 in order, then 36
 (README). 24's live run waits for HAE's fix (21). Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
@@ -44,7 +44,7 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–20, 22, 23, 25, 26, 27, 29–32, 34, 35, 37–44 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–20, 22, 23, 25, 26, 27, 29–32, 34, 35, 28, 37–44 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
 **21. Health Auto Export bug report** *(sent by the user 2026-10-14; HAE acknowledged it and asked
@@ -102,20 +102,56 @@ is unmeasured: the recording's own zone, or the phone's zone at export. (The fix
 `make_fixture.py` moves dates but keeps the offset.) Next time the phone is connected, fetch a
 winter workout. If it reads `-0800`, the offset is the recording's: store it and name by it.
 
-**28. Security audit** *(requested 2026-10-23; after 27, near the finish)* — secrets (HAE token, Strava client
-secret and OAuth tokens: Keychain use, nothing in logs, defaults or crash output), the MCP link
-(plain HTTP on the LAN, token in transit), Strava OAuth (redirect handling, state check, token
-refresh), handling of untrusted input (HAE and Strava replies, stored series files), on-disk data
-and file protection, entitlements and sandboxing, and that the test isolation can't reach real data.
-Output as for 27. Already found:
-- The HAE bearer token sits in plain UserDefaults (`syncToken`, `WorkoutActions.swift`), not the
-  Keychain.
-- `SeriesStore.fileURL(for:)` builds a path from the unchecked workout id, so `../` could escape
-  `Series/`.
+**From the security audit (28, 2026-10-27; agreed with the user, in this order):**
 
-**33. Say who uploaded it** *(requested 2026-10-24; built 2026-10-25, awaiting the user's check)* —
-the inspector's note for a workout found already on Strava now reads "Uploaded to Strava by another
-source." (user's wording; was "Already uploaded to Strava.").
+**45. Validate input from the phone** —
+- **S1:** a workout id is used as a file name unchecked. A spoofed `../../x` writes outside
+  `Series/` and `Thumbnails/` (measured: it resolves out of the folder), and goes unescaped into
+  the upload's `filename=` header.
+- **S2:** a huge but finite number (a duration of `1e300`) traps `Int(…)` in the formatters. Once
+  stored, the app would crash on every launch.
+- **Fix:** ids must look like HAE's (letters, digits, hyphens; up to 64); numbers range-checked in
+  the decoder (duration up to 7 days, valid latitude and longitude, heart rate 0–300, quantities
+  bounded); formatters clamp rather than trap; `SeriesStore` checks paths stay inside its folder;
+  a fixed upload file name. Each with a test.
+
+**46. Revoke on Disconnect** (S3) — Disconnect only deletes the tokens locally. Call Strava's
+`POST /oauth/deauthorize` first (best effort), and say in Settings that access can also be revoked
+at strava.com/settings/apps.
+
+**47. Hardening** —
+- a hidden field (`SecureField`) for the HAE token;
+- HAE error bodies logged privately;
+- no redirects followed in either transport;
+- a size cap on replies;
+- remove the unused user-selected-files entitlement;
+- Hardened Runtime, checked against Personal Team signing and Keychain prompts first;
+- no default arguments for secrets in `inMemoryFallback`.
+
+**48. HTTPS to Health Auto Export** (S4; the user's idea) — HAE's MCP server has an HTTPS option.
+Plain HTTP lets anyone on the same Wi-Fi read the token and the workouts, or impersonate the phone.
+HTTPS only helps if the certificate is checked, and HAE's is probably self-signed, which
+`URLSession` rejects. Steps:
+1. With the phone (ask for its current address), turn on HTTPS. Look at the certificate:
+   self-signed? Stable across HAE restarts and updates?
+2. Measure what TLS costs a sync.
+3. Pin it: show the fingerprint on first connect for the user to confirm, store it, and accept only
+   that certificate afterwards.
+4. Keep HTTP as a clearly labelled, less safe option.
+
+Until then: trusted networks only, and regenerate the token after an untrusted one. Say so in the
+README (36) and the welcome sheet.
+
+Checked and fine in 28:
+- the OAuth `state` and scope checks;
+- no URL scheme other apps can trigger;
+- no secrets in logs or in errors shown;
+- system TLS for Strava;
+- TCX escaping;
+- health data never leaves the sandbox container.
+
+Kept as is (S11): the HAE token in UserDefaults. The Keychain would prompt after every rebuild,
+and the token is exposed on the network until 48 anyway.
 
 **36. A visual README** *(requested 2026-10-26; after the audits)* — a `README.md` at the root that
 introduces MaxAct and shows its features: what it is (a Mac browser for Apple Health workouts
