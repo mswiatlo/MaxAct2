@@ -958,7 +958,14 @@ final class SeededTableUITests: XCTestCase {
         }
         XCTAssertTrue(scrolledTo, "The table should scroll to the clicked ride.")
         Thread.sleep(forTimeInterval: 0.5)   // let the table settle
-        let afterX = try XCTUnwrap(laidOutX(of: "Sep 9, 2025", in: table))
+        // Polled, not read once: in one full run (2026-10-27) the row had scrolled into view but
+        // had no laid-out copy yet half a second later.
+        var laidOut: CGFloat?
+        for _ in 0..<25 where laidOut == nil {
+            laidOut = laidOutX(of: "Sep 9, 2025", in: table)
+            if laidOut == nil { Thread.sleep(forTimeInterval: 0.2) }
+        }
+        let afterX = try XCTUnwrap(laidOut, "The clicked ride never laid out in the table.")
         // Once in four full runs this read x 466 against 1516, and it hasn't recurred. Keep the
         // evidence if it does: every copy's frame, the table and window, and the window itself.
         if abs(afterX - dateColumnX) > 1, app.state == .runningForeground {

@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed or closed known issues (1–20, 22, 23, 25–27, 29–32, 34, 35, 37–41)
+## 2. Fixed or closed known issues (1–20, 22, 23, 25–27, 29–32, 34, 35, 37–43)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -518,6 +518,56 @@ other in order, and ranking by time. Checked on a copy: the newest commute 92 ti
 times, 3rd. Extended the next day: pointing at an attempt shows its exact date, time and
 duration, and clicking it opens that workout and scrolls the table to it (`AppModel.reveal`). If
 a search or filter hides it, the table goes back to All Workouts. Going back is issue 32.
+
+**42. ~~Structure, duplication and dead code.~~ — done 2026-10-27, checked by the user (no visible change).** —
+- **Removed:**
+  - `WorkoutStore.delete(id:)`, `itemsNeedingDetail` and `setThumbnailFileName`;
+  - `allItems`' unused ordering parameter;
+  - `SyncFrontier`, `RouteSketchCache.sketches` and `StravaClient.updateActivity(id:sportType:)`;
+  - an unused binding in the sync panel;
+  - the five tests that only covered these.
+
+  The record's `thumbnailFileName` attribute stays, so the store's schema doesn't change.
+- **About ten comments corrected,** and `describeUpload` renamed `describeStravaError`.
+- **One copy of shared maths in the core:**
+  - step and cumulative distances;
+  - even sampling;
+  - the period walk and binary search, so heart-rate zones by period is no longer linear per
+    workout;
+  - metres-per-degree for the heatmap (`PlaceGrid`'s stays: changing it would move every cell);
+  - the simplification tolerance.
+- **Shared views:** `SectionHeader`, `Footnote`, `StatCell`, `CLLocationCoordinate2D(Coordinate)`,
+  `WorkoutFormatting.span` and `hoursAndMinutes`.
+- **Files split:**
+  - `AppSettings`, `SettingsView`, `BestsSection`, `StatisticsWithInspector` and
+    `SelectionSummaryView` moved into their own files;
+  - `WorkoutStore` split into `+Strava`, `+Places` and `+Repairs` extensions.
+- **Deferred:** splitting `WorkoutDetailView` (650 lines) into map, charts and notes. Its map and
+  charts share hover state, so it needs that state lifted, which is a design change rather than a
+  tidy-up.
+
+**43. ~~Tests.~~ — done 2026-10-27.** —
+- **Timing limits:** about 10–25× each test's time alone, so they still catch a 10× regression on
+  a busy machine. Statistics went 200 ms → 1 s; training load and route lookup 300/200 ms → 500 ms.
+- **No real network:** `ConnectionCheckTests` uses a pretend phone that never answers, instead of
+  a real unroutable address.
+- **No `xmllint` deadlock:** the schema check reads its error output before waiting.
+- **New tests:**
+  - `itemsUploadingToStrava`;
+  - `AppModel`'s Strava path: an upload, Stop mid-upload (38's fix, mutation-checked) and resuming
+    an upload in flight;
+  - `WorkoutFilter`.
+
+  `AppModel` now takes a `StravaTransport` for this.
+- **Bug found by the resume test:** queuing a batch overwrote an in-flight upload's state, so it
+  was sent again (a duplicate, and a wasted write). Uploads in flight are no longer re-queued.
+- **UI test file split** into one file per class, plus `UITestSupport.swift`. The store factory is
+  shared (`TestSupport.swift`).
+- **Left as they are:**
+  - the 27 fixed sleeps in the UI tests. Each guards a different animation or settle; replace
+    them one at a time, run-checked.
+  - store write failures, which still can't be injected, so 40's reporting paths are untested.
+  - the date helpers in four test files, which differ in calendar and defaults.
 
 **41. ~~Performance.~~ — done 2026-10-27, confirmed by the user ("both feel much better").** — measured
 first on a copy of the library (481 workouts with routes, up to 12,992 points), in a debug build:
@@ -1298,6 +1348,12 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-27** — **Issues 42 and 43 closed**, with the Statistics accessibility-frame
+  investigation. Full suite, with Do Not Disturb on: 82 passed, 3 skipped, 1 expected failure.
+  The first run failed `testClickingAnAttemptOpensThatWorkout`: the row had scrolled into view but
+  wasn't laid out half a second later. The read is now polled. Planned 44: the user's search stall
+  on backspace.
 
 - **2026-10-27** — **43 built: tests.** The new Strava resume test found a bug: a batch's queuing
   step overwrote an in-flight upload's state, so asking to upload it again sent a duplicate.

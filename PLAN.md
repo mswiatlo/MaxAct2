@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** the code-quality fixes 42 and 43, then 28 (security audit), then 36
+**Next:** 44 (search stall), then 28 (security audit), then 36
 (README). 24's live run waits for HAE's fix (21). Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
@@ -44,7 +44,7 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–20, 22, 23, 25, 26, 27, 29–32, 34, 35, 37–41 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–20, 22, 23, 25, 26, 27, 29–32, 34, 35, 37–43 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
 **21. Health Auto Export bug report** *(sent by the user 2026-10-14; HAE acknowledged it and asked
@@ -102,56 +102,11 @@ is unmeasured: the recording's own zone, or the phone's zone at export. (The fix
 `make_fixture.py` moves dates but keeps the offset.) Next time the phone is connected, fetch a
 winter workout. If it reads `-0800`, the offset is the recording's: store it and name by it.
 
-**42. Structure, duplication and dead code** *(built 2026-10-27 on `structure-cleanup`, awaiting the
-full UI run; nothing visible changes)* —
-- **Removed:**
-  - `WorkoutStore.delete(id:)`, `itemsNeedingDetail` and `setThumbnailFileName`;
-  - `allItems`' unused ordering parameter;
-  - `SyncFrontier`, `RouteSketchCache.sketches` and `StravaClient.updateActivity(id:sportType:)`;
-  - an unused binding in the sync panel;
-  - the five tests that only covered these.
-
-  The record's `thumbnailFileName` attribute stays, so the store's schema doesn't change.
-- **About ten comments corrected,** and `describeUpload` renamed `describeStravaError`.
-- **One copy of shared maths in the core:**
-  - step and cumulative distances;
-  - even sampling;
-  - the period walk and binary search, so heart-rate zones by period is no longer linear per
-    workout;
-  - metres-per-degree for the heatmap (`PlaceGrid`'s stays: changing it would move every cell);
-  - the simplification tolerance.
-- **Shared views:** `SectionHeader`, `Footnote`, `StatCell`, `CLLocationCoordinate2D(Coordinate)`,
-  `WorkoutFormatting.span` and `hoursAndMinutes`.
-- **Files split:**
-  - `AppSettings`, `SettingsView`, `BestsSection`, `StatisticsWithInspector` and
-    `SelectionSummaryView` moved into their own files;
-  - `WorkoutStore` split into `+Strava`, `+Places` and `+Repairs` extensions.
-- **Deferred:** splitting `WorkoutDetailView` (650 lines) into map, charts and notes. Its map and
-  charts share hover state, so it needs that state lifted, which is a design change rather than a
-  tidy-up.
-
-**43. Tests** *(built 2026-10-27 on `tests-cleanup`, awaiting the full UI run)* —
-- **Timing limits:** about 10–25× each test's time alone, so they still catch a 10× regression on
-  a busy machine. Statistics went 200 ms → 1 s; training load and route lookup 300/200 ms → 500 ms.
-- **No real network:** `ConnectionCheckTests` uses a pretend phone that never answers, instead of
-  a real unroutable address.
-- **No `xmllint` deadlock:** the schema check reads its error output before waiting.
-- **New tests:**
-  - `itemsUploadingToStrava`;
-  - `AppModel`'s Strava path: an upload, Stop mid-upload (38's fix, mutation-checked) and resuming
-    an upload in flight;
-  - `WorkoutFilter`.
-
-  `AppModel` now takes a `StravaTransport` for this.
-- **Bug found by the resume test:** queuing a batch overwrote an in-flight upload's state, so it
-  was sent again (a duplicate, and a wasted write). Uploads in flight are no longer re-queued.
-- **UI test file split** into one file per class, plus `UITestSupport.swift`. The store factory is
-  shared (`TestSupport.swift`).
-- **Left as they are:**
-  - the 27 fixed sleeps in the UI tests. Each guards a different animation or settle; replace
-    them one at a time, run-checked.
-  - store write failures, which still can't be injected, so 40's reporting paths are untested.
-  - the date helpers in four test files, which differ in calendar and defaults.
+**44. Search can stall while deleting a term** *(reported 2026-10-27, next)* — searching, then
+pressing backspace on the term, can slow or stall the app. "California" in the user's real library
+triggered it. Measure first on a library copy: what each keystroke recomputes. Suspects: search
+matching over every item's place terms and tags, then `visibleItems`' sort, then Statistics or the
+heatmap if visible.
 
 **28. Security audit** *(requested 2026-10-23; after 27, near the finish)* — secrets (HAE token, Strava client
 secret and OAuth tokens: Keychain use, nothing in logs, defaults or crash output), the MCP link
