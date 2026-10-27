@@ -12,7 +12,7 @@ import Testing
         let suite = "JobTests"
         let defaults = UserDefaults(suiteName: suite)!
         defaults.removePersistentDomain(forName: suite)
-        let model = AppModel.inMemoryFallback(settings: AppSettings(defaults: defaults), seedCount: seed,
+        let model = AppModel.inMemoryFallback(settings: AppSettings(defaults: defaults, tokenStore: InMemoryHAETokenStore()), seedCount: seed,
                                               resolvesPlaces: false, stravaSecrets: InMemorySecretStore())
         await model.load()
         return model

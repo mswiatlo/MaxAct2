@@ -48,6 +48,18 @@ public struct MCPEndpoint: Sendable, Equatable, CustomStringConvertible {
         self.url = url
     }
 
+    /// The same address over HTTPS or plain HTTP — the setting decides, not whatever was typed.
+    public func with(https: Bool) -> MCPEndpoint {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return self }
+        components.scheme = https ? "https" : "http"
+        guard let changed = components.url else { return self }
+        return MCPEndpoint(url: changed)
+    }
+
+    public var isHTTPS: Bool { url.scheme == "https" }
+
+    private init(url: URL) { self.url = url }
+
     public init(host: String, port: Int = MCPEndpoint.defaultPort) {
         var components = URLComponents()
         components.scheme = "http"

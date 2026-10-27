@@ -53,7 +53,7 @@ import Testing
         try await secrets.save(credentials: StravaCredentials(clientID: "1", clientSecret: "s"))
         try await secrets.save(tokens: StravaTokens(accessToken: "A", refreshToken: "R",
                                                     expiresAt: .now.addingTimeInterval(3600), athleteName: "Test"))
-        let model = AppModel.inMemoryFallback(settings: AppSettings(defaults: defaults), seedCount: 40,
+        let model = AppModel.inMemoryFallback(settings: AppSettings(defaults: defaults, tokenStore: InMemoryHAETokenStore()), seedCount: 40,
                                               resolvesPlaces: false, stravaSecrets: secrets, stravaTransport: strava)
         await model.load()
         try #require(model.isStravaConnected)

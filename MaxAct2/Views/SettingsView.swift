@@ -19,13 +19,14 @@ struct SettingsView: View {
                 // Not a sample address: one reads as filled in (see `WelcomeSheet`).
                 TextField("iPhone address", text: $settings.host, prompt: Text("required"))
                 SecureField("Bearer token", text: $settings.token)   // hidden (issue 47)
+                HTTPSFields(settings: settings)
             } header: {
                 Text("Health Auto Export")
             } footer: {
                 Text("""
                     Open Health Auto Export on your iPhone, go to the Server screen and start the \
                     server, then copy the address and token shown there. The token can be \
-                    regenerated there at any time.
+                    regenerated there at any time, and is kept in your Keychain.
 
                     The app must stay open and in the foreground while syncing, and the phone \
                     unlocked — Apple does not allow health data to be read otherwise.

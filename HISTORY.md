@@ -1416,6 +1416,23 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-27** — **48 built: HTTPS to HAE, pinned to its CA; the token in the Keychain.**
+  Measured with the phone at work (192.168.77.243):
+  - HAE's exported CA is self-signed (`CA:TRUE`, ten years). The server certificate is issued by
+    it, names `IP:192.168.77.243`, and also runs ten years. TLS 1.3.
+  - Apple's SSL policy rejects that certificate even with the CA as the only anchor: "exceeds
+    maximum temporal validity period". MaxAct checks the chain with the basic X.509 policy instead
+    (dates and signatures), with no name check.
+  - Treating a certificate as its own anchor accepted a `CA:FALSE` one, so `PinnedCA` reads
+    basicConstraints from the DER.
+  - TLS costs nothing noticeable. Week's list (7 workouts): 16.3–17.8 s over HTTPS, 17.6–20.1 s over
+    HTTP. One detail (3,214 points): 6.0 s against 6.1 s. Handshake 0.1–0.3 s either way.
+  - MaxAct on HTTPS against HAE on HTTP hung, each side waiting for the other to speak. It was
+    still waiting after 5 minutes. The handshake now has a 10 s deadline (10.6 s measured), and the
+    advice says to check HTTPS matches.
+  - A bad token is rejected at the handshake (HTTP 401 to `initialize`), which settles a known
+    limitation.
+
 - **2026-10-27** — **Issue 47 closed.** The full suite failed 3 tests that still typed the token
   into a plain text field (missed when the first three were updated). They were fixed and rerun:
   3 passed. The other 81 had passed in the same run against the same app code, plus 4 skipped and

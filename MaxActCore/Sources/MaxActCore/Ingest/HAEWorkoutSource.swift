@@ -1,4 +1,5 @@
 import Foundation
+import Security
 import os
 
 /// The chosen ingest path: Health Auto Export's MCP server, pulled by the Mac.
@@ -29,22 +30,27 @@ public struct HAEWorkoutSource: WorkoutSource {
         self.toolName = toolName
     }
 
-    public init(endpoint: MCPEndpoint, token: String?, timeout: TimeInterval = 600) {
-        self.init(client: MCPClient(endpoint: endpoint, token: token, timeout: timeout))
+    public init(endpoint: MCPEndpoint, token: String?, timeout: TimeInterval = 600, pinnedCA: SecCertificate? = nil) {
+        self.init(client: MCPClient(endpoint: endpoint, token: token, timeout: timeout, pinnedCA: pinnedCA))
     }
 
     /// Convenience for anything holding raw user input. `nil` when the text can't be parsed —
     /// the caller reports that rather than the app trapping.
-    public init?(address: String, token: String?) {
+    public init?(address: String, token: String?, pinnedCA: SecCertificate? = nil) {
         guard let endpoint = MCPEndpoint(address) else { return nil }
-        self.init(endpoint: endpoint, token: token)
+        self.init(endpoint: endpoint, token: token, pinnedCA: pinnedCA)
     }
 
     /// Handshake, and confirm the server actually offers the tool we intend to call. Better a
     /// clear error naming the available tools than a bare `-32602` mid-backfill.
+    ///
+    /// The handshake has its own short deadline (issue 48): MaxAct set to HTTPS and the phone to
+    /// HTTP, each waits for the other to speak first, and nothing failed until the 10-minute
+    /// request timeout (measured: still waiting after 5 minutes).
     @discardableResult
     public func connect() async throws -> MCPClient.ServerInfo {
-        let info = try await client.connect()
+        let client = client
+        let info = try await ConnectionCheck.withDeadline(ConnectionCheck.connectDeadline) { try await client.connect() }
         let tools = try await client.listToolNames()
         guard tools.contains(toolName) else {
             throw MCPError.malformedResult(

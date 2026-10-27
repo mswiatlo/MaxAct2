@@ -1,4 +1,5 @@
 import Foundation
+import Security
 import os
 
 public enum MCPError: Error, CustomStringConvertible, Equatable {
@@ -48,8 +49,8 @@ public actor MCPClient {
         self.token = token
     }
 
-    public init(endpoint: MCPEndpoint, token: String?, timeout: TimeInterval = 600) {
-        self.init(transport: URLSessionMCPTransport(endpoint: endpoint, timeout: timeout), token: token)
+    public init(endpoint: MCPEndpoint, token: String?, timeout: TimeInterval = 600, pinnedCA: SecCertificate? = nil) {
+        self.init(transport: URLSessionMCPTransport(endpoint: endpoint, timeout: timeout, pinnedCA: pinnedCA), token: token)
     }
 
     public struct ServerInfo: Sendable, Equatable {

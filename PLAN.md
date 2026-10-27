@@ -4,7 +4,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 (HAE), with batch upload to Strava.
 
 **Status:** Phases 0–8 complete and checked by the user. Next: see §1.
-**Last updated:** 2026-10-26.
+**Last updated:** 2026-10-27.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first: the HAE data
 > contract, the Xcode tooling limits, and the Strava API facts. **`HISTORY.md`** holds how we got
@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** 48 (HTTPS to HAE; needs the phone), then 36
+**Next:** finish 48 (the user's check, the full UI run, merge), then 36
 (README). 24's live run waits for HAE's fix (21). Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
@@ -111,19 +111,21 @@ replaces in about 0.5 s. Unexplained. Next ideas: whether `Table` builds row vie
 (Instruments, SwiftUI template), and what tearing one down costs. It's once per session, against
 6.5 s on every growth before 44.
 
-**48. HTTPS to Health Auto Export** (S4; the user's idea) — HAE's MCP server has an HTTPS option.
-Plain HTTP lets anyone on the same Wi-Fi read the token and the workouts, or impersonate the phone.
-HTTPS only helps if the certificate is checked, and HAE's is probably self-signed, which
-`URLSession` rejects. Steps:
-1. With the phone (ask for its current address), turn on HTTPS. Look at the certificate:
-   self-signed? Stable across HAE restarts and updates?
-2. Measure what TLS costs a sync.
-3. Pin it: show the fingerprint on first connect for the user to confirm, store it, and accept only
-   that certificate afterwards.
-4. Keep HTTP as a clearly labelled, less safe option.
+**48. HTTPS to Health Auto Export** (S4; the user's idea) — *built on `hae-https` 2026-10-27;
+waiting on the user's check in the real app and the full UI run.* MaxAct pins HAE's own CA
+(loaded from the file HAE exports, fingerprint shown), trusts nothing else for the phone, and keeps
+plain HTTP as an option labelled less safe. The token moved from the preferences to the Keychain.
+Measured: TLS costs nothing noticeable. Diagnosis and numbers in `HISTORY.md` §2 once merged.
 
-Until then: trusted networks only, and regenerate the token after an untrusted one. Say so in the
-README (36) and the welcome sheet.
+Still open from 48:
+- **Report to HAE:** its server certificate is valid for ten years, so Apple's TLS policy rejects it
+  outright (825-day limit), even with the CA trusted. MaxAct works around it; other Apple clients
+  can't.
+- **Check HTTPS at home.** The server certificate names `IP:192.168.77.243`, the work address.
+  MaxAct doesn't check the name (see the decision), so it should connect on 10.0.0.x all the same.
+  Confirm it does.
+- **Is the CA stable across HAE restarts and updates?** If HAE makes a new one, every sync fails with
+  "The iPhone's certificate isn't the one MaxAct trusts" until the new CA is loaded.
 
 Checked and fine in 28:
 - the OAuth `state` and scope checks;
@@ -132,9 +134,6 @@ Checked and fine in 28:
 - system TLS for Strava;
 - TCX escaping;
 - health data never leaves the sandbox container.
-
-Kept as is (S11): the HAE token in UserDefaults. The Keychain would prompt after every rebuild,
-and the token is exposed on the network until 48 anyway.
 
 **36. A visual README** *(requested 2026-10-26; after the audits)* — a `README.md` at the root that
 introduces MaxAct and shows its features: what it is (a Mac browser for Apple Health workouts
@@ -178,8 +177,6 @@ setting.
   remembered separately and it doesn't take part in window state restoration.
 - **The load-error banner has no test** (Phase 8): there's no reliable way to make the store fail
   inside a UI test. Checked by build and by reading only.
-- **Whether HAE rejects a bad token at the handshake is unmeasured.** Test Connection doesn't
-  depend on it — it also lists workouts — but a sync's first failure point might differ.
 - **Performance tests have loose thresholds.** They catch 10× regressions; the printed figures are
   the real measurements.
 - **`Spikes/` stays** as the quickest way to inspect a stored series file. It's excluded from every
@@ -193,7 +190,7 @@ setting.
 |---|---|---|
 | Targets | One macOS app (`MaxAct2`, display name **MaxAct**) + `MaxActCore` local SwiftPM package + unit and UI test bundles | Package logic is testable with `swift test` without launching the app. |
 | Minimum OS | macOS 26.0 | Liquid Glass, `MKReverseGeocodingRequest`, Swift-native `Network`. |
-| Sync | **MCP over HTTP** to HAE on the phone; chunked weekly and resumable | All three HAE paths carry full route and heart rate; only MCP can be driven by the Mac to completion for ~2,867 workouts. `.hae` backfill stalls; manual export needs GBs of phone storage. |
+| Sync | **MCP over HTTPS** (HTTP optional) to HAE on the phone; chunked weekly and resumable | All three HAE paths carry full route and heart rate; only MCP can be driven by the Mac to completion for ~2,867 workouts. `.hae` backfill stalls; manual export needs GBs of phone storage. |
 | Sync shape | **Two passes.** List sync with no routes (`metadataAggregation: "minutes"`); per-workout detail with routes (`"seconds"`), fetched on demand or via "Download Missing Detail" | List sync is the only blocking cost (~1.9 h of foreground phone for 7 years). Fetching every route up front would double it. |
 | Units | Metric only, normalised to SI; anything else is a hard decode failure | HAE's unit strings follow its preferences. A loud failure beats reading `mi` as `km`. |
 | Model | Own value types in `MaxActCore`, decoded from HAE's shape; `ActivityKind.other(String)` | HAE sends activity display names, not HealthKit codes. |
@@ -202,6 +199,7 @@ setting.
 | Location | Snap the start to a ~1 km grid **before** geocoding; store city-level names only | An unsnapped start geocodes to a street address. |
 | Strava format | **TCX only**; sport corrected afterwards with a `PUT` | Carries GPS, HR and calories, works for indoor workouts. TCX's `Sport` knows only Running/Biking/Other. |
 | Strava credentials | User's own client ID + secret in the Keychain | A bundled secret is extractable and shares one rate-limit budget. |
+| HAE trust (48) | Pin HAE's exported **CA**, in-app only; chain check without Apple's SSL policy or name check | The server certificate names the phone's IP, which changes between networks. Apple's SSL policy rejects HAE's 10-year certificate. The CA is private to the phone, so a chain to it is the phone. Never installed system-wide: its key lives on the phone. |
 | Tags | Local tags; **Commute/Trainer** mirrored to Strava's flags; everything else Mac-only | Strava's API has no Activity Tags. |
 | Windows | **One.** No tabs, no New Window | Filter, search and selection live on the shared `AppModel`, so extra windows only looked independent. Making them independent was the alternative, judged not worth it for a one-library app. |
 | Concurrency | Swift 6, strict concurrency, `async`/`await`, no Combine; default actor isolation `MainActor` | Project style. |

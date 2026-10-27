@@ -19,7 +19,7 @@ import Testing
         let suite = "SilentFailureTests"
         let defaults = UserDefaults(suiteName: suite)!
         defaults.removePersistentDomain(forName: suite)
-        return AppModel.inMemoryFallback(settings: AppSettings(defaults: defaults), resolvesPlaces: false,
+        return AppModel.inMemoryFallback(settings: AppSettings(defaults: defaults, tokenStore: InMemoryHAETokenStore()), resolvesPlaces: false,
                                          stravaSecrets: secrets)
     }
 

@@ -12,7 +12,7 @@ import Testing
         let suite = "RememberedStateTests.\(name)"
         let defaults = UserDefaults(suiteName: suite)!
         defaults.removePersistentDomain(forName: suite)
-        return (AppSettings(defaults: defaults), defaults)
+        return (AppSettings(defaults: defaults, tokenStore: InMemoryHAETokenStore()), defaults)
     }
 
     private func model(_ settings: AppSettings) -> AppModel {
@@ -44,7 +44,7 @@ import Testing
         first.sortOrder = TableSort.order(storageKey: "distance:desc")!
         first.searchText = "commute"
 
-        let second = model(AppSettings(defaults: defaults))
+        let second = model(AppSettings(defaults: defaults, tokenStore: InMemoryHAETokenStore()))
         #expect(second.sidebarSelection == .statistics)
         #expect(TableSort.storageKey(for: second.sortOrder) == "distance:desc")
         #expect(second.searchText.isEmpty, "Search isn't remembered.")

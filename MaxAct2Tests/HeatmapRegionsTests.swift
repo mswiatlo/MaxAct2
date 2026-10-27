@@ -10,7 +10,7 @@ import Testing
         let suite = "HeatmapRegionsTests"
         let defaults = UserDefaults(suiteName: suite)!
         defaults.removePersistentDomain(forName: suite)
-        let model = AppModel.inMemoryFallback(settings: AppSettings(defaults: defaults), seedCount: 40,
+        let model = AppModel.inMemoryFallback(settings: AppSettings(defaults: defaults, tokenStore: InMemoryHAETokenStore()), seedCount: 40,
                                               resolvesPlaces: false, stravaSecrets: InMemorySecretStore())
         await model.load()
         await model.loadRouteSketches()

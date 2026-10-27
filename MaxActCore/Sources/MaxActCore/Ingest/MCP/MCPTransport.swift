@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 public struct MCPHTTPResponse: Sendable {
     public let statusCode: Int
@@ -26,14 +27,15 @@ public struct URLSessionMCPTransport: MCPTransport {
     /// - Parameter timeout: generous by necessity. The phone answers at ~2.4 s per workout, so a
     ///   90-day window measured 234 s — far past `URLSession`'s 60 s default, which would abort
     ///   every large request.
-    public init(endpoint: MCPEndpoint, timeout: TimeInterval = 600, configuration custom: URLSessionConfiguration? = nil) {
+    public init(endpoint: MCPEndpoint, timeout: TimeInterval = 600, configuration custom: URLSessionConfiguration? = nil,
+                pinnedCA: SecCertificate? = nil) {
         self.endpoint = endpoint.url
 
         let configuration = custom ?? URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = timeout
         configuration.timeoutIntervalForResource = timeout
         configuration.waitsForConnectivity = false
-        session = GuardedSession(configuration: configuration)
+        session = GuardedSession(configuration: configuration, pinnedCA: pinnedCA)
     }
 
     public func post(_ body: Data, headers: [String: String]) async throws -> MCPHTTPResponse {

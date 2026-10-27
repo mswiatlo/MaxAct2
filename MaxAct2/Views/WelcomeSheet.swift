@@ -1,5 +1,73 @@
 import MaxActCore
 import SwiftUI
+import UniformTypeIdentifiers
+
+/// HTTPS to the phone, and the CA it's pinned to (issue 48). Shared by `ConnectionFields` and
+/// Settings.
+struct HTTPSFields: View {
+    @Bindable var settings: AppSettings
+
+    @State private var isImporting = false
+    @State private var problem: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle("Use HTTPS", isOn: $settings.usesHTTPS)
+                .help("Encrypts the link to the phone. Turn it on in Health Auto Export's server settings too.")
+            if settings.usesHTTPS {
+                if let ca = settings.pinnedCA {
+                    LabeledContent("Trusts") {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(ca.subjectSummary)
+                            Text(ca.fingerprint)
+                                .font(.caption2.monospaced())
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                                .accessibilityLabel("SHA-256 fingerprint \(ca.fingerprint)")
+                        }
+                    }
+                    Button("Replace Certificate…") { isImporting = true }
+                } else {
+                    Button("Load Certificate…") { isImporting = true }
+                    Text("In Health Auto Export, turn on HTTPS and export its CA certificate, then load it here. "
+                         + "MaxAct trusts it for the phone only, not system-wide.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } else {
+                Label("Less safe: anyone on this network can read the token and your workouts as they sync.",
+                      systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let problem {
+                Label(problem, systemImage: "exclamationmark.circle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+        }
+        .fileImporter(isPresented: $isImporting,
+                      allowedContentTypes: [.x509Certificate, UTType(filenameExtension: "pem") ?? .data]) { result in
+            load(result)
+        }
+    }
+
+    private func load(_ result: Result<URL, any Error>) {
+        do {
+            let url = try result.get()
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            settings.pinnedCA = try PinnedCA(contents: Data(contentsOf: url))
+            problem = nil
+        } catch let error as PinnedCA.Problem {
+            problem = error.description
+        } catch {
+            problem = error.localizedDescription
+        }
+    }
+}
 
 /// The iPhone address and token, with what they resolve to, what's missing, and Test Connection.
 /// Shared by the sync panel and the welcome sheet so the two can't drift apart.
@@ -28,6 +96,7 @@ struct ConnectionFields: View {
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
             }
+            HTTPSFields(settings: settings)
             LabeledContent("Token") {
                 // Hidden, like the Strava secret (issue 47): it grants your whole Health export.
                 SecureField("", text: $settings.token, prompt: Text("required"))
@@ -35,6 +104,11 @@ struct ConnectionFields: View {
                     .font(.system(.body, design: .monospaced))
             }
 
+            if let keep = settings.tokenSaveProblem {
+                Label("The token couldn't be saved in the Keychain: \(keep)", systemImage: "exclamationmark.circle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
             if let missing = missingFieldDescription {
                 Label(missing, systemImage: "exclamationmark.circle")
                     .font(.caption)
@@ -63,6 +137,8 @@ struct ConnectionFields: View {
         // A result describes the address and token it was run with; editing either makes it stale.
         .onChange(of: settings.host) { model.clearConnectionCheck() }
         .onChange(of: settings.token) { model.clearConnectionCheck() }
+        .onChange(of: settings.usesHTTPS) { model.clearConnectionCheck() }
+        .onChange(of: settings.pinnedCA) { model.clearConnectionCheck() }
     }
 
     private var missingFieldDescription: String? {
@@ -76,6 +152,7 @@ struct ConnectionFields: View {
             return "That address can't be read. Try just the IP, like 192.168.1.20."
         }
         if token.isEmpty { return "The token is still empty." }
+        if settings.usesHTTPS && settings.pinnedCA == nil { return "HTTPS needs Health Auto Export's certificate." }
         return nil
     }
 }
@@ -109,8 +186,8 @@ struct WelcomeSheet: View {
                      + "Premium feature.\n• The iPhone and this Mac on the **same Wi-Fi** network.")
             }
             step(2, "Start the server on your iPhone") {
-                Text("In Health Auto Export, open the **Server** screen and start the server. It "
-                     + "shows an address and a token.")
+                Text("In Health Auto Export, open the **Server** screen, turn on **HTTPS** and "
+                     + "export its CA certificate, then start the server. It shows an address and a token.")
             }
             step(3, "Enter them here, and test") {
                 ConnectionFields(model: model)

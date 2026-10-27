@@ -276,6 +276,26 @@ final class MaxAct2UITests: XCTestCase {
         )
     }
 
+    /// Issue 48: HTTPS can't sync until HAE's certificate is loaded, and plain HTTP says it's less safe.
+    @MainActor
+    func testHTTPSNeedsTheCertificateBeforeSyncing() throws {
+        let app = launchApp()
+        app.buttons["Sync"].click()
+        let startSync = app.buttons["Start Sync"]
+        XCTAssertTrue(startSync.waitForExistence(timeout: 5))
+        let address = app.textFields.element(boundBy: 0)
+        address.click(); address.typeText("10.0.0.158")
+        let token = app.secureTextFields.firstMatch
+        token.click(); token.typeText("test-token")
+        XCTAssertTrue(startSync.isEnabled, "Plain HTTP (the UI-test default) needs no certificate.")
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "value BEGINSWITH %@", "Less safe")).firstMatch.exists)
+
+        app.checkBoxes["Use HTTPS"].click()
+        XCTAssertTrue(app.buttons["Load Certificate…"].waitForExistence(timeout: 3))
+        XCTAssertFalse(startSync.isEnabled, "HTTPS without the CA can't sync.")
+        XCTAssertTrue(app.staticTexts["HTTPS needs Health Auto Export's certificate."].exists)
+    }
+
     /// Phase 8: a first launch with nothing configured opens the welcome sheet, whose Test
     /// Connection names the problem — here, this Mac, where no server is running.
     @MainActor

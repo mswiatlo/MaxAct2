@@ -19,6 +19,8 @@ public enum SyncProblem: Equatable, Sendable {
     case serverNotRunning
     case phoneUnreachable
     case tokenRejected
+    /// HTTPS, and the phone's certificate isn't signed by the CA saved in MaxAct (issue 48).
+    case certificateNotTrusted
     case serverError(status: Int)
     case unexpectedReply(String)
     case nothingReturned
@@ -31,6 +33,10 @@ public enum SyncProblem: Equatable, Sendable {
             case .transport(let detail): self = .unexpectedReply(detail)
             case .rpc, .missingSessionID, .malformedResult: self = .unexpectedReply(mcp.description)
             }
+            return
+        }
+        if error is GuardedSession.UntrustedCertificate {
+            self = .certificateNotTrusted
             return
         }
         if let url = error as? URLError {
@@ -52,6 +58,7 @@ public enum SyncProblem: Equatable, Sendable {
         case .serverNotRunning: "The iPhone answered, but Health Auto Export's server isn't running."
         case .phoneUnreachable: "Can't reach the iPhone."
         case .tokenRejected: "Health Auto Export rejected the token."
+        case .certificateNotTrusted: "The iPhone's certificate isn't the one MaxAct trusts."
         case .serverError(let status): "Health Auto Export reported an error (HTTP \(status))."
         case .unexpectedReply: "Health Auto Export's reply wasn't understood."
         case .nothingReturned: "Health Auto Export returned no workouts."
@@ -66,10 +73,13 @@ public enum SyncProblem: Equatable, Sendable {
                 + "front with the phone unlocked until the sync finishes."
         case .phoneUnreachable:
             "Check that the iPhone is on the same Wi-Fi as this Mac, unlocked, with Health Auto "
-                + "Export open — and that the address matches its Server screen."
+                + "Export open — and that the address, and whether HTTPS is on, match its Server screen."
         case .tokenRejected:
             "Copy the token again from Health Auto Export's Server screen. It changes if the server "
                 + "is reset."
+        case .certificateNotTrusted:
+            "Check the address is your iPhone's. If Health Auto Export has made a new certificate, "
+                + "export its CA again and load it in MaxAct's Settings."
         case .serverError:
             "Try again. If it keeps happening, stop and restart the server in Health Auto Export."
         case .unexpectedReply(let detail):

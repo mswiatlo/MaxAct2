@@ -2,12 +2,10 @@ import Foundation
 import MaxActCore
 import Observation
 
-/// User settings, persisted in `UserDefaults`.
+/// User settings, persisted in `UserDefaults` — except Health Auto Export's token, which is in the
+/// Keychain (issue 48; see `KeychainHAETokenStore`).
 ///
-/// Named for the app rather than for sync because it now carries appearance too. The bearer token
-/// is *not* a long-lived secret — it is regenerated from Health Auto Export's Server screen at
-/// will, and only grants access to a server that must be foregrounded on an unlocked phone on the
-/// same LAN. Strava's client secret in Phase 8 is a different matter and goes in the Keychain.
+/// Named for the app rather than for sync because it now carries appearance too.
 @Observable
 final class AppSettings {
     /// Injected rather than reaching for `.standard`, so UI tests can be handed a throwaway
@@ -19,7 +17,30 @@ final class AppSettings {
         didSet { defaults.set(host, forKey: "syncHost") }
     }
     var token: String {
-        didSet { defaults.set(token, forKey: "syncToken") }
+        didSet {
+            guard token != oldValue else { return }
+            do {
+                try tokenStore.save(token: token)
+                tokenSaveProblem = nil
+            } catch {
+                tokenSaveProblem = String(describing: error)
+            }
+        }
+    }
+    @ObservationIgnored private let tokenStore: any HAETokenStore
+    /// Why the token couldn't be kept, shown under the field.
+    private(set) var tokenSaveProblem: String?
+
+    /// HTTPS to the phone, trusting only `pinnedCA` (issue 48). Off means plain HTTP, which anyone
+    /// on the network can read — the token included.
+    var usesHTTPS: Bool {
+        didSet { defaults.set(usesHTTPS, forKey: "syncUsesHTTPS") }
+    }
+
+    /// The CA Health Auto Export exported, as DER. In the preferences rather than the Keychain:
+    /// a certificate is public.
+    var pinnedCA: PinnedCA? {
+        didSet { defaults.set(pinnedCA?.der, forKey: "syncPinnedCA") }
     }
 
     /// Mute activities MaxAct uploads (Strava's `hide_from_home`), keeping them off followers'
@@ -85,10 +106,16 @@ final class AppSettings {
         didSet { defaults.set(routeColor.rawValue, forKey: "routeColor") }
     }
 
-    init(defaults: UserDefaults = .standard) {
+    /// - Parameter tokenStore: no default, so nothing — a test least of all — reaches the real
+    ///   Keychain without saying so.
+    init(defaults: UserDefaults = .standard, tokenStore: any HAETokenStore) {
         self.defaults = defaults
+        self.tokenStore = tokenStore
         host = defaults.string(forKey: "syncHost") ?? ""
-        token = defaults.string(forKey: "syncToken") ?? ""
+        token = Self.migrateToken(from: defaults, to: tokenStore)
+        // New setups start on HTTPS; one that already syncs over HTTP stays on it until changed.
+        usesHTTPS = defaults.object(forKey: "syncUsesHTTPS") as? Bool ?? (defaults.string(forKey: "syncHost") ?? "").isEmpty
+        pinnedCA = defaults.data(forKey: "syncPinnedCA").flatMap { try? PinnedCA(contents: $0) }
         routeColor = RouteColor(storageKey: defaults.string(forKey: "routeColor"))
         muteStravaUploads = defaults.object(forKey: "muteStravaUploads") as? Bool ?? true
         hasSeenWelcome = defaults.bool(forKey: "hasSeenWelcome")
@@ -102,17 +129,31 @@ final class AppSettings {
         hasMarkedRepairsForRedownload = defaults.bool(forKey: "hasMarkedRepairsForRedownload")
     }
 
-    /// The address as actually parsed, or `nil` if it can't be. Shown in the UI so there is no
-    /// question about what will be contacted.
-    var endpoint: MCPEndpoint? { MCPEndpoint(host) }
+    /// The token from the Keychain; or, the first time, moved there from the preferences, where
+    /// it used to be. Removed from the preferences only once the Keychain has it.
+    private static func migrateToken(from defaults: UserDefaults, to store: any HAETokenStore) -> String {
+        if let stored = store.token() { return stored }
+        guard let old = defaults.string(forKey: "syncToken") else { return "" }
+        do {
+            try store.save(token: old)
+            defaults.removeObject(forKey: "syncToken")
+        } catch {
+            // Left where it was, and tried again next launch.
+        }
+        return old
+    }
+
+    /// The address as actually parsed, with the scheme the HTTPS setting chooses, or `nil` if it
+    /// can't be parsed. Shown in the UI so there is no question about what will be contacted.
+    var endpoint: MCPEndpoint? { MCPEndpoint(host)?.with(https: usesHTTPS) }
 
     var isConfigured: Bool {
-        endpoint != nil && !token.trimmingCharacters(in: .whitespaces).isEmpty
+        endpoint != nil && !token.trimmingCharacters(in: .whitespaces).isEmpty && (!usesHTTPS || pinnedCA != nil)
     }
 
     func makeSource(timeout: TimeInterval = 600) -> HAEWorkoutSource? {
-        guard let endpoint, !token.isEmpty else { return nil }
+        guard isConfigured, let endpoint else { return nil }
         return HAEWorkoutSource(endpoint: endpoint, token: token.trimmingCharacters(in: .whitespaces),
-                                timeout: timeout)
+                                timeout: timeout, pinnedCA: usesHTTPS ? pinnedCA?.certificate : nil)
     }
 }

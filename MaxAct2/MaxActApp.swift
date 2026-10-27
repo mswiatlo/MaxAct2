@@ -80,7 +80,11 @@ struct MaxActApp: App {
         if Self.isIsolatedForTesting {
             let domain = "com.swiatlowski.MaxAct.uitests"
             UserDefaults.standard.removePersistentDomain(forName: domain)
-            let settings = AppSettings(defaults: UserDefaults(suiteName: domain) ?? .standard)
+            // Plain HTTP unless asked: the tests point at addresses with no certificate to pin.
+            UserDefaults(suiteName: domain)?.set(ProcessInfo.processInfo.arguments.contains("--ui-testing-https"),
+                                                 forKey: "syncUsesHTTPS")
+            let settings = AppSettings(defaults: UserDefaults(suiteName: domain) ?? .standard,
+                                       tokenStore: InMemoryHAETokenStore())
             // `--ui-testing-real-copy`: a copy of a real library, placed by hand in the app's own
             // temporary directory, for checking layout against real content. Only honoured inside
             // this isolated branch, so it can never stand in for the real store.
@@ -103,7 +107,7 @@ struct MaxActApp: App {
             return
         }
 
-        let settings = AppSettings()
+        let settings = AppSettings(tokenStore: KeychainHAETokenStore())
         // The stores are the app's foundation. If they can't open there is no useful degraded
         // mode, so fall back to memory and say so plainly rather than crashing at launch.
         do {

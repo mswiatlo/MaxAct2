@@ -19,7 +19,7 @@ import Testing
 
     @Test func theWholeViewReflowsToTheMinimumWidth() async {
         let model = AppModel.inMemoryFallback(
-            settings: AppSettings(defaults: UserDefaults(suiteName: "StatisticsLayoutTests") ?? .standard),
+            settings: AppSettings(defaults: UserDefaults(suiteName: "StatisticsLayoutTests") ?? .standard, tokenStore: InMemoryHAETokenStore()),
             seedCount: 400, resolvesPlaces: false, stravaSecrets: InMemorySecretStore()
         )
         await model.load()

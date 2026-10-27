@@ -260,6 +260,28 @@ the "no laps" note below was measured on WorkOutDoors workouts only.
 Python is blocked by macOS Local Network privacy and fails with "No route to host" even while
 `ping` and `curl` reach the phone; `swift test` (`LiveMCPTests`) works.
 
+**Live tests and the token.** Since 48 the token is in the Keychain (service
+`com.swiatlowski.MaxAct.hae`, account `token`), not the preferences. Pass it to a gated test
+without printing it:
+`MAXACT_LIVE_TOKEN="$(security find-generic-password -s com.swiatlowski.MaxAct.hae -a token -w)"`.
+macOS may ask whether Terminal may read MaxAct's item.
+
+### HTTPS *(measured 2026-10-27, issue 48)*
+
+Turning on HTTPS in HAE's server settings offers to **export a CA certificate**. Facts:
+- The CA is self-signed: `CN=Health Auto Export MCP TLS CA`, `CA:TRUE`, valid ten years. The server
+  certificate it issues names the phone's **IP** in its SAN (`IP:192.168.77.243`). It is also valid
+  ten years, uses TLS 1.3, and is on the same port, 9000.
+- **Apple's SSL policy rejects the server certificate even with the CA as sole anchor:** "exceeds
+  maximum temporal validity period" (825 days). `GuardedSession` therefore evaluates with
+  `SecPolicyCreateBasicX509` (chain to the pinned CA, dates, signatures) and no name check.
+- **HTTPS and HTTP can't be mixed.** An HTTPS client against HAE on HTTP hangs: each waits for the
+  other. (The other way round: not yet measured.) `HAEWorkoutSource.connect` has a 10 s
+  deadline for this.
+- TLS adds nothing measurable: the phone's ~2.4 s per workout dominates.
+- `LiveTLSTests` (`MAXACT_LIVE_HOST=https://…`, `MAXACT_LIVE_CA=<pem>`) times a week's sync, and
+  checks that the phone is refused without the pin.
+
 ### Interval-style Workout-app routes arrive partial *(measured 2026-10-14)*
 
 For Workout-app recordings with several `activities` (intervals), `get_workouts` with
@@ -296,7 +318,7 @@ the sense that it runs unattended. Treat "the user must have HAE open on an unlo
 fixed constraint of this whole design, and build sync UI that says so plainly rather than implying
 background magic.
 
-### MCP server over HTTP (Mac pulls) — the chosen path *(all measured)*
+### MCP server over HTTP(S) (Mac pulls) — the chosen path *(all measured)*
 
 **The help pages describe the TCP transport's simplified `callTool` shape. The HTTP transport is
 real MCP Streamable HTTP and that shape does not work on it.** A bare `callTool` gets

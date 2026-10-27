@@ -10,7 +10,7 @@ import Testing
         let suite = "WorkoutFilterTests"
         let defaults = UserDefaults(suiteName: suite)!
         defaults.removePersistentDomain(forName: suite)
-        let model = AppModel.inMemoryFallback(settings: AppSettings(defaults: defaults), seedCount: 40,
+        let model = AppModel.inMemoryFallback(settings: AppSettings(defaults: defaults, tokenStore: InMemoryHAETokenStore()), seedCount: 40,
                                               resolvesPlaces: false, stravaSecrets: InMemorySecretStore())
         await model.load()
         func count(_ filter: WorkoutFilter) -> Int { model.items.filter(filter.matches).count }
