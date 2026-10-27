@@ -297,6 +297,21 @@ click by coordinates call `app.activate()` and assert `.runningForeground` first
 screenshots are taken only while MaxAct is frontmost. If one ever shows another app, delete it and
 its result bundle at once.
 
+**Notification banners land in "window" screenshots, and over the controls** *(2026-10-27)*. A
+window screenshot from `XCUIElement.screenshot()` includes whatever is drawn over the window. One
+caught calendar invites, a reminder and a chat message, so the screenshot and its result bundle
+were deleted at once. The banners also covered the inspector's top right, where the colouring
+menu is, and that test failed "not hittable". Ask the user to turn on **Do Not Disturb** before a
+full run. Don't keep failure-evidence screenshots in tests that run unattended: print frames
+instead.
+
+**Statistics' accessibility frames are off by the sidebar's width once its inspector has opened**
+*(2026-10-27)*. With the inspector open, and still after it closes, every element in Statistics
+reports a frame 223 pt left of where it's drawn. The map reported x 129.5 while drawn at ~353,
+then 328 instead of 551. A click aimed with `element.coordinate(...)` lands off target. Read
+frames before anything opens and aim from the window, as the heatmap test does. An open app
+issue; see `PLAN.md`.
+
 **A screensaver or locked screen breaks UI tests in two recognisable ways** *(2026-10-25)*: window
 screenshots fail with "Failed to look up screen N: Failed to match screen with displayID N", and launches
 fail with "Failed to activate application … (current state: Running Background)". Every check before

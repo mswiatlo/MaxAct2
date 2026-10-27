@@ -1168,8 +1168,15 @@ final class SeededTableUITests: XCTestCase {
 
     /// Issue 29: clicking a route on the heatmap opens its workout; where routes overlap, a picker
     /// lists them. The seed's routes are loops of different sizes around one point, and its two
-    /// identical rides share a loop, so a sweep along the centre line meets both cases. Leftwards,
-    /// because the inspector opens over the right of the statistics after a hit.
+    /// identical rides share a loop, so a sweep along the centre line meets both cases.
+    ///
+    /// Aimed by window position, from the map's frame read before anything opens. Once the
+    /// inspector has opened in Statistics, every element there reports an accessibility frame
+    /// 223 pt left of where it's drawn — the sidebar's width — even after it closes again
+    /// (measured 2026-10-27: the map reported at x 129.5 while drawn at ~353, and at 328 rather than
+    /// 551 once the inspector had closed). Aimed by the map's own frame, the sweep clicked
+    /// off the map after its first hit and failed 4 runs in 7. The inspector is hidden (⌃⌘I) after
+    /// each hit, so the drawn layout is the one the frame was read from.
     @MainActor
     func testClickingTheHeatmapOpensAWorkoutOrOffersAChoice() throws {
         let app = launchSeeded()
@@ -1182,7 +1189,7 @@ final class SeededTableUITests: XCTestCase {
         let toggle = app.checkBoxes["Show squares"]
         for _ in 0..<15 where !(toggle.exists && toggle.isHittable) { scroll.scroll(byDeltaX: 0, deltaY: -400) }
         XCTAssertTrue(toggle.waitForExistence(timeout: 20), "The routes section should finish preparing.")
-        let map = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Map of '")).firstMatch
+        let map = app.descendants(matching: .any)["RoutesMap"]
         scrollFullyIntoView(map, scrolling: scroll.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)),
                             in: app.windows.firstMatch)
 
@@ -1191,22 +1198,30 @@ final class SeededTableUITests: XCTestCase {
         app.activate()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 5), "MaxAct must be frontmost before clicking the map.")
         let back = app.toolbars.buttons["Back"]
+        let inspector = app.descendants(matching: .any)["StatisticsInspector"]
         let picker = app.staticTexts.containing(NSPredicate(format: "value ENDSWITH 'routes pass here'")).firstMatch
+        let window = app.windows.firstMatch
+        let mapFrame = map.frame, windowFrame = window.frame
+        let windowOrigin = window.coordinate(withNormalizedOffset: .zero)
+        func onMap(_ dx: Double) -> XCUICoordinate {
+            windowOrigin.withOffset(CGVector(dx: mapFrame.minX - windowFrame.minX + dx * mapFrame.width,
+                                             dy: mapFrame.midY - windowFrame.minY))
+        }
         var openedDirectly = false, offeredChoice = false
         for dx in stride(from: 0.5, through: 0.02, by: -0.01) where !offeredChoice {
-            map.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: 0.5)).click()
+            onMap(dx).click()
             if picker.waitForExistence(timeout: 0.5) {
                 offeredChoice = true
-            } else if back.isEnabled {
-                openedDirectly = true
+            } else if inspector.waitForExistence(timeout: 0.5) {
+                openedDirectly = back.isEnabled
+                // Back to the layout the sweep is aimed by (see above). Not Back itself: that
+                // restores the empty selection but leaves the inspector open.
+                app.typeKey("i", modifierFlags: [.control, .command])
+                XCTAssertTrue(inspector.waitForNonExistence(timeout: 5), "⌃⌘I should hide the inspector.")
+                Thread.sleep(forTimeInterval: 0.3)   // its 0.2 s slide out
             }
         }
-        // Keep the evidence — but only of MaxAct: a screenshot with another app in front shows that app.
-        if !offeredChoice, app.state == .runningForeground {
-            print("HEATMAP map \(map.frame) window \(app.windows.firstMatch.frame)")
-            let evidence = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
-            evidence.name = "heatmap-no-choice"; evidence.lifetime = .keepAlways; add(evidence)
-        }
+        if !offeredChoice { print("HEATMAP no choice; map reported at \(map.frame), aimed by \(mapFrame)") }
         XCTAssertTrue(openedDirectly, "Clicking a single route should open its workout.")
         XCTAssertTrue(offeredChoice, "Clicking the two rides' shared loop should offer a choice.")
         XCTAssertTrue((picker.value as? String ?? "").hasPrefix("2 "), "The two identical rides: \(picker.value ?? "")")

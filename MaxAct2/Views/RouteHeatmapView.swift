@@ -114,6 +114,7 @@ struct RouteHeatmapSection: View {
         .frame(height: Self.mapHeight)
         .clipShape(.rect(cornerRadius: 8))
         .accessibilityLabel("Map of \(sketches.count) routes")
+        .accessibilityIdentifier("RoutesMap")
     }
 
     /// The routes within ``clickTolerance`` of a click, nearest first.

@@ -66,6 +66,13 @@ exported route piece is exactly one entry of the workout's `activities` array, o
 incomplete-route note, despite explicit accessibility labels — check with VoiceOver /
 `debugDescription` which element the identifier lands on.
 
+**Statistics' accessibility frames are wrong once its inspector has opened** *(found 2026-10-27)*.
+Every element reports a frame one sidebar-width (223 pt) left of where it's drawn, and stays wrong
+after the inspector closes. VoiceOver's cursor, and any click aimed by frame, land off target. It
+made the heatmap UI test fail 4 runs in 7; the test now aims from the window (see the Xcode
+reference). The likely source is `StatisticsWithInspector`'s `HStack` inside the split view's
+detail column. Check with Accessibility Inspector, and compare against the system `.inspector`.
+
 **Follow-up from 23:** after a detail re-download, the inspector uses the old sketch until the
 sketches are next loaded (a Statistics visit).
 
@@ -143,8 +150,6 @@ behave as before.
   - `PlaceResolver` and `WorkoutFilter`;
   - store write failures: there's no way to make `WorkoutStore` fail on demand, so 40's reporting
     paths are untested.
-- `testClickingTheHeatmapOpensAWorkoutOrOffersAChoice` failed once in a full run (2026-10-26).
-  The sweep found a single route but not the shared loop. It passed alone and in the next full run.
 - Split the 1,873-line UI test file by class, and share test helpers (store factory ×8, date
   helper ×4, route builders ×5).
 

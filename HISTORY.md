@@ -1255,6 +1255,17 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-27** — **Heatmap UI test flake found and fixed** (pulled forward from 43, by the user's
+  choice). A per-click trace showed the sweep stopped hitting anything after its first hit.
+  - Once Statistics' inspector opens, every element there reports its accessibility frame one
+    sidebar-width (223 pt) left of where it's drawn, and keeps doing so after it closes.
+  - The test now reads the map's frame before anything opens, aims from the window, and hides the
+    inspector after each hit. Its failure screenshot is gone: on the same day, one caught
+    notification banners with personal content, and was deleted.
+  - The frame bug itself is open in `PLAN.md`.
+  - Also that day: issue 40's colouring-menu UI test failed because notification banners covered
+    the menu.
+
 - **2026-10-27** — **40 built: silent failures.** Found while doing it: the Keychain store reported
   only the last read's problem, so a failed credentials read was hidden by the tokens read that
   followed. It now keeps one entry per item. The secret-store protocol had to become `nonisolated`
