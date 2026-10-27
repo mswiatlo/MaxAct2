@@ -26,8 +26,8 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ## 1. Where things stand — 2026-10-24
 
-All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 377 in
-`MaxActCore` (`swift test`), 82 app and UI tests (`RunAllTests` — ask first, then leave the Mac
+All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 378 in
+`MaxActCore` (`swift test`), 86 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~15 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
 
@@ -130,20 +130,28 @@ full UI run; nothing visible changes)* —
   charts share hover state, so it needs that state lifted, which is a design change rather than a
   tidy-up.
 
-**43. Tests:**
-- Timing limits too tight (200/300/200 ms, 1 s): loosen to the 10× rule.
-- `ConnectionCheckTests` uses the real network.
-- The `xmllint` pipe can deadlock.
-- The UI tests use about 28 fixed sleeps.
-- No tests yet for:
-  - `AppModel`'s Strava pipeline;
-  - the repair passes, backfill and delete;
+**43. Tests** *(built 2026-10-27 on `tests-cleanup`, awaiting the full UI run)* —
+- **Timing limits:** about 10–25× each test's time alone, so they still catch a 10× regression on
+  a busy machine. Statistics went 200 ms → 1 s; training load and route lookup 300/200 ms → 500 ms.
+- **No real network:** `ConnectionCheckTests` uses a pretend phone that never answers, instead of
+  a real unroutable address.
+- **No `xmllint` deadlock:** the schema check reads its error output before waiting.
+- **New tests:**
   - `itemsUploadingToStrava`;
-  - `PlaceResolver` and `WorkoutFilter`;
-  - store write failures: there's no way to make `WorkoutStore` fail on demand, so 40's reporting
-    paths are untested.
-- Split the 1,873-line UI test file by class, and share test helpers (store factory ×8, date
-  helper ×4, route builders ×5).
+  - `AppModel`'s Strava path: an upload, Stop mid-upload (38's fix, mutation-checked) and resuming
+    an upload in flight;
+  - `WorkoutFilter`.
+
+  `AppModel` now takes a `StravaTransport` for this.
+- **Bug found by the resume test:** queuing a batch overwrote an in-flight upload's state, so it
+  was sent again (a duplicate, and a wasted write). Uploads in flight are no longer re-queued.
+- **UI test file split** into one file per class, plus `UITestSupport.swift`. The store factory is
+  shared (`TestSupport.swift`).
+- **Left as they are:**
+  - the 27 fixed sleeps in the UI tests. Each guards a different animation or settle; replace
+    them one at a time, run-checked.
+  - store write failures, which still can't be injected, so 40's reporting paths are untested.
+  - the date helpers in four test files, which differ in calendar and defaults.
 
 **28. Security audit** *(requested 2026-10-23; after 27, near the finish)* — secrets (HAE token, Strava client
 secret and OAuth tokens: Keychain use, nothing in logs, defaults or crash output), the MCP link

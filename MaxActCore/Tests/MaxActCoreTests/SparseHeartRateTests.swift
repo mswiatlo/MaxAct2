@@ -110,7 +110,7 @@ import Testing
         let root = FileManager.default.temporaryDirectory.appending(path: "SparseHeartRateTests-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let seriesStore = try SeriesStore(directory: root)
-        let store = WorkoutStore(modelContainer: try WorkoutStore.container(inMemory: true))
+        let store = try inMemoryStore()
         let t0 = Date(timeIntervalSince1970: 1_760_000_000)
         func item(_ id: String, readings: Int, every: TimeInterval, average: Double?) -> IngestedWorkout {
             IngestedWorkout(

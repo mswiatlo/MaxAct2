@@ -141,7 +141,7 @@ import Testing
 
 @Suite struct AlreadyOnStravaStoreTests {
     private func store() throws -> WorkoutStore {
-        WorkoutStore(modelContainer: try WorkoutStore.container(inMemory: true))
+        try inMemoryStore()
     }
 
     private func ingested(_ id: String) -> IngestedWorkout {

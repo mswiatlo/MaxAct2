@@ -41,7 +41,7 @@ import Testing
         let root = FileManager.default.temporaryDirectory.appending(path: "SeriesProvenanceTests-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let seriesStore = try SeriesStore(directory: root)
-        let store = WorkoutStore(modelContainer: try WorkoutStore.container(inMemory: true))
+        let store = try inMemoryStore()
         func item(_ id: String, source: String, accuracy: Double?, provenance: SeriesProvenance = .init()) -> IngestedWorkout {
             IngestedWorkout(
                 workout: Workout(id: id, kind: .running, start: t0, end: t0.addingTimeInterval(600), duration: 600, sourceName: source),

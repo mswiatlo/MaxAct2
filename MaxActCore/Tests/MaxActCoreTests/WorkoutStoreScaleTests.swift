@@ -17,7 +17,7 @@ import Testing
 
     @Test("a seven-year corpus inserts and lists without the table touching a blob")
     func fullCorpusListing() async throws {
-        let store = WorkoutStore(modelContainer: try WorkoutStore.container(inMemory: true))
+        let store = try inMemoryStore()
         let base = Date(timeIntervalSince1970: 1_500_000_000)
 
         let batch = (0..<Self.corpusSize).map { index in

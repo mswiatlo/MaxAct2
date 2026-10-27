@@ -7,7 +7,7 @@ import Testing
 @Suite struct WorkoutStoreTests {
 
     private func makeStore() throws -> WorkoutStore {
-        WorkoutStore(modelContainer: try WorkoutStore.container(inMemory: true))
+        try inMemoryStore()
     }
 
     private func makeSeriesStore() throws -> SeriesStore {

@@ -120,7 +120,7 @@ import Testing
 
         // A fresh cache (as after relaunch) must have to build all three again.
         let calls = Counter()
-        _ = await try RouteSketchCache(directory: root).digests(for: ["A", "B", "C"], seriesStore: seriesStore) { _, _ in
+        _ = try await RouteSketchCache(directory: root).digests(for: ["A", "B", "C"], seriesStore: seriesStore) { _, _ in
             await calls.bump()
         }
         #expect(await calls.value == 3)

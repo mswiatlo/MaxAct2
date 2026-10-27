@@ -9,7 +9,7 @@ import Testing
     private let base = Date(timeIntervalSince1970: 1_790_000_000)
 
     private func store() throws -> WorkoutStore {
-        WorkoutStore(modelContainer: try WorkoutStore.container(inMemory: true))
+        try inMemoryStore()
     }
 
     private func ingested(_ id: String, daysIn: Double) -> IngestedWorkout {

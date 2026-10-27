@@ -1299,6 +1299,10 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-27** — **43 built: tests.** The new Strava resume test found a bug: a batch's queuing
+  step overwrote an in-flight upload's state, so asking to upload it again sent a duplicate.
+  Fixed. Also fixed a `try`/`await` order warning in 39's cache test.
+
 - **2026-10-27** — **42 built: structure, duplication and dead code**, in four commits, with no
   visible change. `swift test` went from 382 to 377: five tests covered only removed code.
 
