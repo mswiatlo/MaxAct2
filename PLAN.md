@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** 44 (search stall), then 28 (security audit), then 36
+**Next:** 28 (security audit), then 36
 (README). 24's live run waits for HAE's fix (21). Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
@@ -44,7 +44,7 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–20, 22, 23, 25, 26, 27, 29–32, 34, 35, 37–43 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–20, 22, 23, 25, 26, 27, 29–32, 34, 35, 37–44 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
 **21. Health Auto Export bug report** *(sent by the user 2026-10-14; HAE acknowledged it and asked
@@ -101,30 +101,6 @@ morning run abroad can be named "Night Run". The fix depends on what HAE's UTC o
 is unmeasured: the recording's own zone, or the phone's zone at export. (The fixtures can't tell:
 `make_fixture.py` moves dates but keeps the offset.) Next time the phone is connected, fetch a
 winter workout. If it reads `-0800`, the offset is the recording's: store it and name by it.
-
-**44. Search stalled while deleting a term** *(built 2026-10-27 on `search-stall`, awaiting the
-user's check)* —
-- **Measured on a library copy** (536 workouts): deleting "California" back to "Ca" took **6.5 s**,
-  and every other keystroke took 160–620 ms. That step grows the rows from 29 to 473.
-- **The cost is SwiftUI's `Table` inserting many scattered rows**, about 16 ms a row. It isn't any
-  of these, each measured:
-  - the filtering (6 ms);
-  - the sort (under 1 ms);
-  - the cells (plain text took as long);
-  - the thumbnails;
-  - animation;
-  - column customization.
-- **Fix:** an update that would insert more than 20 rows builds the table afresh (`.id`), about
-  350 ms. The decision is made in `searchText`'s and `sidebarSelection`'s `didSet`, before the
-  redraw: made during the redraw, it measured 1.8 s. Now **554 ms**, with the worst keystroke
-  675 ms.
-- **Jumps still scroll:** a jump that clears the search rebuilds the table, so the view scrolls
-  again once the new table is up. A UI test reproduced the missed scroll before the fix.
-- **Tests:** `TableIdentityTests` (mutation-checked), `testAJumpThatClearsTheSearchStillScrollsToItsRow`
-  (red before the fix), and `RealContentUITests.testSearchAndDeleteStayResponsive`, which times
-  each keystroke on a library copy.
-- **To check:** search "California", delete back to empty; also a jump from Same Route while
-  searching.
 
 **28. Security audit** *(requested 2026-10-23; after 27, near the finish)* — secrets (HAE token, Strava client
 secret and OAuth tokens: Keychain use, nothing in logs, defaults or crash output), the MCP link

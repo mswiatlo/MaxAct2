@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed or closed known issues (1–20, 22, 23, 25–27, 29–32, 34, 35, 37–43)
+## 2. Fixed or closed known issues (1–20, 22, 23, 25–27, 29–32, 34, 35, 37–44)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -518,6 +518,28 @@ other in order, and ranking by time. Checked on a copy: the newest commute 92 ti
 times, 3rd. Extended the next day: pointing at an attempt shows its exact date, time and
 duration, and clicking it opens that workout and scrolls the table to it (`AppModel.reveal`). If
 a search or filter hides it, the table goes back to All Workouts. Going back is issue 32.
+
+**44. ~~Search stalled while deleting a term.~~ — done 2026-10-27, confirmed by the user.** —
+- **Measured on a library copy** (536 workouts): deleting "California" back to "Ca" took **6.5 s**,
+  and every other keystroke took 160–620 ms. That step grows the rows from 29 to 473.
+- **The cost is SwiftUI's `Table` inserting many scattered rows**, about 16 ms a row. It isn't any
+  of these, each measured:
+  - the filtering (6 ms);
+  - the sort (under 1 ms);
+  - the cells (plain text took as long);
+  - the thumbnails;
+  - animation;
+  - column customization.
+- **Fix:** an update that would insert more than 20 rows builds the table afresh (`.id`), about
+  350 ms. The decision is made in `searchText`'s and `sidebarSelection`'s `didSet`, before the
+  redraw: made during the redraw, it measured 1.8 s. Now **554 ms**, with the worst keystroke
+  675 ms.
+- **Jumps still scroll:** a jump that clears the search rebuilds the table, so the view scrolls
+  again once the new table is up. A UI test reproduced the missed scroll before the fix.
+- **Tests:** `TableIdentityTests` (mutation-checked), `testAJumpThatClearsTheSearchStillScrollsToItsRow`
+  (red before the fix), and `RealContentUITests.testSearchAndDeleteStayResponsive`, which times
+  each keystroke on a library copy.
+- The user judged a jump that clears a search too rare to check by hand; the UI test covers it.
 
 **42. ~~Structure, duplication and dead code.~~ — done 2026-10-27, checked by the user (no visible change).** —
 - **Removed:**
@@ -1348,6 +1370,8 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-27** — **Issue 44 closed**, confirmed by the user. Full suite, with Do Not Disturb on: 84 passed, 4 skipped, 1 expected failure.
 
 - **2026-10-27** — **44 built: search stall.** Reproduced at 6.5 s, timed per keystroke by a
   real-copy UI test. Five experiments ruled out filtering, sorting, cells, thumbnails, animation
