@@ -26,7 +26,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ## 1. Where things stand — 2026-10-24
 
-All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 386 in
+All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 388 in
 `MaxActCore` (`swift test`), 89 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~15 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
@@ -121,9 +121,12 @@ run; nothing visible changes)* — `InputLimits` (new) holds the rules:
 Tests: `InputValidationTests`, 7 (19 cases); the id, path and range guards are each
 mutation-checked.
 
-**46. Revoke on Disconnect** (S3) — Disconnect only deletes the tokens locally. Call Strava's
-`POST /oauth/deauthorize` first (best effort), and say in Settings that access can also be revoked
-at strava.com/settings/apps.
+**46. Revoke on Disconnect** *(built 2026-10-27 on `strava-revoke`)* — Disconnect now asks Strava
+to revoke access (`POST /oauth/deauthorize`, refreshing a stale token first), then deletes the
+tokens here either way. If Strava doesn't confirm, the banner says so and points to
+strava.com/settings/apps. Settings ▸ Strava says what Disconnect does. Tests: 2, mutation-checked.
+**Not yet seen against the live API:** the next real Disconnect should leave the app gone from
+strava.com/settings/apps.
 
 **47. Hardening** —
 - a hidden field (`SecureField`) for the HAE token;

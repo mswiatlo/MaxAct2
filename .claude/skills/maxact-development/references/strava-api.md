@@ -48,6 +48,11 @@ recorded as already-uploaded rather than surfaced as a failure.
 - Store client ID, secret, access token, refresh token and expiry in the Keychain
   (`kSecClassGenericPassword`, `.whenUnlocked`). Refresh proactively on expiry and reactively on a
   `401`.
+- **Disconnect revokes first:** `POST https://www.strava.com/oauth/deauthorize`, with the access
+  token as both a form field (`access_token=`, as Strava documents) and a bearer header. Deleting
+  only the local tokens leaves the grant live at Strava. Best effort; the local tokens go either
+  way. *Not yet seen against the live API* — confirm on the next real Disconnect that
+  strava.com/settings/apps no longer lists the app.
 - **Only one refresh at a time, even inside an actor.** Strava rotates the refresh token on every
   refresh. An actor's methods interleave at each `await`, so two requests that both find the token
   stale would each refresh, and the second would spend a token the first had already used.

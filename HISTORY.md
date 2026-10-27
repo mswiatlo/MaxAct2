@@ -1377,6 +1377,8 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-27** — **46 built: Disconnect revokes at Strava.** Unverified live, by design: testing it disconnects the user's real account.
+
 - **2026-10-27** — **45 built: input validation.** Measured first: `appending(path: "../../x")`
   resolves outside its folder once standardised.
 

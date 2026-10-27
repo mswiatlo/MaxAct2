@@ -68,6 +68,11 @@ struct StravaSettingsSection: View {
                     """)
                 .font(.callout)
                 .foregroundStyle(.secondary)
+            } else {
+                // Issue 46: what Disconnect does, and the other way to revoke it.
+                Text("Disconnect revokes MaxAct's access at Strava and forgets it here. You can also revoke it at strava.com/settings/apps.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             }
         }
         .task { await model.refreshStravaConnection() }

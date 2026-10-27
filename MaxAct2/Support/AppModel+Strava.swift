@@ -190,7 +190,11 @@ extension AppModel {
 
     func disconnectStrava() async {
         do {
-            try await strava.disconnect()
+            if try await !strava.disconnect() {
+                // Disconnected here, but the grant may still be live at Strava (issue 46).
+                reportFailedChange("Disconnected, but Strava couldn't be told",
+                                   StravaNotRevoked())
+            }
         } catch {
             reportFailedChange("Couldn't disconnect from Strava", error)
         }
@@ -446,4 +450,9 @@ extension AppModel {
 /// The store refused a write; the underlying errors are in the log.
 struct StoreWriteFailed: LocalizedError {
     var errorDescription: String? { "the library couldn't be written" }
+}
+
+/// Strava didn't confirm revoking MaxAct's access.
+struct StravaNotRevoked: LocalizedError {
+    var errorDescription: String? { "revoke MaxAct's access at strava.com/settings/apps" }
 }

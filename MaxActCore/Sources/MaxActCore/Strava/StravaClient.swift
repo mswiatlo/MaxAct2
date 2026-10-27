@@ -59,6 +59,7 @@ public actor StravaClient {
     public static let apiBase = URL(string: "https://www.strava.com/api/v3")!
     static let authorizeEndpoint = URL(string: "https://www.strava.com/oauth/authorize")!
     static let tokenEndpoint = URL(string: "https://www.strava.com/oauth/token")!
+    static let deauthorizeEndpoint = URL(string: "https://www.strava.com/oauth/deauthorize")!
 
     /// `activity:write` to upload; `activity:read_all` to read back status of private activities.
     public static let scope = "activity:write,activity:read_all"
@@ -122,8 +123,27 @@ public actor StravaClient {
         return tokens
     }
 
-    public func disconnect() async throws {
+    /// Revokes MaxAct's access at Strava, then forgets the tokens here. Returns whether Strava
+    /// confirmed the revocation; the local tokens go either way.
+    ///
+    /// Revoked first (issue 46): deleting only the local copy left the grant live at Strava, so a
+    /// copy of the token taken earlier — from a backup, say — kept working. Best effort: offline,
+    /// or with Strava refusing, the user is told to revoke it at strava.com/settings/apps.
+    @discardableResult
+    public func disconnect() async throws -> Bool {
+        var revoked = false
+        if let tokens = try? await validTokens() {
+            let response = try? await transport.send(StravaHTTPRequest(
+                method: "POST", url: Self.deauthorizeEndpoint,
+                headers: ["Authorization": "Bearer \(tokens.accessToken)",
+                          "Content-Type": "application/x-www-form-urlencoded"],
+                // Strava's documentation sends it as a form field; the header too costs nothing.
+                body: Data("access_token=\(Self.formEncode(tokens.accessToken))".utf8)
+            ))
+            revoked = response.map { (200..<300).contains($0.status) } ?? false
+        }
         try await secrets.save(tokens: nil)
+        return revoked
     }
 
     // MARK: - API

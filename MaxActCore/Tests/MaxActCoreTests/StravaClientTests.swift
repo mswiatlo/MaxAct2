@@ -158,6 +158,31 @@ private func client(_ transport: any StravaTransport, _ secrets: MemorySecrets) 
         #expect(await transport.authorizations == ["Bearer NEW1", "Bearer NEW1"])
     }
 
+    /// Issue 46: Disconnect revokes the grant at Strava, then forgets the tokens either way.
+    @Test("disconnecting revokes at Strava, then forgets the tokens")
+    func disconnectRevokes() async throws {
+        let transport = ScriptedTransport([json(200, ["access_token": "A1"])])
+        let secrets = MemorySecrets(tokens: freshTokens)
+        #expect(try await client(transport, secrets).disconnect())
+        let request = try #require(await transport.requests.first)
+        #expect(request.url == StravaClient.deauthorizeEndpoint)
+        #expect(request.method == "POST")
+        #expect(request.headers["Authorization"] == "Bearer A1")
+        #expect(request.body.map { String(decoding: $0, as: UTF8.self) } == "access_token=A1")
+        #expect(await secrets.storedTokens == nil)
+    }
+
+    @Test("if Strava can't be told, the tokens still go, and the caller hears so")
+    func disconnectOffline() async throws {
+        let secrets = MemorySecrets(tokens: freshTokens)
+        #expect(try await !client(ScriptedTransport([]), secrets).disconnect())   // script exhausted: a failure
+        #expect(await secrets.storedTokens == nil)
+
+        let refused = MemorySecrets(tokens: freshTokens)
+        #expect(try await !client(ScriptedTransport([json(401, ["message": "Authorization Error"])]), refused).disconnect())
+        #expect(await refused.storedTokens == nil)
+    }
+
     @Test("a 401 triggers one refresh and one retry")
     func reactiveRefresh() async throws {
         let transport = ScriptedTransport([
