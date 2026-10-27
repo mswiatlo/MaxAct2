@@ -1299,6 +1299,9 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-27** — **42 built: structure, duplication and dead code**, in four commits, with no
+  visible change. `swift test` went from 382 to 377: five tests covered only removed code.
+
 - **2026-10-27** — **Statistics accessibility frames: investigated, left open.**
   - A new UI test reproduces the bug every time.
   - Three layout changes didn't fix it (no animation, vertical-only scrolling, explicit placement

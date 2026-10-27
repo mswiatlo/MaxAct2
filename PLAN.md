@@ -26,7 +26,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ## 1. Where things stand — 2026-10-24
 
-All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 382 in
+All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 377 in
 `MaxActCore` (`swift test`), 82 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~15 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
@@ -102,15 +102,33 @@ is unmeasured: the recording's own zone, or the phone's zone at export. (The fix
 `make_fixture.py` moves dates but keeps the offset.) Next time the phone is connected, fetch a
 winter workout. If it reads `-0800`, the offset is the recording's: store it and name by it.
 
-**42. Structure, duplication and dead code** (no change in behaviour):
-- Split `DetailPane`, `StatisticsView` and `WorkoutStore`.
-- Move `AppSettings`/`SettingsView` out of `WorkoutActions.swift`.
-- Shared stat cell, section header, duration text and coordinate conversion.
-- Core maths in one place: cumulative distance (5 copies), thinning (2), by-period buckets (2),
-  metres-per-degree (two values).
-- Remove about 12 unused APIs, including the thumbnail-filename chain,
-  `StravaClient.updateActivity` and status cases that are never created.
-- Fix about 10 stale or misplaced comments.
+**42. Structure, duplication and dead code** *(built 2026-10-27 on `structure-cleanup`, awaiting the
+full UI run; nothing visible changes)* —
+- **Removed:**
+  - `WorkoutStore.delete(id:)`, `itemsNeedingDetail` and `setThumbnailFileName`;
+  - `allItems`' unused ordering parameter;
+  - `SyncFrontier`, `RouteSketchCache.sketches` and `StravaClient.updateActivity(id:sportType:)`;
+  - an unused binding in the sync panel;
+  - the five tests that only covered these.
+
+  The record's `thumbnailFileName` attribute stays, so the store's schema doesn't change.
+- **About ten comments corrected,** and `describeUpload` renamed `describeStravaError`.
+- **One copy of shared maths in the core:**
+  - step and cumulative distances;
+  - even sampling;
+  - the period walk and binary search, so heart-rate zones by period is no longer linear per
+    workout;
+  - metres-per-degree for the heatmap (`PlaceGrid`'s stays: changing it would move every cell);
+  - the simplification tolerance.
+- **Shared views:** `SectionHeader`, `Footnote`, `StatCell`, `CLLocationCoordinate2D(Coordinate)`,
+  `WorkoutFormatting.span` and `hoursAndMinutes`.
+- **Files split:**
+  - `AppSettings`, `SettingsView`, `BestsSection`, `StatisticsWithInspector` and
+    `SelectionSummaryView` moved into their own files;
+  - `WorkoutStore` split into `+Strava`, `+Places` and `+Repairs` extensions.
+- **Deferred:** splitting `WorkoutDetailView` (650 lines) into map, charts and notes. Its map and
+  charts share hover state, so it needs that state lifted, which is a design change rather than a
+  tidy-up.
 
 **43. Tests:**
 - Timing limits too tight (200/300/200 ms, 1 s): loosen to the 10× rule.
