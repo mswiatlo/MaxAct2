@@ -14,6 +14,7 @@ struct HTTPSFields: View {
         VStack(alignment: .leading, spacing: 6) {
             Toggle("Use HTTPS", isOn: $settings.usesHTTPS)
                 .toggleStyle(.switch)
+                .accessibilityIdentifier("UseHTTPS")   // in a form, the title is a separate text
                 .help("Encrypts the link to the phone. Turn it on in Health Auto Export's server settings too.")
             if settings.usesHTTPS {
                 if let ca = settings.pinnedCA {

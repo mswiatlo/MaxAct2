@@ -38,8 +38,11 @@ final class MaxAct2UITests: XCTestCase {
     @MainActor
     private func openSettings(_ app: XCUIApplication) -> XCUIElement {
         app.typeKey(",", modifierFlags: .command)
-        let address = app.textFields["iPhone address"]
-        XCTAssertTrue(address.waitForExistence(timeout: 5), "Settings has no address field.")
+        let address = app.textFields["SettingsHost"]
+        if !address.waitForExistence(timeout: 5) {
+            print("SETTINGS TREE:\n\(app.windows.firstMatch.debugDescription)")
+            XCTFail("Settings has no address field.")
+        }
         return address
     }
 
@@ -235,12 +238,14 @@ final class MaxAct2UITests: XCTestCase {
         app.buttons["Sync"].click()
         let settingsButton = app.buttons["Connection Settings…"]
         XCTAssertTrue(settingsButton.waitForExistence(timeout: 5))
-        XCTAssertFalse(app.textFields["iPhone address"].exists, "The panel shouldn't edit the connection.")
-        XCTAssertEqual(app.secureTextFields.count, 0, "The panel shouldn't take the token.")
+        let panel = app.popovers.firstMatch
+        XCTAssertTrue(panel.exists)
+        XCTAssertEqual(panel.textFields.count, 0, "The panel shouldn't edit the connection.")
+        XCTAssertEqual(panel.secureTextFields.count, 0, "The panel shouldn't take the token.")
         XCTAssertTrue(app.buttons["Start Sync"].exists, "The panel must still offer a way to start syncing.")
 
         settingsButton.click()
-        XCTAssertTrue(app.textFields["iPhone address"].waitForExistence(timeout: 5),
+        XCTAssertTrue(app.textFields["SettingsHost"].waitForExistence(timeout: 5),
                       "Connection Settings… should open Settings at the connection fields.")
         XCTAssertTrue(app.buttons["Test Connection"].exists, "Settings should offer Test Connection.")
     }
@@ -284,7 +289,7 @@ final class MaxAct2UITests: XCTestCase {
         let app = launchConfigured(host: "10.0.0.158")
         _ = openSettings(app)
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "value BEGINSWITH %@", "HTTPS is off")).firstMatch.exists)
-        let https = app.switches["Use HTTPS"]
+        let https = app.switches["UseHTTPS"]
         XCTAssertTrue(https.exists, "Use HTTPS should be a switch.")
         https.click()
         XCTAssertTrue(app.buttons["Load Certificate…"].waitForExistence(timeout: 3))

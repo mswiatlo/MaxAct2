@@ -18,6 +18,7 @@ struct SettingsView: View {
             Section {
                 // Not a sample address: one reads as filled in (see `WelcomeSheet`).
                 TextField("iPhone address", text: $settings.host, prompt: Text("required"))
+                    .accessibilityIdentifier("SettingsHost")   // the form exposes only the prompt
                 SecureField("Bearer token", text: $settings.token)   // hidden (issue 47)
                 HTTPSFields(settings: settings)
                 if let model {
