@@ -12,6 +12,34 @@ final class RealContentUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    /// Issue 44: searching, then deleting the term, stalled on the user's library ("California").
+    /// XCTest waits for the app to go idle after each key, so how long each key takes is how long
+    /// the main thread was busy with it. Prints timings; no screenshots.
+    @MainActor
+    func testSearchAndDeleteStayResponsive() throws {
+        let app = launchMaxAct(extraArguments: ["--ui-testing-real-copy"])
+        let table = app.outlines["WorkoutTable"]
+        guard table.waitForExistence(timeout: 15) else {
+            throw XCTSkip("No real-library copy in place; nothing to measure.")
+        }
+        let search = app.searchFields.firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: 5))
+        search.click()
+        func timed(_ label: String, _ key: () -> Void) -> Double {
+            let start = Date()
+            key()
+            let ms = Date().timeIntervalSince(start) * 1000
+            print(String(format: "SEARCH %@: %.0f ms", label, ms))
+            return ms
+        }
+        var worst = 0.0
+        for character in "California" { worst = max(worst, timed("type \(character)") { search.typeText(String(character)) }) }
+        for remaining in stride(from: 9, through: 0, by: -1) {
+            worst = max(worst, timed("delete to \(remaining)") { search.typeKey(.delete, modifierFlags: []) })
+        }
+        print(String(format: "SEARCH worst: %.0f ms", worst))
+    }
+
     @MainActor
     func testInspectorLayoutWithRealContent() throws {
         // A plausible profile so the inspector's heart-rate zones draw.

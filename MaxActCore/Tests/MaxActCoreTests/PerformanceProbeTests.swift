@@ -130,6 +130,27 @@ struct PerformanceProbeTests {
     }
 }
 
+extension PerformanceProbeTests {
+    /// Issue 44: what each keystroke costs while deleting "California" from the search field.
+    /// `visibleItems` filters and sorts the library each time it's read — about seven times per
+    /// redraw of the table, title, Statistics and selection summary.
+    @Test func searchingAndDeleting() async throws {
+        let (items, _) = try await library()
+        let sort = [KeyPathComparator(\WorkoutListItem.workout.start, order: .reverse)]
+        let word = "California"
+        print("PERF search: \(items.count) workouts")
+        for length in stride(from: word.count, through: 1, by: -1) {
+            let needle = String(word.prefix(length))
+            var matched: [WorkoutListItem] = []
+            let filter = Self.ms { matched = items.filter { $0.matches(searchText: needle) } }
+            let sorted = Self.ms { _ = matched.sorted(using: sort) }
+            print(String(format: "PERF search '%@': %d match, filter %.1f ms, sort %.1f ms", needle, matched.count, filter, sorted))
+        }
+        let all = Self.ms { _ = items.sorted(using: sort) }
+        print(String(format: "PERF search: sorting all, %.1f ms", all))
+    }
+}
+
 extension SeriesStore {
     /// A synchronous read for timing, outside the actor's queue.
     nonisolated func loadSync(_ workoutID: String) throws -> WorkoutSeries {

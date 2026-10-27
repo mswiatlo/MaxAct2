@@ -1349,6 +1349,13 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-27** — **44 built: search stall.** Reproduced at 6.5 s, timed per keystroke by a
+  real-copy UI test. Five experiments ruled out filtering, sorting, cells, thumbnails, animation
+  and column customization. Rebuilding the table for big insertions brought it to 0.55 s. The
+  timing depended on two things, both measured, neither explained: deciding the rebuild before the
+  redraw rather than during it (1.8 s), and rebuilding on the first search keystroke too (1.8 s
+  without).
+
 - **2026-10-27** — **Issues 42 and 43 closed**, with the Statistics accessibility-frame
   investigation. Full suite, with Do Not Disturb on: 82 passed, 3 skipped, 1 expected failure.
   The first run failed `testClickingAnAttemptOpensThatWorkout`: the row had scrolled into view but

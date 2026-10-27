@@ -919,6 +919,58 @@ final class SeededTableUITests: XCTestCase {
     /// Issue 23: pointing at another attempt in the Same Route chart shows its exact time, and
     /// clicking it opens that workout and scrolls the table to it. The seed's other ride on the
     /// route is a month older — about 30 rows down, well off-screen.
+    /// Issue 44: a jump that clears the search rebuilds the table (a big insertion), and the jump
+    /// must still scroll to its row. Tag the newer ride, search for the tag (one row), then click
+    /// the older ride's attempt: the search clears, 1 row becomes 40, and the older ride shows.
+    @MainActor
+    func testAJumpThatClearsTheSearchStillScrollsToItsRow() throws {
+        let app = launchSeeded()
+        let table = app.outlines["WorkoutTable"]
+        XCTAssertTrue(table.waitForExistence(timeout: 15))
+        table.cells.element(boundBy: 0).click()
+        table.cells.element(boundBy: 0).rightClick()
+        let tagsMenu = app.menuItems["Tags"]
+        XCTAssertTrue(tagsMenu.waitForExistence(timeout: 5))
+        tagsMenu.hover()
+        let newTag = app.menuItems["New Tag…"]
+        XCTAssertTrue(newTag.waitForExistence(timeout: 5))
+        newTag.click()
+        let field = app.dialogs.textFields.firstMatch.exists
+            ? app.dialogs.textFields.firstMatch : app.sheets.textFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.click()
+        field.typeText("Solo")
+        let add = app.sheets.buttons["Add"].exists ? app.sheets.buttons["Add"] : app.dialogs.buttons["Add"]
+        XCTAssertTrue(add.waitForExistence(timeout: 3))
+        add.click()
+
+        let search = app.searchFields.firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: 5))
+        search.click()
+        search.typeText("Solo")
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "value CONTAINS %@", "1 workouts"))
+            .firstMatch.waitForExistence(timeout: 10), "Only the tagged ride should match.")
+        XCTAssertTrue(app.staticTexts["RouteHistoryCount"].waitForExistence(timeout: 15))
+
+        let chart = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == 'Time on this route per attempt'")).firstMatch
+        let inspector = app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5))
+        scrollFullyIntoView(chart, scrolling: inspector, in: app.windows.firstMatch)
+        let opened = app.staticTexts.containing(NSPredicate(format: "value CONTAINS 'September 9, 2025'")).firstMatch
+        var found = false
+        search: for dy in stride(from: 0.1, through: 0.9, by: 0.1) {
+            for dx in stride(from: 0.0, through: 0.4, by: 0.025) {
+                chart.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: dy)).click()
+                if opened.waitForExistence(timeout: 0.3) { found = true; break search }
+            }
+        }
+        XCTAssertTrue(found, "Clicking along the chart never opened the other attempt.")
+        XCTAssertEqual(search.value as? String ?? "", "", "The jump should clear the search that hid its row.")
+        let olderRow = table.staticTexts.matching(NSPredicate(format: "value == 'Sep 9, 2025'")).firstMatch
+        XCTAssertTrue(olderRow.waitForExistence(timeout: 5) && olderRow.isHittable,
+                      "The rebuilt table should scroll to the ride the jump opened.")
+    }
+
     @MainActor
     func testClickingAnAttemptOpensThatWorkout() throws {
         let app = launchSeeded()

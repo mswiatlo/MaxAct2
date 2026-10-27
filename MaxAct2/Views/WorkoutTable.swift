@@ -25,6 +25,8 @@ struct WorkoutTable: View {
     ///   reading this key back after a launch is the only reliable way to see what it really did.
     @AppStorage("workoutTableColumns.v6") private var columnCustomizationData = Data()
     @State private var columnCustomization = TableColumnCustomization<WorkoutListItem>()
+    /// The jump last scrolled to after a rebuild, so it's done once.
+    @State private var rescrolledReveal: Int?
 
     var body: some View {
         // Read for `reveal`: a selection set from elsewhere (the Same Route chart) would
@@ -148,6 +150,7 @@ struct WorkoutTable: View {
                 .customizationID("tags")
             }
             .tableStyle(.inset)
+            .id(model.tableIdentity)
             // SwiftUI's Table is exposed to accessibility as an *outline*, not a table, and the
             // sidebar List is one too — so UI tests need a way to tell them apart that doesn't depend
             // on ordering.
@@ -178,6 +181,16 @@ struct WorkoutTable: View {
                 // 15 rows short, in roughly one full UI-test run in three), presumably cut off
                 // by the table's own scrolling as the selection changed. An immediate scroll
                 // completes before anything can interrupt it.
+                proxy.scrollTo(request.workoutID, anchor: UnitPoint(x: 0, y: 0.5))
+            }
+            // A jump that cleared the search may have rebuilt the table in the same update (issue
+            // 44): the scroll above then reached a table with no rows yet. Once the new table is
+            // up, scroll again — only for a request made with this table's identity.
+            .task(id: model.tableIdentity) {
+                guard let request = model.revealRequest, request.tableIdentity == model.tableIdentity,
+                      request.serial != rescrolledReveal else { return }
+                rescrolledReveal = request.serial
+                try? await Task.sleep(for: .milliseconds(100))
                 proxy.scrollTo(request.workoutID, anchor: UnitPoint(x: 0, y: 0.5))
             }
         }

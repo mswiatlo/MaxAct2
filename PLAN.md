@@ -27,7 +27,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 ## 1. Where things stand — 2026-10-24
 
 All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 378 in
-`MaxActCore` (`swift test`), 86 app and UI tests (`RunAllTests` — ask first, then leave the Mac
+`MaxActCore` (`swift test`), 89 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~15 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
 
@@ -102,11 +102,29 @@ is unmeasured: the recording's own zone, or the phone's zone at export. (The fix
 `make_fixture.py` moves dates but keeps the offset.) Next time the phone is connected, fetch a
 winter workout. If it reads `-0800`, the offset is the recording's: store it and name by it.
 
-**44. Search can stall while deleting a term** *(reported 2026-10-27, next)* — searching, then
-pressing backspace on the term, can slow or stall the app. "California" in the user's real library
-triggered it. Measure first on a library copy: what each keystroke recomputes. Suspects: search
-matching over every item's place terms and tags, then `visibleItems`' sort, then Statistics or the
-heatmap if visible.
+**44. Search stalled while deleting a term** *(built 2026-10-27 on `search-stall`, awaiting the
+user's check)* —
+- **Measured on a library copy** (536 workouts): deleting "California" back to "Ca" took **6.5 s**,
+  and every other keystroke took 160–620 ms. That step grows the rows from 29 to 473.
+- **The cost is SwiftUI's `Table` inserting many scattered rows**, about 16 ms a row. It isn't any
+  of these, each measured:
+  - the filtering (6 ms);
+  - the sort (under 1 ms);
+  - the cells (plain text took as long);
+  - the thumbnails;
+  - animation;
+  - column customization.
+- **Fix:** an update that would insert more than 20 rows builds the table afresh (`.id`), about
+  350 ms. The decision is made in `searchText`'s and `sidebarSelection`'s `didSet`, before the
+  redraw: made during the redraw, it measured 1.8 s. Now **554 ms**, with the worst keystroke
+  675 ms.
+- **Jumps still scroll:** a jump that clears the search rebuilds the table, so the view scrolls
+  again once the new table is up. A UI test reproduced the missed scroll before the fix.
+- **Tests:** `TableIdentityTests` (mutation-checked), `testAJumpThatClearsTheSearchStillScrollsToItsRow`
+  (red before the fix), and `RealContentUITests.testSearchAndDeleteStayResponsive`, which times
+  each keystroke on a library copy.
+- **To check:** search "California", delete back to empty; also a jump from Same Route while
+  searching.
 
 **28. Security audit** *(requested 2026-10-23; after 27, near the finish)* — secrets (HAE token, Strava client
 secret and OAuth tokens: Keychain use, nothing in logs, defaults or crash output), the MCP link

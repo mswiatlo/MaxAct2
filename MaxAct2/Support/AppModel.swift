@@ -24,9 +24,14 @@ final class AppModel {
     /// Remembered between launches, as is `sortOrder` (Phase 8); restored in `init`. The search
     /// and the selection are deliberately not — a relaunch starts with a clean slate there.
     var sidebarSelection: SidebarSelection? = .filter(.all) {
-        didSet { settings.sidebarSelectionKey = sidebarSelection?.storageKey }
+        didSet {
+            settings.sidebarSelectionKey = sidebarSelection?.storageKey
+            noteRowChange()
+        }
     }
-    var searchText = ""
+    var searchText = "" {
+        didSet { noteRowChange() }
+    }
     var selection: Set<String> = []
     var sortOrder: [KeyPathComparator<WorkoutListItem>] = TableSort.default {
         didSet { settings.tableSortKey = TableSort.storageKey(for: sortOrder) }
@@ -89,6 +94,10 @@ final class AppModel {
     struct RevealRequest: Equatable {
         let workoutID: String
         let serial: Int
+        /// The table identity current when it was made. If clearing the search rebuilt the table
+        /// in the same update, the new table has no rows yet when the request arrives, so the view
+        /// scrolls again once that table has appeared (issue 44).
+        let tableIdentity: Int
     }
 
     /// The narrowest window that holds sidebar, table and inspector at their minimums.
@@ -371,8 +380,34 @@ final class AppModel {
         selection = ids
         guard let only = ids.first, ids.count == 1 else { return }
         showsDetail = true
-        revealRequest = RevealRequest(workoutID: only, serial: (revealRequest?.serial ?? 0) + 1)
+        revealRequest = RevealRequest(workoutID: only, serial: (revealRequest?.serial ?? 0) + 1,
+                                      tableIdentity: tableIdentity)
     }
+
+    /// The table's rows, and an identity for the table that changes when an update would insert
+    /// many rows at once (issue 44).
+    ///
+    /// SwiftUI's `Table` inserts scattered rows slowly: deleting "California" back to "Ca", 29
+    /// rows becoming 473 took 6.5 s on the user's library — not the filtering (6 ms), nor the
+    /// cells (plain text took as long), nor animation or column customization (measured). Building
+    /// the table afresh took ~350 ms. So a big insertion gets a fresh table; small changes keep the
+    /// diff, and with it the scroll position.
+    private(set) var tableIdentity = 0
+
+    /// Decided when the search or sidebar changes, before the table redraws: decided while
+    /// drawing, the old table still took the insertions first (1.8 s against ~0.6 s, measured).
+    private func noteRowChange() {
+        let ids = Set(visibleItems.map(\.id))
+        // Starts empty, so the first search or sidebar change also builds the table afresh. That
+        // looks wasteful, but measured: without it, deleting "California" back to "Ca" took 1.8 s
+        // (three runs); with it, 0.5 s (two runs).
+        if ids.subtracting(shownRowIDs).count > Self.rebuildAbove { tableIdentity += 1 }
+        shownRowIDs = ids
+    }
+
+    /// Inserting more rows than this rebuilds the table: ~16 ms a row against ~350 ms a rebuild.
+    static let rebuildAbove = 20
+    @ObservationIgnored private var shownRowIDs: Set<String> = []
 
     var selectedItems: [WorkoutListItem] {
         // Preserve the table's visible order, so the summary reads the way the list looks.

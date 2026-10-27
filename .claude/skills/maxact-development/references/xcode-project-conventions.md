@@ -670,6 +670,13 @@ build, as the app does from Xcode, where sorting is far slower than in release. 
 cache hit, build both sides fresh: equality on two copies of one array or dictionary short-cuts
 and reads as 0 ms.
 
+**SwiftUI's `Table` inserts many rows slowly** *(2026-10-27)*: about 16 ms a row for scattered
+inserts on macOS 26 (29 → 473 rows took 6.5 s), whatever the cells hold. Deleting rows is fast.
+Building the table afresh with `.id` costs ~350 ms. `AppModel.noteRowChange` rebuilds above 20
+inserted rows. Measure keystrokes with `RealContentUITests.testSearchAndDeleteStayResponsive`:
+XCTest waits for the app to go idle after each key. A key taking exactly 10 s is that wait
+timing out, e.g. while the first build of the Same Route index on a fresh copy keeps the app busy.
+
 ## Checking layout against real content, safely
 
 Seeded data has the wrong shape for layout questions — real place names, real numbers and real
