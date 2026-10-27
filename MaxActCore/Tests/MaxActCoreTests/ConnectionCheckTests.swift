@@ -41,10 +41,18 @@ import Testing
         #expect(!check.succeeded)
     }
 
+    /// A phone that never answers, in place of a real unroutable address: that depended on this
+    /// Mac's network, VPN and sandbox, and could fail some other way (issue 43).
+    actor SilentPhone: MCPTransport {
+        func post(_ body: Data, headers: [String: String]) async throws -> MCPHTTPResponse {
+            try await Task.sleep(for: .seconds(60))
+            throw URLError(.timedOut)
+        }
+    }
+
     @Test("an unreachable phone fails at the handshake's deadline, not the listing's long timeout")
     func unreachableIsQuick() async throws {
-        let source = HAEWorkoutSource(endpoint: try #require(MCPEndpoint("10.255.255.1")), token: "t",
-                                      timeout: ConnectionCheck.requestTimeout)
+        let source = HAEWorkoutSource(client: MCPClient(transport: SilentPhone(), token: "t"))
         let clock = ContinuousClock()
         var check: ConnectionCheck?
         let elapsed = await clock.measure { check = await ConnectionCheck.run(source, connectDeadline: 2) }

@@ -183,8 +183,10 @@ private enum TCXSample {
         let errors = Pipe()
         process.standardError = errors
         try process.run()
-        process.waitUntilExit()
+        // Read before waiting (issue 43): xmllint blocks once its error output fills the pipe's
+        // ~64 KB buffer, so waiting first would hang on a file with many errors.
         let message = String(decoding: errors.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        process.waitUntilExit()
         #expect(process.terminationStatus == 0, "\(name) fails the TCX schema:\n\(message)")
     }
 

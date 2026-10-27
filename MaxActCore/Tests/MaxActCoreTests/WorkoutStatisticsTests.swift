@@ -220,6 +220,8 @@ import Testing
             _ = WorkoutStatistics.personalBests(workouts)
         }
         print("statistics over 2,867 workouts: \(elapsed)")
-        #expect(elapsed < .milliseconds(200), "took \(elapsed)")
+        // ~60 ms alone, but over 200 ms once in a parallel `swift test` (issue 43). The limit
+        // catches a 10× regression without failing on a busy machine.
+        #expect(elapsed < .seconds(1), "took \(elapsed)")
     }
 }

@@ -372,6 +372,19 @@ import Testing
         #expect(try #require(try await store.item(id: "W1")).stravaActivityID == 123)
     }
 
+    /// Issue 43: the query that resumes uploads after a relaunch had no test. Only workouts both
+    /// uploading *and* holding an upload id count — without the id there is nothing to resume.
+    @Test("uploads in flight are those uploading with an id")
+    func uploadsInFlight() async throws {
+        let store = try makeStore()
+        try await store.upsert(["A", "B", "C", "D"].map { ingested(workout(id: $0)) })
+        try await store.setStravaState(.uploading, uploadID: 11, for: "A")
+        try await store.setStravaState(.uploading, for: "B")                  // accepted id not yet saved
+        try await store.setStravaState(.uploaded, activityID: 5, uploadID: 33, for: "C")
+        #expect(try await store.itemsUploadingToStrava().map(\.id) == ["A"])
+        #expect(try await store.itemsUploadingToStrava().first?.uploadID == 11)
+    }
+
     // MARK: - Round-tripping enums
 
     @Test("an unrecognised activity name survives persistence")

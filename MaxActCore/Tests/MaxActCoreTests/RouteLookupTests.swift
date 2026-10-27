@@ -82,6 +82,7 @@ import Testing
                 _ = RouteLookup.point(at: start.addingTimeInterval(Double(second) + 0.3), in: route)
             }
         }
-        #expect(elapsed < .milliseconds(200), "took \(elapsed)")
+        // ~12 ms alone; room for a parallel run, still catching a 10× regression (issue 43).
+        #expect(elapsed < .milliseconds(500), "took \(elapsed)")
     }
 }
