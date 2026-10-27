@@ -50,18 +50,15 @@ enum SyncRange: String, CaseIterable, Identifiable {
 
 /// The sync control, shown as a popover from the toolbar.
 ///
-/// **Everything needed to run a sync is in here, including the connection fields.** Two earlier
-/// attempts both dead-ended:
+/// **Syncing only; the connection is edited in Settings** (issue 49), like Strava's — and in the
+/// welcome sheet on a first launch. The panel says where it will connect, or exactly what's
+/// missing, with a button to Settings.
 ///
-/// 1. No affordance at all — the empty state said "add your iPhone's address in Settings" with no
-///    button, and the toolbar icons were unlabelled and disabled.
-/// 2. This panel, but sending people to Settings to type the address. That's four hops (Sync →
-///    Settings → type → close → Sync again) with nothing bringing you back, and in practice the
-///    host silently stayed empty while the token got filled in, so pressing Sync just re-opened
-///    Settings for ever.
-///
-/// So the fields are here, the panel says which one is missing, and one press of Sync reaches a
-/// running sync. Settings keeps the same fields for later editing.
+/// That status line is what keeps this from repeating an old dead end. The first version sent
+/// people to Settings with no button at all; the second had a link but no word on what was
+/// missing, so the address silently stayed empty while the token was filled in, and every Sync
+/// just led back to Settings. The fields then moved into this panel, until HTTPS (48) made the
+/// connection more than two fields and three copies of them had started to drift.
 struct SyncPanel: View {
     /// Passed in rather than read from the environment. A popover is a separate `NSWindow`, and
     /// its content does **not** reliably inherit `.environment(...)` — when the main window
@@ -115,15 +112,26 @@ struct SyncPanel: View {
 
     @ViewBuilder
     private var connection: some View {
+        let settings = model.settings
         VStack(alignment: .leading, spacing: 8) {
-            Text("In Health Auto Export on your iPhone, open the **Server** screen and start the "
-                 + "server. Copy the address and token it shows. The IP alone is enough — "
-                 + "`192.168.1.20` — but a full URL works too.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            ConnectionFields(model: model)
+            if settings.isConfigured, let endpoint = settings.endpoint {
+                Label("Connects to \(endpoint.description)",
+                      systemImage: endpoint.isHTTPS ? "lock.fill" : "lock.open")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            } else {
+                Text("Set up the connection to Health Auto Export on your iPhone first.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let missing = settings.missingConnectionDescription {
+                    Label(missing, systemImage: "exclamationmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
+            SettingsLink { Text("Connection Settings…") }
         }
     }
 
@@ -176,7 +184,6 @@ struct SyncPanel: View {
             .fixedSize(horizontal: false, vertical: true)
 
         HStack {
-            SettingsLink { Text("Settings…") }
             Spacer()
             Button("Start Sync") {
                 guard let interval = importInterval else { return }

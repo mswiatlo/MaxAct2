@@ -151,6 +151,23 @@ final class AppSettings {
         endpoint != nil && !token.trimmingCharacters(in: .whitespaces).isEmpty && (!usesHTTPS || pinnedCA != nil)
     }
 
+    /// What's still needed before a sync can run, in words; `nil` once `isConfigured`. Shown
+    /// wherever the connection is, so an empty field is never a silent dead end.
+    var missingConnectionDescription: String? {
+        let host = host.trimmingCharacters(in: .whitespaces)
+        let token = token.trimmingCharacters(in: .whitespaces)
+        if host.isEmpty && token.isEmpty {
+            return "Enter the address and token shown on the Server screen."
+        }
+        if host.isEmpty { return "The iPhone address is still empty." }
+        if MCPEndpoint(host) == nil {
+            return "That address can't be read. Try just the IP, like 192.168.1.20."
+        }
+        if token.isEmpty { return "The token is still empty." }
+        if usesHTTPS && pinnedCA == nil { return "HTTPS needs Health Auto Export's certificate." }
+        return nil
+    }
+
     func makeSource(timeout: TimeInterval = 600) -> HAEWorkoutSource? {
         guard isConfigured, let endpoint else { return nil }
         return HAEWorkoutSource(endpoint: endpoint, token: token.trimmingCharacters(in: .whitespaces),

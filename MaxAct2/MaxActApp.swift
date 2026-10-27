@@ -83,8 +83,13 @@ struct MaxActApp: App {
             // Plain HTTP unless asked: the tests point at addresses with no certificate to pin.
             UserDefaults(suiteName: domain)?.set(ProcessInfo.processInfo.arguments.contains("--ui-testing-https"),
                                                  forKey: "syncUsesHTTPS")
+            // `--ui-testing-token=<value>` starts with a token, for tests that need a configured
+            // connection now that the sync panel has no fields to type into (issue 49).
+            let token = ProcessInfo.processInfo.arguments
+                .first { $0.hasPrefix("--ui-testing-token=") }
+                .map { String($0.dropFirst("--ui-testing-token=".count)) }
             let settings = AppSettings(defaults: UserDefaults(suiteName: domain) ?? .standard,
-                                       tokenStore: InMemoryHAETokenStore())
+                                       tokenStore: InMemoryHAETokenStore(token: token))
             // `--ui-testing-real-copy`: a copy of a real library, placed by hand in the app's own
             // temporary directory, for checking layout against real content. Only honoured inside
             // this isolated branch, so it can never stand in for the real store.

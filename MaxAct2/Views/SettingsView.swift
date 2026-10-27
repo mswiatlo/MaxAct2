@@ -20,6 +20,9 @@ struct SettingsView: View {
                 TextField("iPhone address", text: $settings.host, prompt: Text("required"))
                 SecureField("Bearer token", text: $settings.token)   // hidden (issue 47)
                 HTTPSFields(settings: settings)
+                if let model {
+                    ConnectionStatus(model: model)
+                }
             } header: {
                 Text("Health Auto Export")
             } footer: {

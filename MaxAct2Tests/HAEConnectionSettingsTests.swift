@@ -67,6 +67,22 @@ struct HAEConnectionSettingsTests {
         #expect(settings.isConfigured)
     }
 
+    @Test("what's missing is named, one thing at a time, until nothing is")
+    func missingIsNamed() {
+        let settings = AppSettings(defaults: defaults(), tokenStore: InMemoryHAETokenStore())
+        settings.usesHTTPS = true
+        #expect(settings.missingConnectionDescription == "Enter the address and token shown on the Server screen.")
+        settings.token = "t"
+        #expect(settings.missingConnectionDescription == "The iPhone address is still empty.")
+        settings.host = "10.0.0.5"
+        #expect(settings.missingConnectionDescription == "HTTPS needs Health Auto Export's certificate.")
+        settings.usesHTTPS = false
+        #expect(settings.missingConnectionDescription == nil)
+        #expect(settings.isConfigured)
+        settings.token = ""
+        #expect(settings.missingConnectionDescription == "The token is still empty.")
+    }
+
     private final class RefusingStore: HAETokenStore {
         func token() -> String? { nil }
         func save(token: String?) throws { throw KeychainError(status: errSecInteractionNotAllowed) }

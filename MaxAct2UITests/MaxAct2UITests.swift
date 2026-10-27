@@ -27,6 +27,22 @@ final class MaxAct2UITests: XCTestCase {
         launchMaxAct(seed: seed)
     }
 
+    /// Launched with a connection already set up, over plain HTTP (issue 49: the sync panel has no
+    /// fields to type it into).
+    @MainActor
+    private func launchConfigured(host: String) -> XCUIApplication {
+        launchMaxAct(defaults: ["syncHost": host], extraArguments: ["--ui-testing-token=irrelevant"])
+    }
+
+    /// Opens Settings and waits for its address field.
+    @MainActor
+    private func openSettings(_ app: XCUIApplication) -> XCUIElement {
+        app.typeKey(",", modifierFlags: .command)
+        let address = app.textFields["iPhone address"]
+        XCTAssertTrue(address.waitForExistence(timeout: 5), "Settings has no address field.")
+        return address
+    }
+
     @MainActor
     func testAppLaunchesAndShowsMainWindow() throws {
         let app = launchApp()
@@ -199,44 +215,34 @@ final class MaxAct2UITests: XCTestCase {
         let app = launchApp()
         app.buttons["Sync"].click()
 
-        // The panel must explain where the address and token come from. Matching on "Health Auto
-        // Export" rather than an exact sentence: the copy contains markdown emphasis, which
-        // fragments the accessibility value and makes a phrase match brittle.
+        // Unconfigured, the panel says so, says exactly what's missing, and offers the way there.
         XCTAssertTrue(
             app.staticTexts.containing(
                 NSPredicate(format: "value CONTAINS[c] 'Health Auto Export'")
             ).firstMatch.waitForExistence(timeout: 5),
-            "Sync panel should explain where the address and token come from."
+            "Sync panel should say the connection to Health Auto Export needs setting up."
         )
-        XCTAssertTrue(
-            app.buttons.matching(
-                NSPredicate(format: "label CONTAINS[c] 'Settings'")
-            ).firstMatch.exists,
-            "Sync panel should still offer a route to Settings."
-        )
+        XCTAssertTrue(app.staticTexts["Enter the address and token shown on the Server screen."].exists,
+                      "Sync panel should say what's missing, not just that something is.")
+        XCTAssertTrue(app.buttons["Connection Settings…"].exists, "Sync panel should offer a route to Settings.")
     }
 
-    /// Regression test for the reported bug: pressing Sync or ⌘R opened Settings and never
-    /// synced, because the address had silently stayed empty and the panel's only affordance in
-    /// that state was a link to Settings. The connection fields now live in the panel itself.
+    /// Issue 49: the connection is edited in Settings only. The panel has no fields, and its
+    /// button opens Settings at them.
     @MainActor
-    func testSyncPanelHoldsTheConnectionFields() throws {
+    func testTheSyncPanelLeavesTheConnectionToSettings() throws {
         let app = launchApp()
         app.buttons["Sync"].click()
+        let settingsButton = app.buttons["Connection Settings…"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.textFields["iPhone address"].exists, "The panel shouldn't edit the connection.")
+        XCTAssertEqual(app.secureTextFields.count, 0, "The panel shouldn't take the token.")
+        XCTAssertTrue(app.buttons["Start Sync"].exists, "The panel must still offer a way to start syncing.")
 
-        let addressField = app.textFields.element(boundBy: 0)
-        XCTAssertTrue(
-            addressField.waitForExistence(timeout: 5),
-            "The sync panel must let you enter the iPhone address without leaving for Settings."
-        )
-        XCTAssertTrue(
-            app.secureTextFields.firstMatch.exists,
-            "Both the address and the token (hidden, issue 47) belong in the panel."
-        )
-        XCTAssertTrue(
-            app.buttons["Start Sync"].exists,
-            "The panel must offer a way to actually start syncing."
-        )
+        settingsButton.click()
+        XCTAssertTrue(app.textFields["iPhone address"].waitForExistence(timeout: 5),
+                      "Connection Settings… should open Settings at the connection fields.")
+        XCTAssertTrue(app.buttons["Test Connection"].exists, "Settings should offer Test Connection.")
     }
 
     @MainActor
@@ -250,48 +256,43 @@ final class MaxAct2UITests: XCTestCase {
         )
     }
 
-    /// Typing an address should be enough to make syncing possible — the previous flow left you
-    /// with a permanently disabled action and no indication of what was missing.
+    /// Typing an address and token in Settings is enough to make syncing possible, and the
+    /// panel says where it will connect — the old dead end was a panel that never changed.
     @MainActor
     func testEnteringAnAddressEnablesSyncing() throws {
         let app = launchApp()
-        app.buttons["Sync"].click()
-
-        let startSync = app.buttons["Start Sync"]
-        XCTAssertTrue(startSync.waitForExistence(timeout: 5))
-
-        let address = app.textFields.element(boundBy: 0)
+        let address = openSettings(app)
         address.click()
-        address.typeKey("a", modifierFlags: .command)
         address.typeText("10.0.0.158")
-
         let token = app.secureTextFields.firstMatch   // hidden (issue 47)
         token.click()
-        token.typeKey("a", modifierFlags: .command)
         token.typeText("test-token")
+        app.typeKey("w", modifierFlags: .command)
 
-        XCTAssertTrue(
-            startSync.isEnabled,
-            "With an address and a token entered, Start Sync must be available."
-        )
-    }
-
-    /// Issue 48: HTTPS can't sync until HAE's certificate is loaded, and plain HTTP says it's less safe.
-    @MainActor
-    func testHTTPSNeedsTheCertificateBeforeSyncing() throws {
-        let app = launchApp()
         app.buttons["Sync"].click()
         let startSync = app.buttons["Start Sync"]
         XCTAssertTrue(startSync.waitForExistence(timeout: 5))
-        let address = app.textFields.element(boundBy: 0)
-        address.click(); address.typeText("10.0.0.158")
-        let token = app.secureTextFields.firstMatch
-        token.click(); token.typeText("test-token")
-        XCTAssertTrue(startSync.isEnabled, "Plain HTTP (the UI-test default) needs no certificate.")
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "value BEGINSWITH %@", "HTTPS is off")).firstMatch.exists)
+        XCTAssertTrue(startSync.isEnabled, "With an address and a token entered, Start Sync must be available.")
+        XCTAssertTrue(app.staticTexts["Connects to http://10.0.0.158:9000/mcp"].exists,
+                      "The panel should say where it will connect.")
+    }
 
-        app.checkBoxes["Use HTTPS"].click()
+    /// Issue 48: HTTPS can't sync until HAE's certificate is loaded, and with HTTPS off Settings
+    /// says that's less safe. A switch, as in the welcome sheet (49).
+    @MainActor
+    func testHTTPSNeedsTheCertificateBeforeSyncing() throws {
+        let app = launchConfigured(host: "10.0.0.158")
+        _ = openSettings(app)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "value BEGINSWITH %@", "HTTPS is off")).firstMatch.exists)
+        let https = app.switches["Use HTTPS"]
+        XCTAssertTrue(https.exists, "Use HTTPS should be a switch.")
+        https.click()
         XCTAssertTrue(app.buttons["Load Certificate…"].waitForExistence(timeout: 3))
+        app.typeKey("w", modifierFlags: .command)
+
+        app.buttons["Sync"].click()
+        let startSync = app.buttons["Start Sync"]
+        XCTAssertTrue(startSync.waitForExistence(timeout: 5))
         XCTAssertFalse(startSync.isEnabled, "HTTPS without the CA can't sync.")
         XCTAssertTrue(app.staticTexts["HTTPS needs Health Auto Export's certificate."].exists)
     }
@@ -340,14 +341,9 @@ final class MaxAct2UITests: XCTestCase {
     /// Issue 17: the sync panel can import one chosen month, and won't offer one still to come.
     @MainActor
     func testTheSyncPanelImportsASpecificMonth() throws {
-        let app = launchApp()
+        let app = launchConfigured(host: "10.255.255.1")
         app.buttons["Sync"].click()
-        let address = app.textFields.element(boundBy: 0)
-        XCTAssertTrue(address.waitForExistence(timeout: 5))
-        address.click(); address.typeText("10.255.255.1")
-        let token = app.secureTextFields.firstMatch   // the token, hidden (issue 47)
-        token.click(); token.typeText("irrelevant")
-
+        XCTAssertTrue(app.popUpButtons["Import"].waitForExistence(timeout: 5))
         app.popUpButtons["Import"].click()
         app.menuItems["A specific month…"].click()
         let month = app.popUpButtons["Month"]
@@ -373,16 +369,9 @@ final class MaxAct2UITests: XCTestCase {
     /// Phase 8: a refused connection names its cause.
     @MainActor
     func testARefusedConnectionSaysTheServerIsntRunning() throws {
-        let app = launchApp()
+        let app = launchConfigured(host: "127.0.0.1")   // this Mac, where nothing listens on 9000: refused at once
         app.buttons["Sync"].click()
-
-        let address = app.textFields.element(boundBy: 0)
-        XCTAssertTrue(address.waitForExistence(timeout: 5))
-        address.click()
-        address.typeText("127.0.0.1")     // this Mac, where nothing listens on 9000: refused at once
-        let token = app.secureTextFields.firstMatch   // the token, hidden (issue 47)
-        token.click()
-        token.typeText("irrelevant")
+        XCTAssertTrue(app.buttons["Start Sync"].waitForExistence(timeout: 5))
         app.buttons["Start Sync"].click()
 
         // Phase 8: a refused connection is "the server isn't running", not a generic network error.
@@ -393,7 +382,7 @@ final class MaxAct2UITests: XCTestCase {
                        .completed, "The banner should say the server isn't running; it says '\(banner.value ?? "")'.")
     }
 
-    /// Smoke test for the Start Sync path: enter a connection, start a sync, and keep poking the
+    /// Smoke test for the Start Sync path: with a connection set up, start a sync, and keep poking the
     /// window while it runs.
     ///
     /// **This does not reproduce the "No Observable object of type AppModel found" crash** that
@@ -402,19 +391,11 @@ final class MaxAct2UITests: XCTestCase {
     /// path rather than proof the crash is gone.
     @MainActor
     func testStartingASyncDoesNotCrash() throws {
-        let app = launchApp()
+        let app = launchConfigured(host: "10.255.255.1")   // unroutable: the sync stays "running"
         app.buttons["Sync"].click()
 
-        let address = app.textFields.element(boundBy: 0)
-        XCTAssertTrue(address.waitForExistence(timeout: 5))
-        address.click()
-        address.typeText("10.255.255.1")     // unroutable: the sync stays "running"
-
-        let token = app.secureTextFields.firstMatch   // the token, hidden (issue 47)
-        token.click()
-        token.typeText("irrelevant")
-
         let startSync = app.buttons["Start Sync"]
+        XCTAssertTrue(startSync.waitForExistence(timeout: 5))
         XCTAssertTrue(startSync.isEnabled)
         startSync.click()
 
