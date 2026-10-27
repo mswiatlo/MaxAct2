@@ -1299,6 +1299,14 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-27** — **Statistics accessibility frames: investigated, left open.**
+  - A new UI test reproduces the bug every time.
+  - Three layout changes didn't fix it (no animation, vertical-only scrolling, explicit placement
+    beside the sidebar). The test now holds it as a strict expected failure.
+  - Found on the way: seeded UI tests kept ~15 window screenshots per full run, and any of them
+    could have caught notification banners. They're now kept only when a test fails.
+  - All 103 earlier test-result bundles were deleted (87 from the Xcode tools, 16 in DerivedData).
+
 - **2026-10-27** — **Issue 41 closed**, confirmed by the user. Full suite, with Do Not Disturb on: 78 passed, 3 skipped.
 
 - **2026-10-27** — **41 built: performance, measured first.** Of the audit's eight suspects, three

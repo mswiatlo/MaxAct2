@@ -27,7 +27,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 ## 1. Where things stand — 2026-10-24
 
 All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 382 in
-`MaxActCore` (`swift test`), 81 app and UI tests (`RunAllTests` — ask first, then leave the Mac
+`MaxActCore` (`swift test`), 82 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~15 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
 
@@ -66,12 +66,21 @@ exported route piece is exactly one entry of the workout's `activities` array, o
 incomplete-route note, despite explicit accessibility labels — check with VoiceOver /
 `debugDescription` which element the identifier lands on.
 
-**Statistics' accessibility frames are wrong once its inspector has opened** *(found 2026-10-27)*.
-Every element reports a frame one sidebar-width (223 pt) left of where it's drawn, and stays wrong
-after the inspector closes. VoiceOver's cursor, and any click aimed by frame, land off target. It
-made the heatmap UI test fail 4 runs in 7; the test now aims from the window (see the Xcode
-reference). The likely source is `StatisticsWithInspector`'s `HStack` inside the split view's
-detail column. Check with Accessibility Inspector, and compare against the system `.inspector`.
+**Statistics' accessibility frames are wrong** *(found 2026-10-27; investigated, left open)*. A
+two-axis `ScrollView` in the split view's detail column, under macOS 26's floating sidebar,
+reports frames that don't match where things are drawn:
+- the scroll view itself, always: x 552, width 1133, where it's drawn from 330 across about 1355;
+- its contents, once the inspector has opened: one sidebar-width (~223 pt) left, and still after
+  it closes.
+
+VoiceOver's cursor, and any click aimed by frame, land off target. None of these changed it:
+- no slide-in animation (this only moved the failure from open to closed);
+- vertical-only scrolling (the layout overflowed the window);
+- laying statistics and inspector out beside the sidebar explicitly.
+
+`testStatisticsReportWhereTheyAreDrawn` holds it as a strict expected failure, so it fails once an
+OS update fixes it. The heatmap test aims from the window meanwhile. Next, if pursued: try the
+system `.inspector` here (avoided for 8d's overflow), or report it to Apple with a small sample.
 
 **Follow-up from 23:** after a detail re-download, the inspector uses the old sketch until the
 sketches are next loaded (a Statistics visit).

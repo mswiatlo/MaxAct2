@@ -770,6 +770,45 @@ final class SeededTableUITests: XCTestCase {
     /// Before: the window's real inspector opened beside the statistics, SwiftUI pinned the
     /// statistics column at its current width, and the panes ran off both edges of the window —
     /// the inspector 40pt wide, the sidebar cut off.
+    /// Statistics is drawn right of the sidebar, so everything in it must *report* being right of
+    /// the sidebar too. Once its inspector had opened, every element reported a frame one
+    /// sidebar-width to the left, and kept doing so after it closed (found 2026-10-27). VoiceOver's
+    /// cursor and any click aimed by frame landed off target.
+    @MainActor
+    func testStatisticsReportWhereTheyAreDrawn() throws {
+        let app = launchSeeded()
+        let sidebar = app.outlines["Sidebar"]
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 15))
+        sidebar.staticTexts.containing(NSPredicate(format: "value == 'Statistics' OR label == 'Statistics'"))
+            .firstMatch.click()
+        let scroll = app.scrollViews["StatisticsScroll"]
+        XCTAssertTrue(scroll.waitForExistence(timeout: 10))
+        let inspector = app.descendants(matching: .any)["StatisticsInspector"]
+        let sidebarEdge = sidebar.frame.maxX
+
+        func check(_ when: String) {
+            Thread.sleep(forTimeInterval: 0.5)   // past the inspector's 0.2 s slide
+            XCTAssertGreaterThanOrEqual(scroll.frame.minX, sidebarEdge - 1, "The statistics \(when)")
+            let text = scroll.staticTexts.firstMatch
+            XCTAssertGreaterThanOrEqual(text.frame.minX, sidebarEdge, "\(text.label) \(when)")
+        }
+        check("before the inspector opens")
+        app.typeKey("i", modifierFlags: [.control, .command])
+        XCTAssertTrue(inspector.waitForExistence(timeout: 5))
+        // Strict: once an OS update reports these right, this fails, and the workaround in the
+        // heatmap test and this expectation can go. Three layout changes didn't fix it (2026-10-27):
+        // no slide-in animation, vertical-only scrolling, and laying the pair out beside the
+        // sidebar explicitly. See PLAN.md.
+        XCTExpectFailure("Statistics' accessibility frames are a sidebar-width off once the inspector has opened") {
+            check("with the inspector open")
+        }
+        app.typeKey("i", modifierFlags: [.control, .command])
+        XCTAssertTrue(inspector.waitForNonExistence(timeout: 5))
+        XCTExpectFailure("Statistics' accessibility frames stay a sidebar-width off after the inspector closes") {
+            check("after the inspector closes")
+        }
+    }
+
     @MainActor
     func testStatisticsShowTheInspectorOverThem() throws {
         let app = launchSeeded()
@@ -790,7 +829,7 @@ final class SeededTableUITests: XCTestCase {
         func capture(_ name: String) {
             let attachment = XCTAttachment(screenshot: window.screenshot())
             attachment.name = name
-            attachment.lifetime = .keepAlways
+            attachment.lifetime = .deleteOnSuccess
             add(attachment)
         }
 
@@ -1088,7 +1127,7 @@ final class SeededTableUITests: XCTestCase {
         XCTAssertFalse(prompt.exists, "The prompt goes once the details are set.")
         let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
         attachment.name = "15-training-load"
-        attachment.lifetime = .keepAlways
+        attachment.lifetime = .deleteOnSuccess
         add(attachment)
     }
 
@@ -1269,7 +1308,7 @@ final class SeededTableUITests: XCTestCase {
         XCTAssertTrue(caption.contains(" – "), "The caption should cover the whole span: \(caption)")
         let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
         attachment.name = "15-heart-rate-zones"
-        attachment.lifetime = .keepAlways
+        attachment.lifetime = .deleteOnSuccess
         add(attachment)
     }
 
@@ -1299,7 +1338,7 @@ final class SeededTableUITests: XCTestCase {
                       "A seeded workout with heart rate spends time in some zone.")
         let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
         attachment.name = "15-inspector-zones"
-        attachment.lifetime = .keepAlways
+        attachment.lifetime = .deleteOnSuccess
         add(attachment)
     }
 
@@ -1321,7 +1360,7 @@ final class SeededTableUITests: XCTestCase {
         print("NOTES: \(texts)")
         XCTAssertEqual(notes.count, 2, "Route and heart rate: \(texts)")
         let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
-        attachment.name = "22-repair-notes"; attachment.lifetime = .keepAlways; add(attachment)
+        attachment.name = "22-repair-notes"; attachment.lifetime = .deleteOnSuccess; add(attachment)
     }
 
     /// Issue 23: a workout whose route was done before shows how often, the fastest and its rank.
@@ -1391,7 +1430,7 @@ final class SeededTableUITests: XCTestCase {
             let all = table.staticTexts.matching(NSPredicate(format: "value == 'Sep 9, 2025'")).allElementsBoundByIndex.map { $0.frame }
             print("NOT-SCROLLED all \(all) table \(table.frame) window \(app.windows.firstMatch.frame) sidebar \(app.outlines["Sidebar"].frame)")
             let evidence = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
-            evidence.name = "not-scrolled"; evidence.lifetime = .keepAlways; add(evidence)
+            evidence.name = "not-scrolled"; evidence.lifetime = .deleteOnSuccess; add(evidence)
         }
         XCTAssertTrue(scrolledTo, "The table should scroll to the clicked ride.")
         Thread.sleep(forTimeInterval: 0.5)   // let the table settle
@@ -1402,7 +1441,7 @@ final class SeededTableUITests: XCTestCase {
             let all = table.staticTexts.matching(NSPredicate(format: "value == 'Sep 9, 2025'")).allElementsBoundByIndex.map { $0.frame }
             print("SIDEWAYS before \(dateColumnX) after \(afterX) all \(all) table \(table.frame) window \(app.windows.firstMatch.frame) sidebar \(app.outlines["Sidebar"].frame)")
             let evidence = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
-            evidence.name = "sideways-jump"; evidence.lifetime = .keepAlways; add(evidence)
+            evidence.name = "sideways-jump"; evidence.lifetime = .deleteOnSuccess; add(evidence)
         }
         XCTAssertEqual(afterX, dateColumnX, accuracy: 1, "The jump scrolled the table sideways.")
 
@@ -1427,7 +1466,7 @@ final class SeededTableUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 1)
         let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
         attachment.name = "23-same-route-tooltip"
-        attachment.lifetime = .keepAlways
+        attachment.lifetime = .deleteOnSuccess
         add(attachment)
     }
 

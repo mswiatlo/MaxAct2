@@ -305,12 +305,17 @@ menu is, and that test failed "not hittable". Ask the user to turn on **Do Not D
 full run. Don't keep failure-evidence screenshots in tests that run unattended: print frames
 instead.
 
-**Statistics' accessibility frames are off by the sidebar's width once its inspector has opened**
-*(2026-10-27)*. With the inspector open, and still after it closes, every element in Statistics
-reports a frame 223 pt left of where it's drawn. The map reported x 129.5 while drawn at ~353,
-then 328 instead of 551. A click aimed with `element.coordinate(...)` lands off target. Read
-frames before anything opens and aim from the window, as the heatmap test does. An open app
-issue; see `PLAN.md`.
+**Statistics' accessibility frames don't match where it's drawn** *(2026-10-27)*. Its two-axis
+`ScrollView` reports its own frame from x 552 when it's drawn from 330. Once the inspector has
+opened, its contents report one sidebar-width (~223 pt) left of where they are, and still after it
+closes. A click aimed with `element.coordinate(...)` then lands off target. Read frames before
+anything opens and aim from the window, as the heatmap test does.
+`testStatisticsReportWhereTheyAreDrawn` holds this as a strict expected failure. See `PLAN.md`.
+
+**Seeded UI tests keep screenshots only when they fail** (`.deleteOnSuccess`) *(2026-10-27)*. A
+window screenshot can carry notification banners with personal content, and every full run kept
+about 15 of them. `RealContentUITests` still keeps its screenshots: they only run against a
+library copy, and are reviewed and deleted with it.
 
 **A screensaver or locked screen breaks UI tests in two recognisable ways** *(2026-10-25)*: window
 screenshots fail with "Failed to look up screen N: Failed to match screen with displayID N", and launches
