@@ -26,15 +26,15 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 
 ## 1. Where things stand — 2026-10-24
 
-All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 391 in
-`MaxActCore` (`swift test`), 89 app and UI tests (`RunAllTests` — ask first, then leave the Mac
+All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 398 in
+`MaxActCore` (`swift test`), 95 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~15 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
 
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** finish 48 (the full UI run, merge), then 49 or 36
+**Next:** 49 (connection settings in Settings only) or 36 (README)
 (README). 24's live run waits for HAE's fix (21). Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
@@ -44,7 +44,7 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–20, 22, 23, 25, 26, 27, 29–32, 34, 35, 28, 37–47 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–20, 22, 23, 25, 26, 27, 29–32, 34, 35, 28, 37–48 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
 **21. Health Auto Export bug report** *(sent by the user 2026-10-14; HAE acknowledged it and asked
@@ -111,14 +111,7 @@ replaces in about 0.5 s. Unexplained. Next ideas: whether `Table` builds row vie
 (Instruments, SwiftUI template), and what tearing one down costs. It's once per session, against
 6.5 s on every growth before 44.
 
-**48. HTTPS to Health Auto Export** (S4; the user's idea) — *built on `hae-https` 2026-10-27;
-checked by the user (Test Connection over HTTPS passes; the token moved to the Keychain); waiting on
-the full UI run.* MaxAct pins HAE's own CA
-(loaded from the file HAE exports, fingerprint shown), trusts nothing else for the phone, and keeps
-plain HTTP as an option labelled less safe. The token moved from the preferences to the Keychain.
-Measured: TLS costs nothing noticeable. Diagnosis and numbers in `HISTORY.md` §2 once merged.
-
-Still open from 48:
+**Follow-ups from 48 (HTTPS to HAE):**
 - **Report to HAE:** its server certificate is valid for ten years, so Apple's TLS policy rejects it
   outright (825-day limit), even with the CA trusted. MaxAct works around it; other Apple clients
   can't.
@@ -147,7 +140,7 @@ first-run guidance) or opens Settings, and where Test Connection lives.
 **36. A visual README** *(requested 2026-10-26; after the audits)* — a `README.md` at the root that
 introduces MaxAct and shows its features: what it is (a Mac browser for Apple Health workouts
 exported by Health Auto Export, with Strava upload), screenshots of the main views (table and
-inspector, Same Route, coloured routes, statistics and the heatmap), how sync works, and what's
+inspector, Same Route, coloured routes, statistics and the heatmap), how sync works (with HTTPS: turn it on in HAE and load its CA), and what's
 needed (HAE Premium on the phone, same Wi-Fi). **Screenshots from seeded data only**, window-only
 via `XCUIElement`, never the user's library or screen: real routes would show where the user
 lives. Keep it short; `PLAN.md` and `HISTORY.md` stay the developer docs.

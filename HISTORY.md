@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed or closed known issues (1–20, 22, 23, 25–32, 34, 35, 37–47)
+## 2. Fixed or closed known issues (1–20, 22, 23, 25–32, 34, 35, 37–48)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -518,6 +518,39 @@ other in order, and ranking by time. Checked on a copy: the newest commute 92 ti
 times, 3rd. Extended the next day: pointing at an attempt shows its exact date, time and
 duration, and clicking it opens that workout and scrolls the table to it (`AppModel.reveal`). If
 a search or filter hides it, the table goes back to All Workouts. Going back is issue 32.
+
+**48. ~~HTTPS to Health Auto Export.~~ — done 2026-10-27, checked by the user (Test Connection
+over HTTPS passes; the token moved to the Keychain without a prompt).** — The user's idea, from the
+security audit's S4: plain HTTP lets anyone on the same Wi-Fi read the token and workouts, or
+pose as the phone.
+- **Pinned to HAE's CA, not to the server certificate.** HAE exports a self-signed CA, and the server
+  certificate it issues names the phone's IP, which changes between networks. The CA is loaded once
+  in Settings (`PinnedCA`, PEM or DER, `CA:TRUE` required, SHA-256 fingerprint shown) and trusted
+  only for the phone, never system-wide: its key lives on the phone.
+- **No Apple SSL policy.** It rejected HAE's ten-year server certificate even with the CA as sole
+  anchor ("exceeds maximum temporal validity period"). `GuardedSession` checks the chain with the
+  basic X.509 policy (dates and signatures) and no name check. A certificate that chains to a CA
+  private to the phone is the phone.
+- **`CA:TRUE` is read from the DER.** Evaluating a certificate as its own anchor accepted a
+  `CA:FALSE` one (measured with a throwaway certificate).
+- **An untrusted certificate is named** (`GuardedSession.UntrustedCertificate` →
+  `SyncProblem.certificateNotTrusted`), not left as a `URLError(.cancelled)` that reads as the user
+  stopping.
+- **A 10 s deadline on the handshake** (`HAEWorkoutSource.connect`). MaxAct on HTTPS against HAE
+  on HTTP hung for over 5 minutes; now 10.6 s. The reverse fails in 0.28 s. The advice for
+  "Can't reach the iPhone" now says to check HTTPS matches.
+- **Cost:** none measurable (figures in §8).
+- **Settings:** a Use HTTPS switch, Load/Replace Certificate…, and a warning while HTTPS is off. New
+  setups start on HTTPS; one already syncing stays on HTTP until changed. UI tests default to
+  HTTP (`--ui-testing-https` to change it). Reading the chosen file needs user-selected files,
+  read-only — re-enabled for this.
+- **The token is in the Keychain** (`KeychainHAETokenStore`, service `com.swiatlowski.MaxAct.hae`),
+  moved from the preferences on first launch and removed there only once saved. This reverses S11's
+  "kept as is", raised by the user: the token grants the whole Health export, and the preferences
+  are a plain file. Tests and UI tests use `InMemoryHAETokenStore`; `AppSettings` has no default
+  store.
+- **Tests:** `PinnedCATests` (core), `HAEConnectionSettingsTests` (app), a UI test that HTTPS needs
+  the certificate, all mutation-checked. `LiveTLSTests` is gated on a phone.
 
 **47. ~~Hardening.~~ — done 2026-10-27, checked by the user (no Keychain prompt under Hardened Runtime).** —
 - **The HAE token is a `SecureField`** in Settings and in the connection fields; UI tests type into
@@ -1415,6 +1448,10 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-27** — **Issue 48 closed.** Checked by the user. Full suite: 90 passed, 4 skipped,
+  1 expected failure. The HTTP warning now names its cause ("HTTPS is off, …"), after the user found
+  it read as a warning about the switch. Issue 49 opened: connection settings in Settings only.
 
 - **2026-10-27** — **48 built: HTTPS to HAE, pinned to its CA; the token in the Keychain.**
   Measured with the phone at work (192.168.77.243):
