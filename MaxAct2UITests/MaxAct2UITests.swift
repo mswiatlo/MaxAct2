@@ -282,6 +282,36 @@ final class MaxAct2UITests: XCTestCase {
                       "The panel should say where it will connect.")
     }
 
+    /// Follow-up from 49: every control in Settings and the welcome sheet carries its own name. In a
+    /// grouped form the title is drawn as separate text, and the fields exposed only their prompt
+    /// ("required") — what VoiceOver would announce. Queried by label, not identifier.
+    @MainActor
+    func testSettingsControlsAreNamed() throws {
+        let app = launchApp()
+        _ = openSettings(app)
+        func named(_ query: XCUIElementQuery, _ name: String) -> Bool {
+            query.matching(NSPredicate(format: "label == %@", name)).firstMatch.exists
+        }
+        var missing: [String] = []
+        for (query, name) in [(app.textFields, "iPhone address"), (app.secureTextFields, "Bearer token"),
+                              (app.switches, "Use HTTPS"), (app.textFields, "Client ID"),
+                              (app.secureTextFields, "Client secret"), (app.popUpButtons, "Route colour"),
+                              (app.textFields, "Resting heart rate"), (app.textFields, "Maximum heart rate"),
+                              (app.popUpButtons, "Effort curve")] where !named(query, name) {
+            missing.append(name)
+        }
+        XCTAssertEqual(missing, [], "Unnamed in Settings")
+
+        app.typeKey("w", modifierFlags: .command)
+        app.menuBars.menuBarItems["Help"].click()
+        app.menuItems["Getting Started with MaxAct…"].click()
+        let sheet = app.sheets.firstMatch
+        XCTAssertTrue(sheet.waitForExistence(timeout: 5))
+        missing = [(sheet.textFields, "iPhone address"), (sheet.secureTextFields, "Token"), (sheet.switches, "Use HTTPS")]
+            .filter { !named($0.0, $0.1) }.map(\.1)
+        XCTAssertEqual(missing, [], "Unnamed in the welcome sheet")
+    }
+
     /// Issue 48: HTTPS can't sync until HAE's certificate is loaded, and with HTTPS off Settings
     /// says that's less safe. A switch, as in the welcome sheet (49).
     @MainActor

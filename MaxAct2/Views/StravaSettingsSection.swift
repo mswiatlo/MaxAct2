@@ -26,6 +26,7 @@ struct StravaSettingsSection: View {
                     set: { model.settings.muteStravaUploads = $0 }
                 ))
                 .help("Keeps uploads off followers' home feeds — useful when uploading old workouts in bulk")
+                .accessibilityLabel("Mute uploaded activities")
                 Button("Check for Workouts Already on Strava") { model.startStravaCheck() }
                     .disabled(model.syncStatus.isRunning)
                     .help("Matches by time, so it finds workouts the watch uploaded, not only MaxAct's")
@@ -33,8 +34,11 @@ struct StravaSettingsSection: View {
                     Task { await model.disconnectStrava() }
                 }
             } else {
+                // Named explicitly: a grouped form leaves the controls themselves unnamed.
                 TextField("Client ID", text: $clientID, prompt: Text("12345"))
+                    .accessibilityLabel("Client ID")
                 SecureField("Client secret", text: $clientSecret)
+                    .accessibilityLabel("Client secret")
                 Button(isWorking ? "Connecting…" : "Connect to Strava…") {
                     Task { await connect() }
                 }

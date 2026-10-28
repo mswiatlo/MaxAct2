@@ -17,9 +17,13 @@ struct SettingsView: View {
         Form {
             Section {
                 // Not a sample address: one reads as filled in (see `WelcomeSheet`).
+                // A grouped form draws each title as separate text and leaves the control itself
+                // unnamed — VoiceOver read the address field as "required" — so name them.
                 TextField("iPhone address", text: $settings.host, prompt: Text("required"))
-                    .accessibilityIdentifier("SettingsHost")   // the form exposes only the prompt
+                    .accessibilityLabel("iPhone address")
+                    .accessibilityIdentifier("SettingsHost")
                 SecureField("Bearer token", text: $settings.token)   // hidden (issue 47)
+                    .accessibilityLabel("Bearer token")
                 HTTPSFields(settings: settings)
                 if let model {
                     ConnectionStatus(model: model)
@@ -84,6 +88,7 @@ struct SettingsView: View {
                     .tag(color)
                 }
             }
+            .accessibilityLabel("Route colour")
         } header: {
             Text("Appearance")
         } footer: {

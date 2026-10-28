@@ -14,7 +14,8 @@ struct HTTPSFields: View {
         VStack(alignment: .leading, spacing: 6) {
             Toggle("Use HTTPS", isOn: $settings.usesHTTPS)
                 .toggleStyle(.switch)
-                .accessibilityIdentifier("UseHTTPS")   // in a form, the title is a separate text
+                .accessibilityLabel("Use HTTPS")   // in a form the title is separate text
+                .accessibilityIdentifier("UseHTTPS")
                 .help("Encrypts the link to the phone. Turn it on in Health Auto Export's server settings too.")
             if settings.usesHTTPS {
                 if let ca = settings.pinnedCA {
@@ -88,12 +89,14 @@ struct ConnectionFields: View {
                 // so the host stayed empty and nothing said so.
                 TextField("", text: $settings.host, prompt: Text("required"))
                     .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("iPhone address")   // the empty title left it unnamed
             }
             HTTPSFields(settings: settings)
             LabeledContent("Token") {
                 // Hidden, like the Strava secret (issue 47): it grants your whole Health export.
                 SecureField("", text: $settings.token, prompt: Text("required"))
                     .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Token")
                     .font(.system(.body, design: .monospaced))
             }
             ConnectionStatus(model: model)

@@ -20,6 +20,7 @@ struct HeartRateProfileFields: View {
             HStack(spacing: 4) {
                 TextField("", value: unsetIsEmpty($settings.restingHeartRate), format: .number, prompt: Text("required"))
                     .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Resting heart rate")   // the title is separate text
                     .frame(width: 70)
                 Text("bpm").foregroundStyle(.secondary)
             }
@@ -28,6 +29,7 @@ struct HeartRateProfileFields: View {
             HStack(spacing: 4) {
                 TextField("", value: unsetIsEmpty($settings.maximumHeartRate), format: .number, prompt: Text("required"))
                     .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Maximum heart rate")
                     .frame(width: 70)
                 Text("bpm").foregroundStyle(.secondary)
                 // The highest a workout reached: a floor, since real maximums are rarely hit in
