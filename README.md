@@ -82,3 +82,8 @@ in Vancouver (`ShowcaseData`, launched with `--ui-testing-showcase`).
   GmbH 2014–2018, provided under COPERNICUS by the European Union and ESA; all rights reserved),
   via [Open-Meteo](https://open-meteo.com/).
 - Maps by Apple Maps.
+
+## Strava
+
+MaxAct is compatible with [Strava](https://www.strava.com) and uploads through Strava's public
+API, using your own API application. It is not developed, sponsored or endorsed by Strava.

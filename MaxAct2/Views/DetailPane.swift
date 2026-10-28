@@ -291,12 +291,15 @@ struct WorkoutDetailView: View {
             TagChips(tags: item.tags, pendingOnStrava: item.stravaFlagsPending)
 
             // The activity itself, once Strava has one — a duplicate links to the existing copy.
+            // Worded and styled as Strava's brand guidelines require of a link to its data:
+            // "View on Strava", bold or underlined or in Strava orange (#FC5200).
             if let activityID = item.stravaActivityID,
                let url = URL(string: "https://www.strava.com/activities/\(activityID)") {
                 Link(destination: url) {
-                    Label("Open on Strava", systemImage: "arrow.up.right.square")
+                    Label("View on Strava", systemImage: "arrow.up.right.square")
                 }
-                .font(.callout)
+                .font(.callout.bold())
+                .foregroundStyle(Color(red: 0xFC / 255, green: 0x52 / 255, blue: 0))
             }
             // Found rather than uploaded: say how it got there, so "synced" with no upload from
             // MaxAct doesn't look like something went missing.
