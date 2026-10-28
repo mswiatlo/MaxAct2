@@ -1462,6 +1462,12 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-27** — **36: README written, awaiting review.** Six screenshots retaken from the
+  showcase library. The seawall loop still showed 165 m of climb: measured, the smoothed route
+  itself climbed 160 m, because the cliffs outlast a 60 m window. 150 m windows give 49 m on the
+  route, 35–43 m per run. Climb counts rises of 4 m or more, like a watch's filter. Row selection
+  for the shots now clicks the distance cell; stepping row by row took minutes.
+
 - **2026-10-27** — **36 in progress: a realistic showcase library.** The first screenshots, from the
   synthetic seed, looked fake (circles, sine waves, 2025 dates). Routes now come from OpenStreetMap
   route relations. Measured on the way: on macOS, `MKMapSnapshotter.Snapshot.point(for:)` already
