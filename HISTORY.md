@@ -1462,6 +1462,15 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-27** — **36 in progress: a realistic showcase library.** The first screenshots, from the
+  synthetic seed, looked fake (circles, sine waves, 2025 dates). Routes now come from OpenStreetMap
+  route relations. Measured on the way: on macOS, `MKMapSnapshotter.Snapshot.point(for:)` already
+  has its origin at the bottom left. Flipping y mirrored every check render, and three rounds of
+  route tuning were judged on mirrored images. Raw shortest paths wandered off the seawall; routing
+  over the relations' ways fixed it. Elevations at 90 m resolution put cliff tops on the seawall (a
+  walk "climbed" 234 m); shoreline routes take the lowest height within 60 m. Paused before shots
+  1 and 3.
+
 - **2026-10-27** — **Two UI-test warnings traced to XCTest.** The priority-inversion warnings on
   two UI tests are raised in the test runner during XCUIAutomation's screen lookups, not in MaxAct
   or the test code. Left as they are, by the user's choice; noted in the Xcode reference.

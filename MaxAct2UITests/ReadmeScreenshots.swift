@@ -41,9 +41,14 @@ final class ReadmeScreenshots: XCTestCase {
         let table = app.outlines["WorkoutTable"]
         XCTAssertTrue(table.waitForExistence(timeout: 15))
         table.cells.element(boundBy: 0).click()
-        let match = app.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@ AND value ENDSWITH ' km'", distance)).firstMatch
+        // Only the inspector counts: the sidebar lists activities and the table distances too.
+        func inInspector(_ query: XCUIElementQuery) -> Bool {
+            query.allElementsBoundByIndex.contains { $0.frame.minX > table.frame.maxX - 1 }
+        }
+        let distances = app.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@ AND value ENDSWITH ' km'", distance))
+        let titles = app.staticTexts.matching(NSPredicate(format: "value == %@ OR label == %@", activity, activity))
         for _ in 0..<30 {
-            if app.staticTexts[activity].exists && match.exists { return }
+            if inInspector(titles) && inInspector(distances) { return }
             app.typeKey(.downArrow, modifierFlags: [])
             Thread.sleep(forTimeInterval: 0.4)
         }

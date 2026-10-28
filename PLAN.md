@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** 36 (README)
+**Next:** finish 36 (README; branch `readme`, see §2)
 (README). 24's live run waits for HAE's fix (21). Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
@@ -134,13 +134,28 @@ field announces only its prompt ("required"), and the Use HTTPS switch has no na
 titles are separate texts. The tests find them by identifier. Check with VoiceOver, and label them
 if it reads them badly (the Strava and heart-rate fields look the same).
 
-**36. A visual README** *(requested 2026-10-26; after the audits)* — a `README.md` at the root that
-introduces MaxAct and shows its features: what it is (a Mac browser for Apple Health workouts
-exported by Health Auto Export, with Strava upload), screenshots of the main views (table and
-inspector, Same Route, coloured routes, statistics and the heatmap), how sync works (with HTTPS: turn it on in HAE and load its CA), and what's
-needed (HAE Premium on the phone, same Wi-Fi). **Screenshots from seeded data only**, window-only
-via `XCUIElement`, never the user's library or screen: real routes would show where the user
-lives. Keep it short; `PLAN.md` and `HISTORY.md` stay the developer docs.
+**36. A visual README** *(requested 2026-10-26; in progress on branch `readme`, paused 2026-10-27)* —
+a `README.md` at the root: what MaxAct is, screenshots of the main views, how sync works (with
+HTTPS: turn it on in HAE and load its CA), and what's needed (HAE Premium, same Wi-Fi). Credit
+"© OpenStreetMap contributors" (routes) and the Copernicus DEM via Open-Meteo (elevations).
+
+Done on the branch (committed, not merged):
+- **A realistic showcase library** (`ShowcaseData`, `ShowcaseRoutes`; the user's choice over the
+  synthetic seed): 85 workouts over ten weeks, dated to yesterday, on seven real Vancouver paths
+  routed along OpenStreetMap route relations (seawall, False Creek, Kits–Jericho, English Bay,
+  Grouse Grind, Lions Gate–Dundarave, Adanac). Speed follows gradient, stops at lights, GPS jitter,
+  heart rate lags effort. `ShowcaseDataTests` (mutation-checked). Built by `Spikes/showcase/`.
+- **`--ui-testing-showcase`** seeds it with places, tags and Strava states.
+- **`ReadmeScreenshots`** (skipped unless `/tmp/maxact-readme-screenshots` exists).
+
+Next:
+1. Take shots 1 and 3 (seawall run in the inspector; Same Route). The last attempt was stopped by
+   the user: the step that walks the table to find the run was very slow. Make it faster — e.g.
+   select by searching, or give the inspector header an identifier — before rerunning.
+2. Shots 2, 4, 5 and 6 are taken (in `/tmp/shots2/`; regenerate if gone). Crop 6 above the map's
+   bottom edge, where "The University…" label shows.
+3. Write `README.md` with the images in `docs/`, review with the user, then the full UI run and
+   merge.
 
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.
