@@ -34,25 +34,20 @@ final class ReadmeScreenshots: XCTestCase {
         add(attachment)
     }
 
-    /// Steps down the table until the inspector shows `activity` covering `distance` ("10.7").
-    /// Which row that is depends on the weekday: the library is dated back from today.
+    /// Selects the newest row whose distance starts with `distance` ("10.7"), and checks the
+    /// inspector shows `activity`. By the table cell, not by stepping through rows: that searched
+    /// the whole window after every arrow press and took minutes. Which row it is depends on the
+    /// weekday — the library is dated back from today.
     @MainActor
     private func select(_ app: XCUIApplication, _ activity: String, distance: String) {
         let table = app.outlines["WorkoutTable"]
         XCTAssertTrue(table.waitForExistence(timeout: 15))
-        table.cells.element(boundBy: 0).click()
-        // Only the inspector counts: the sidebar lists activities and the table distances too.
-        func inInspector(_ query: XCUIElementQuery) -> Bool {
-            query.allElementsBoundByIndex.contains { $0.frame.minX > table.frame.maxX - 1 }
-        }
-        let distances = app.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@ AND value ENDSWITH ' km'", distance))
-        let titles = app.staticTexts.matching(NSPredicate(format: "value == %@ OR label == %@", activity, activity))
-        for _ in 0..<30 {
-            if inInspector(titles) && inInspector(distances) { return }
-            app.typeKey(.downArrow, modifierFlags: [])
-            Thread.sleep(forTimeInterval: 0.4)
-        }
-        XCTFail("No \(activity) of \(distance) km found")
+        let cell = table.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@ AND value ENDSWITH ' km'", distance)).firstMatch
+        for _ in 0..<6 where !(cell.exists && cell.isHittable) { table.scroll(byDeltaX: 0, deltaY: -300) }
+        XCTAssertTrue(cell.waitForExistence(timeout: 5), "No row of \(distance) km")
+        cell.click()
+        let title = app.staticTexts.matching(NSPredicate(format: "value == %@ OR label == %@", activity, activity))
+        XCTAssertTrue(title.element(boundBy: 0).waitForExistence(timeout: 5))
     }
 
     @MainActor

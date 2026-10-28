@@ -216,7 +216,7 @@ public enum ShowcaseData {
                 route.append(RoutePoint(
                     coordinate: here.coordinate.offset(east: jitterX, north: jitterY),
                     timestamp: start.addingTimeInterval(time),
-                    altitudeMeters: here.elevation + random.gaussian() * 0.6,
+                    altitudeMeters: here.elevation + random.gaussian() * 0.15,
                     speedMetersPerSecond: max(0, speed + random.gaussian() * 0.15),
                     courseDegrees: track.course(at: distance),
                     horizontalAccuracyMeters: 3 + abs(random.gaussian()) * 2,
@@ -293,11 +293,11 @@ public enum ShowcaseData {
         window.removeAll(keepingCapacity: true)
     }
 
-    /// Total climb and descent, ignoring wobbles under 2 m.
+    /// Total climb and descent, ignoring wobbles under 4 m, as a watch's barometer filter does.
     private static func climb(_ altitudes: [Double]) -> (Double, Double) {
         guard var anchor = altitudes.first else { return (0, 0) }
         var up = 0.0, down = 0.0
-        for altitude in altitudes where abs(altitude - anchor) >= 2 {
+        for altitude in altitudes where abs(altitude - anchor) >= 4 {
             if altitude > anchor { up += altitude - anchor } else { down += anchor - altitude }
             anchor = altitude
         }

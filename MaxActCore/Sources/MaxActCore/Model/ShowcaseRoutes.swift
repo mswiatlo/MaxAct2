@@ -23,7 +23,8 @@ enum ShowcaseRoutes {
     ///
     /// - Parameter shoreline: for paths at the foot of cliffs (the seawall). At the model's 90 m
     ///   resolution the cliff tops bleed onto the path: a flat seawall walk measured +234 m of climb.
-    ///   So take the lowest height within 60 m, then average over 100 m.
+    ///   So take the lowest height within 150 m, then average over 150 m (60 m and 100 m, tried
+    ///   first, still left the seawall loop climbing 160 m).
     static func points(_ name: String, shoreline: Bool) -> [(coordinate: Coordinate, elevation: Double)] {
         let raw = points(name)
         guard raw.count > 2 else { return raw }
@@ -36,9 +37,9 @@ enum ShowcaseRoutes {
         func window(_ i: Int, _ radius: Double) -> [Int] {
             raw.indices.filter { abs(along[$0] - along[i]) <= radius }
         }
-        let floor = shoreline ? raw.indices.map { i in window(i, 60).map { raw[$0].elevation }.min()! } : raw.map(\.elevation)
+        let floor = shoreline ? raw.indices.map { i in window(i, 150).map { raw[$0].elevation }.min()! } : raw.map(\.elevation)
         return raw.indices.map { i in
-            let near = window(i, shoreline ? 100 : 25)
+            let near = window(i, shoreline ? 150 : 25)
             return (raw[i].coordinate, near.map { floor[$0] }.reduce(0, +) / Double(near.count))
         }
     }
