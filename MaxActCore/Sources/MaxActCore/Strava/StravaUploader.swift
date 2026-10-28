@@ -25,10 +25,15 @@ public struct UploadOptions: Sendable, Equatable {
     public var flags: StravaFlags
     /// Mute it, so it stays off followers' home feeds — mostly for backfilling old workouts.
     public var muted: Bool
+    /// The zone the name's time of day is read in — where the workout happened, from
+    /// ``WorkoutTimeZone``. `nil` uses the uploader's own (the Mac's).
+    public var timeZone: TimeZone?
 
-    public init(flags: StravaFlags = StravaFlags(commute: false, trainer: false), muted: Bool = false) {
+    public init(flags: StravaFlags = StravaFlags(commute: false, trainer: false), muted: Bool = false,
+                timeZone: TimeZone? = nil) {
         self.flags = flags
         self.muted = muted
+        self.timeZone = timeZone
     }
 }
 
@@ -87,7 +92,7 @@ public struct StravaUploader: WorkoutDestination {
         let response = try await client.upload(
             file: Data(document.utf8),
             fileName: "\(InputLimits.fileComponent(workout.id)).tcx",   // never a raw id in a header (issue 45)
-            name: Self.activityName(for: workout, in: timeZone),
+            name: Self.activityName(for: workout, in: options.timeZone ?? timeZone),
             description: nil,
             externalID: workout.id,
             commute: options.flags.commute,

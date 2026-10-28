@@ -288,10 +288,20 @@ extension AppModel {
         return .finished(.uploadingToStrava, found: uploaded)
     }
 
+    /// Where the workout happened, for naming it by its local time: its own place's zone, or for an
+    /// indoor one the nearest outdoor workout's within a day; `nil` leaves the Mac's.
+    func timeZone(of item: WorkoutListItem) -> TimeZone? {
+        let others = item.placeTimeZone == nil
+            ? items.compactMap { other in other.placeTimeZone.map { (start: other.workout.start, zone: $0) } }
+            : []
+        return WorkoutTimeZone.zone(start: item.workout.start, own: item.placeTimeZone, others: others)
+    }
+
     /// Sends one workout — or, if a previous attempt got as far as an upload id, follows that
     /// instead. Re-uploading an accepted workout would only earn a "duplicate" and spend a write.
     func uploadOne(_ item: WorkoutListItem, with uploader: StravaUploader) async throws -> UploadResult {
-        let options = UploadOptions(flags: StravaFlags(tags: item.tags), muted: settings.muteStravaUploads)
+        let options = UploadOptions(flags: StravaFlags(tags: item.tags), muted: settings.muteStravaUploads,
+                                    timeZone: timeZone(of: item))
         let inFlight: [(id: String, uploadID: Int)]
         do {
             inFlight = try await store.itemsUploadingToStrava()

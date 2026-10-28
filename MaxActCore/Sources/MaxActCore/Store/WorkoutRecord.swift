@@ -78,6 +78,12 @@ public final class WorkoutRecord {
     public var placeCity: String?
     public var placeSubdivision: String?
     public var placeCountry: String?
+
+    /// The place's time zone, as MapKit gives it ("Europe/Zurich"). What a workout's local time is
+    /// read in — HAE's own UTC offset is the phone's zone, not the recording's (measured: a 07:02 run
+    /// in Switzerland came back as `22:01:58 -0700` the evening before). Defaulted, so the store
+    /// migrates without a mapping model.
+    public var placeTimeZone: String?
     public var stravaStateKey: String
     public var stravaFailureReason: String?
     public var stravaActivityID: Int?
@@ -133,6 +139,7 @@ public final class WorkoutRecord {
         placeCity = nil
         placeSubdivision = nil
         placeCountry = nil
+        placeTimeZone = nil
         placeLatitude = nil
         placeLongitude = nil
         stravaStateKey = StravaState.notUploaded.storageKey
@@ -238,6 +245,8 @@ public struct WorkoutListItem: Identifiable, Hashable, Sendable {
     public let stravaActivityID: Int?
     public let hasDetail: Bool
     public let routeColoring: RouteColoring
+    /// Where the workout started, as a zone identifier; `nil` indoors or until resolved.
+    public let placeTimeZone: String?
 
     public var id: String { workout.id }
 
@@ -251,6 +260,7 @@ public struct WorkoutListItem: Identifiable, Hashable, Sendable {
         stravaActivityID = record.stravaActivityID
         hasDetail = record.hasDetail
         routeColoring = RouteColoring(storageKey: record.routeColoringKey)
+        placeTimeZone = record.placeTimeZone
     }
 }
 

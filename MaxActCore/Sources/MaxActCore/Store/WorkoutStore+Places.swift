@@ -65,10 +65,12 @@ extension WorkoutStore {
     public func setPlace(
         label: String?,
         parts: PlaceDescription? = nil,
+        timeZone: String? = nil,
         for workoutID: String
     ) throws {
         guard let record = try record(id: workoutID) else { return }
         record.placeLabel = label
+        record.placeTimeZone = timeZone
         record.placeSearchTerms = parts.flatMap(PlaceTerms.searchTerms(for:))
         record.placeCity = parts?.city
         record.placeSubdivision = parts?.subdivision

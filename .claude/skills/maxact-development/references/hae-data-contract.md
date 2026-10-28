@@ -266,6 +266,15 @@ without printing it:
 `MAXACT_LIVE_TOKEN="$(security find-generic-password -s com.swiatlowski.MaxAct.hae -a token -w)"`.
 macOS may ask whether Terminal may read MaxAct's item.
 
+### The UTC offset is the phone's zone *(measured 2026-10-28)*
+
+`start`/`end` carry an offset, but it is the **phone's current time zone applied to that date**, not
+where the workout was recorded. A 07:02 run in Switzerland came back `2025-10-20 22:01:58 -0700`, an
+Illinois walk `-0800`, a Vancouver ride `-0800` in December. The instant is right; the local time
+isn't. `metadata` is empty, and no field names a zone (the `.hae` format's `sourceTimeZone` has no MCP
+equivalent). For local time, use the place's zone (`placeTimeZone`, from MapKit).
+`LiveTimeZoneTests` re-checks it.
+
 ### HTTPS *(measured 2026-10-27, issue 48)*
 
 Turning on HTTPS in HAE's server settings offers to **export a CA certificate**. Facts:

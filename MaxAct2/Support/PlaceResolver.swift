@@ -21,6 +21,8 @@ actor PlaceResolver {
     struct Place {
         let label: String
         let parts: PlaceDescription?
+        /// MapKit's zone for the place ("Europe/Zurich"), which Strava names are read in.
+        var timeZone: String? = nil
     }
 
     /// Snapped-cell key → resolved place. The reason a corpus costs a request per *place*.
@@ -91,7 +93,7 @@ actor PlaceResolver {
             if unresolvable.contains(key) { continue }
 
             if let hit = resolved[key] {
-                if (try? await store.setPlace(label: hit.label, parts: hit.parts,
+                if (try? await store.setPlace(label: hit.label, parts: hit.parts, timeZone: hit.timeZone,
                                               for: entry.id)) != nil { stored += 1 }
                 continue
             }
@@ -101,7 +103,7 @@ actor PlaceResolver {
             case .found(let place):
                 resolved[key] = place
                 consecutiveFailures = 0
-                if (try? await store.setPlace(label: place.label, parts: place.parts,
+                if (try? await store.setPlace(label: place.label, parts: place.parts, timeZone: place.timeZone,
                                               for: entry.id)) != nil { stored += 1 }
             case .nothingThere:
                 // Not a failure — the geocoder answered, and the answer was "nowhere named".
@@ -143,11 +145,14 @@ actor PlaceResolver {
         ) else { return .nothingThere }
 
         let representations: MKAddressRepresentations
+        let timeZone: String?
         do {
-            guard let found = try await request.mapItems.first?.addressRepresentations else {
-                return .nothingThere
-            }
+            let item = try await request.mapItems.first
+            guard let found = item?.addressRepresentations else { return .nothingThere }
             representations = found
+            // Measured: Geneva → Europe/Zurich, Chicago → America/Chicago, even a point on Lake
+            // Geneva → Europe/Paris.
+            timeZone = item?.timeZone?.identifier
         } catch {
             return .failed
         }
@@ -165,7 +170,7 @@ actor PlaceResolver {
         guard let label = label(
             context: representations.cityWithContext(.automatic)?.cleaned, parts: parts
         ) else { return .nothingThere }
-        return .found(Place(label: label, parts: parts.isEmpty ? nil : parts))
+        return .found(Place(label: label, parts: parts.isEmpty ? nil : parts, timeZone: timeZone))
     }
 
     /// MapKit's own short form when it has one — "Vancouver BC", "Geneva, Switzerland" — else the

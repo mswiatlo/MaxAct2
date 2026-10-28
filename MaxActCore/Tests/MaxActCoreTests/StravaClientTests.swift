@@ -406,6 +406,18 @@ private func client(_ transport: any StravaTransport, _ secrets: MemorySecrets) 
         #expect(!body.contains("<Position>"))
     }
 
+    /// Follow-up from 38: named in the workout's own zone, not the Mac's. 18:00Z is 11:00 in
+    /// Vancouver — "Lunch" — but 20:00 in Zurich.
+    @Test("the upload is named in the zone the options give")
+    func namedInWorkoutZone() async throws {
+        let transport = ScriptedTransport([upload(5, activity: 900)])
+        let (workout, series) = workout(.cycling)
+        _ = try await uploader(transport).send(
+            workout, series: series, options: UploadOptions(timeZone: TimeZone(identifier: "Europe/Zurich")!)) { _ in }
+        let body = String(decoding: try #require(await transport.requests.first?.body), as: UTF8.self)
+        #expect(body.contains("name=\"name\"\r\n\r\nEvening Ride\r\n"), "Zurich time, not the uploader's Vancouver")
+    }
+
     @Test("activities are named the way Strava names them, in local time")
     func names() {
         let vancouver = TimeZone(identifier: "America/Vancouver")!

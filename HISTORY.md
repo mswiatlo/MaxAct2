@@ -519,6 +519,18 @@ times, 3rd. Extended the next day: pointing at an attempt shows its exact date, 
 duration, and clicking it opens that workout and scrolls the table to it (`AppModel.reveal`). If
 a search or filter hides it, the table goes back to All Workouts. Going back is issue 32.
 
+**~~Strava names and time zones~~ (follow-up from 38) — fixed 2026-10-28.** — Activity names
+("Morning Run") were read in the Mac's zone, so a morning run abroad could become "Night Run".
+Measured with the phone (`LiveTimeZoneTests`): **HAE's UTC offset is the phone's zone applied to the
+date**, not the recording's. A Vancouver ride on 2 Dec came back `-0800` (right), but a 07:02 run in
+Switzerland came back `2025-10-20 22:01:58 -0700` and an Illinois walk `-0800`. HAE's metadata is
+empty and no field names a zone. So the zone comes from the place: MapKit's reverse geocode gives
+`MKMapItem.timeZone` (Geneva → Europe/Zurich, Chicago → America/Chicago, measured), now stored as
+`placeTimeZone`. `PlaceTerms.version` 3 re-resolves existing places once to fill it. Uploads name by
+it (`UploadOptions.timeZone`). An indoor workout borrows the nearest outdoor one's zone within a day
+(`WorkoutTimeZone`), else the Mac's. Tests: `WorkoutTimeZoneTests`, an uploader test and a resolver
+test, all mutation-checked.
+
 **~~Statistics' accessibility frames~~ (found 2026-10-27) — fixed 2026-10-28.** — Statistics
 reported frames where nothing was drawn: once the inspector had opened, its contents a sidebar-width
 left, and still after it closed. VoiceOver's cursor and any click aimed by frame missed. Two causes,
@@ -1492,6 +1504,9 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-28** — **Strava names in local time.** HAE's offset is the phone's zone (measured on
+  three workouts); the zone now comes from the place via MapKit.
 
 - **2026-10-28** — **Accessibility fixes merged.** Full suite: 94 passed, 7 skipped (README shots and
   real-content tests), no expected failures left. That run also executed the deleted

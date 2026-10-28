@@ -80,12 +80,6 @@ count), and check the oldest workout and the count.
 
 **From the code-quality audit (27, 2026-10-26; agreed with the user, in this order):**
 
-**Follow-up from 38 — Strava names and time zones.** Activity names use the Mac's time zone, so a
-morning run abroad can be named "Night Run". The fix depends on what HAE's UTC offset means, which
-is unmeasured: the recording's own zone, or the phone's zone at export. (The fixtures can't tell:
-`make_fixture.py` moves dates but keeps the offset.) Next time the phone is connected, fetch a
-winter workout. If it reads `-0800`, the offset is the recording's: store it and name by it.
-
 **From the security audit (28, 2026-10-27; agreed with the user, in this order):**
 
 **Follow-up from 44 — the first table rebuild costs ~2 s.** Replacing the table that has been on

@@ -41,7 +41,10 @@ public enum PlaceTerms {
     /// `2` (2026-10-10): places also store their city, subdivision and country, so a place MapKit
     /// gave no subdivision can borrow one (``lendableSubdivisions(from:)``). Rows from version 1
     /// have no parts to lend or borrow with, so they re-resolve once.
-    public static let version = 2
+    ///
+    /// `3` (2026-10-28): places also store their time zone, which Strava names are read in. Rows
+    /// from version 2 have none, so they re-resolve once.
+    public static let version = 3
 
     /// Case- and diacritic-folded, so "geneve" finds "Genève" and "bc" finds "BC".
     ///

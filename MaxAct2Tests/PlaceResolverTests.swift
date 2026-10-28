@@ -32,6 +32,20 @@ import Testing
         return (store, folder)
     }
 
+    /// Follow-up from 38: the zone MapKit gives a place is kept, for naming uploads by local time.
+    @Test func aPlacesTimeZoneIsStored() async throws {
+        let (store, folder) = try await Self.store(newest: 2, older: 1)   // W0 and W1 share a cell
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let resolver = PlaceResolver(store: store, requestInterval: .zero) { coordinate in
+            .found(.init(label: "Somewhere", parts: nil,
+                         timeZone: coordinate.latitude > 49.2 ? "America/Vancouver" : "Europe/Zurich"))
+        }
+        await resolver.resolvePending()
+        #expect(try await store.item(id: "W0")?.placeTimeZone == "America/Vancouver")
+        #expect(try await store.item(id: "W1")?.placeTimeZone == "America/Vancouver", "a cached cell keeps its zone too")
+        #expect(try await store.item(id: "W2")?.placeTimeZone == "Europe/Zurich")
+    }
+
     @Test func unnameableNewestStartsDontHideOlderWorkouts() async throws {
         let (store, folder) = try await Self.store(newest: 12, older: 3)
         defer { try? FileManager.default.removeItem(at: folder) }
