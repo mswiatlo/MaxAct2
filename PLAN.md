@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** the user's review of the README (36, branch `readme`), then merge
+**Next:** nothing scheduled; open items below
 (README). 24's live run waits for HAE's fix (21). Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
@@ -44,7 +44,7 @@ yet.
 ## 2. Open issues and requests
 
 Numbered independently of the phases: "known issue 8" (summary stats) is not "Phase 8" (polish).
-Fixed or closed issues — 1–20, 22, 23, 25, 26, 27, 29–32, 34, 35, 28, 37–49 — have their diagnoses in `HISTORY.md` §2; what stays open
+Fixed or closed issues — 1–20, 22, 23, 25, 26, 27, 29–32, 34, 35, 28, 36–49 — have their diagnoses in `HISTORY.md` §2; what stays open
 from them is under "Known limitations" below.
 
 **21. Health Auto Export bug report** *(sent by the user 2026-10-14; HAE acknowledged it and asked
@@ -133,28 +133,6 @@ Checked and fine in 28:
 field announces only its prompt ("required"), and the Use HTTPS switch has no name of its own; their
 titles are separate texts. The tests find them by identifier. Check with VoiceOver, and label them
 if it reads them badly (the Strava and heart-rate fields look the same).
-
-**36. A visual README** *(requested 2026-10-26; built on branch `readme` 2026-10-27, awaiting review)* —
-a `README.md` at the root: what MaxAct is, screenshots of the main views, how sync works (with
-HTTPS: turn it on in HAE and load its CA), and what's needed (HAE Premium, same Wi-Fi). Credit
-"© OpenStreetMap contributors" (routes) and the Copernicus DEM via Open-Meteo (elevations).
-
-Done on the branch (committed, not merged):
-- **A realistic showcase library** (`ShowcaseData`, `ShowcaseRoutes`; the user's choice over the
-  synthetic seed): 85 workouts over ten weeks, dated to yesterday, on seven real Vancouver paths
-  routed along OpenStreetMap route relations (seawall, False Creek, Kits–Jericho, English Bay,
-  Grouse Grind, Lions Gate–Dundarave, Adanac). Speed follows gradient, stops at lights, GPS jitter,
-  heart rate lags effort. `ShowcaseDataTests` (mutation-checked). Built by `Spikes/showcase/`.
-- **`--ui-testing-showcase`** seeds it with places, tags and Strava states.
-- **`ReadmeScreenshots`** (skipped unless `/tmp/maxact-readme-screenshots` exists).
-
-**Ready for the user's review** (2026-10-27): `README.md` and its six images in `docs/` are
-committed on the branch, from the showcase library. Full suite green (91 passed, 7 skipped — the
-screenshot and real-content tests — 1 expected failure); `swift test` 403 passed. To decide:
-- the routes map still shows the top half of "The University…" at its bottom edge. It sits level
-  with the Apple Maps logo, which must stay, so cropping can't remove one without the other;
-- the wording and choice of images.
-Then merge `readme` to `main`.
 
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.

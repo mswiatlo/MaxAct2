@@ -90,7 +90,7 @@ passed as `--ui-testing-seed=40`.
 
 ---
 
-## 2. Fixed or closed known issues (1–20, 22, 23, 25–32, 34, 35, 37–49)
+## 2. Fixed or closed known issues (1–20, 22, 23, 25–32, 34–49)
 
 **1. ~~Average speed and pace include time spent stopped.~~ — done 2026-09-21.**
 
@@ -518,6 +518,18 @@ other in order, and ranking by time. Checked on a copy: the newest commute 92 ti
 times, 3rd. Extended the next day: pointing at an attempt shows its exact date, time and
 duration, and clicking it opens that workout and scrolls the table to it (`AppModel.reveal`). If
 a search or filter hides it, the table goes back to All Workouts. Going back is issue 32.
+
+**36. ~~A visual README.~~ — done 2026-10-27, approved by the user.** — `README.md` with six
+screenshots in `docs/`, taken from a realistic showcase library, never a real one:
+- **`ShowcaseData` / `ShowcaseRoutes`:** 85 workouts over ten weeks, dated to yesterday, on seven
+  Vancouver paths routed along OpenStreetMap route relations, with elevations from the Copernicus
+  DEM via Open-Meteo. Built by `Spikes/showcase/`. Seeded with `--ui-testing-showcase`.
+- **`ReadmeScreenshots`:** takes the shots; skipped unless `/tmp/maxact-readme-screenshots` exists.
+- **Credits:** OpenStreetMap (ODbL), Copernicus DEM, Apple Maps, and Strava, worded per Strava's
+  brand guidelines. Those guidelines also require links to Strava data to read "View on Strava",
+  bold or in Strava orange, so the inspector's "Open on Strava" changed to that.
+- **The routes map shows half of "The University…"** at its bottom edge. It sits level with the
+  Apple Maps logo, which must stay, so no crop removes it. Accepted with the README.
 
 **49. ~~Connection settings live in Settings only.~~ — done 2026-10-27, checked by the user.** —
 Raised by the user after 48: the connection was edited in three places, and the same switch was a
@@ -1461,6 +1473,11 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-27** — **Issue 36 closed.** README approved; Strava credited. Per Strava's brand
+  guidelines, the inspector's link now reads "View on Strava" in bold Strava orange; shots 1–3 retaken.
+  The full suite ran before that one-label change, and the two screenshot runs after it exercised
+  the inspector.
 
 - **2026-10-27** — **36: README written, awaiting review.** Six screenshots retaken from the
   showcase library. The seawall loop still showed 165 m of climb: measured, the smoothed route
