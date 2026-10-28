@@ -1493,6 +1493,15 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-28** — **The inspector over Statistics was slow on a real library.** Measured inside the
+  app (main thread busy after ⌃⌘I, on a copy of the user's library): 0.35–0.77 s to open and
+  1.0–1.46 s to close, against 0.03–0.07 s beside the list. Every toggle rebuilt all of Statistics,
+  twice: SwiftUI can't compare `StatisticsView`'s `@AppStorage`, so it re-ran `body`. Now
+  `Equatable` (same model) with `.equatable()`: 0.2 s to open, 0.85 s to close. What remains on close
+  is the two-axis scroll view settling over ~5 layout passes. Vertical-only scrolling made it 0.03 s
+  but brought back 8d's overflow. Ruled out: the routes map, the grid's tooltips (0.14 s), the
+  slide-out, the horizontal scroller.
+
 - **2026-10-28** — **Two accessibility bugs fixed:** Settings' unnamed controls, and Statistics'
   misplaced frames (the scroll view extended under the sidebar, and frames froze mid-animation).
 

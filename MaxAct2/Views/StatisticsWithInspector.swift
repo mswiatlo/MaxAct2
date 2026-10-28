@@ -22,6 +22,7 @@ struct StatisticsWithInspector: View {
     var body: some View {
         HStack(spacing: 0) {
             StatisticsView(model: model)
+                .equatable()
                 // Reflowed at once, not animated: the inspector still slides in, but the
                 // statistics' accessibility frames froze partway through an animated resize and
                 // never caught up — off by a different 11–76 pt each run (measured 2026-10-28).
@@ -61,4 +62,13 @@ struct StatisticsWithInspector: View {
                     )
             }
     }
+}
+
+/// Equal for the same model: the statistics depend on nothing else their parent passes in. Without
+/// this, every toggle of the inspector rebuilt them from scratch — twice — because SwiftUI can't
+/// compare the view's `@AppStorage` properties, so it re-ran `body` to be safe: ~0.6 s a pass on a
+/// real library (measured 2026-10-28). Their own state, settings and the model's changes still
+/// update them as before.
+extension StatisticsView: Equatable {
+    static func == (lhs: StatisticsView, rhs: StatisticsView) -> Bool { lhs.model === rhs.model }
 }
