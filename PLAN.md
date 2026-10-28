@@ -34,8 +34,8 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next:** nothing scheduled; open items below
-(README). 24's live run waits for HAE's fix (21). Issue 7 (TrainingPeaks) starts with
+**Next (paused 2026-10-28):** check HTTPS at home (§ below), then the user tags **1.0.0**. After
+that, work pauses until HAE ships the fix for 21; 24's live run waits on it. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
 **Still to confirm live:** the exact duplicate-error wording — no real duplicate has been rejected
