@@ -1505,6 +1505,11 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-28** — **Stale `InspectorTimingProbe` cleared.** Clean Build Folder didn't remove it
+  from Xcode's test index. Quitting Xcode and deleting `DerivedData/MaxAct2-*/Index.noindex` did:
+  `GetTestList` now shows 101 tests and none from the probe. The test build has zero warnings. The
+  Xcode conventions reference now says so.
+
 - **2026-10-28** — **Strava time zones merged.** Checked on the real library: all 481 located
   workouts re-resolved with a zone (BC → America/Vancouver, Switzerland → Europe/Zurich, Illinois →
   America/Chicago, …). 14 trip workouts change name (the Swiss 07:01 run: "Night Run" →

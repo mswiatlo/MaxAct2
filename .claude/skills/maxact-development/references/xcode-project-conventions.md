@@ -255,7 +255,9 @@ the value is stray — same symptom, hit again 2026-10-14. `launchMaxAct(default
 
 A UI-test file deleted with `rm` (`InspectorTimingProbe`, 2026-10-28) stayed in Xcode's test index
 under its absolute path: `GetTestList` kept listing it, and `RunAllTests` kept reporting it passed,
-though no built bundle contained it. Use `XcodeRM` for test files, or clean the build folder after.
+though no built bundle contained it. Use `XcodeRM` for test files. Clean Build Folder does **not**
+clear it. What did: quit Xcode, delete `DerivedData/MaxAct2-*/Index.noindex`, reopen. The agent
+can't do that itself, since it runs inside Xcode, so ask the user.
 
 ## UI tests must be launched with `--ui-testing`
 
