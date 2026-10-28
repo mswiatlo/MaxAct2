@@ -394,8 +394,14 @@ Two things that cost a debugging round each, both found by printing `app.debugDe
 - **In a grouped `Form`, a field's title is a separate static text** *(measured, issue 49)*.
   `TextField("iPhone address", …, prompt: Text("required"))` exposed only
   `placeholderValue: 'required'`, and a `.switch` toggle a bare `Switch` with no label, so
-  `app.textFields["iPhone address"]` and `app.switches["Use HTTPS"]` match nothing. Give them an
-  `.accessibilityIdentifier` (`SettingsHost`, `UseHTTPS`).
+  `app.textFields["iPhone address"]` and `app.switches["Use HTTPS"]` match nothing — and VoiceOver
+  has no name for them either. Give each an explicit `.accessibilityLabel` (fixed 2026-10-28;
+  `testSettingsControlsAreNamed`).
+- **A scroll view touching the floating sidebar reports frames where nothing is drawn** *(macOS 26,
+  measured 2026-10-28)*. The system extends it under the sidebar, insetting its content, and its
+  accessibility frames are off by the sidebar's width. `.clipped()` doesn't stop it; keeping the
+  scroll view 1 pt clear of the sidebar (`.padding(.leading, 1)`) does. Separately, frames inside a
+  SwiftUI scroll view can freeze partway through an animated resize: don't animate its layout.
 
 When a query doesn't match, dump the hierarchy instead of guessing — a throwaway test that prints
 `app.debugDescription` answers it in one run.

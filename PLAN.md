@@ -66,22 +66,6 @@ exported route piece is exactly one entry of the workout's `activities` array, o
 incomplete-route note, despite explicit accessibility labels — check with VoiceOver /
 `debugDescription` which element the identifier lands on.
 
-**Statistics' accessibility frames are wrong** *(found 2026-10-27; investigated, left open)*. A
-two-axis `ScrollView` in the split view's detail column, under macOS 26's floating sidebar,
-reports frames that don't match where things are drawn:
-- the scroll view itself, always: x 552, width 1133, where it's drawn from 330 across about 1355;
-- its contents, once the inspector has opened: one sidebar-width (~223 pt) left, and still after
-  it closes.
-
-VoiceOver's cursor, and any click aimed by frame, land off target. None of these changed it:
-- no slide-in animation (this only moved the failure from open to closed);
-- vertical-only scrolling (the layout overflowed the window);
-- laying statistics and inspector out beside the sidebar explicitly.
-
-`testStatisticsReportWhereTheyAreDrawn` holds it as a strict expected failure, so it fails once an
-OS update fixes it. The heatmap test aims from the window meanwhile. Next, if pursued: try the
-system `.inspector` here (avoided for 8d's overflow), or report it to Apple with a small sample.
-
 **Follow-up from 23:** after a detail re-download, the inspector uses the old sketch until the
 sketches are next loaded (a Statistics visit).
 
@@ -128,11 +112,6 @@ Checked and fine in 28:
 - system TLS for Strava;
 - TCX escaping;
 - health data never leaves the sandbox container.
-
-**Follow-up from 49 — Settings' fields have no accessible names.** In the grouped form the address
-field announces only its prompt ("required"), and the Use HTTPS switch has no name of its own; their
-titles are separate texts. The tests find them by identifier. Check with VoiceOver, and label them
-if it reads them badly (the Strava and heart-rate fields look the same).
 
 **Optional, not built:** writing Mac-only tags into the Strava description (`#withkid`) behind a
 setting.

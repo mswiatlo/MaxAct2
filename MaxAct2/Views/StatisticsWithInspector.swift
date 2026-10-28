@@ -22,6 +22,10 @@ struct StatisticsWithInspector: View {
     var body: some View {
         HStack(spacing: 0) {
             StatisticsView(model: model)
+                // Reflowed at once, not animated: the inspector still slides in, but the
+                // statistics' accessibility frames froze partway through an animated resize and
+                // never caught up — off by a different 11–76 pt each run (measured 2026-10-28).
+                .transaction { $0.animation = nil }
             if model.showsDetail {
                 handle
                 DetailPane(model: model)

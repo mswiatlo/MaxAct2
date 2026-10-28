@@ -297,7 +297,8 @@ final class SeededTableUITests: XCTestCase {
     /// Statistics is drawn right of the sidebar, so everything in it must *report* being right of
     /// the sidebar too. Once its inspector had opened, every element reported a frame one
     /// sidebar-width to the left, and kept doing so after it closed (found 2026-10-27). VoiceOver's
-    /// cursor and any click aimed by frame landed off target.
+    /// cursor and any click aimed by frame landed off target. Cause: the system extended the scroll
+    /// view under the floating sidebar; fixed by keeping it a point clear (2026-10-28).
     @MainActor
     func testStatisticsReportWhereTheyAreDrawn() throws {
         let app = launchSeeded()
@@ -319,18 +320,10 @@ final class SeededTableUITests: XCTestCase {
         check("before the inspector opens")
         app.typeKey("i", modifierFlags: [.control, .command])
         XCTAssertTrue(inspector.waitForExistence(timeout: 5))
-        // Strict: once an OS update reports these right, this fails, and the workaround in the
-        // heatmap test and this expectation can go. Three layout changes didn't fix it (2026-10-27):
-        // no slide-in animation, vertical-only scrolling, and laying the pair out beside the
-        // sidebar explicitly. See PLAN.md.
-        XCTExpectFailure("Statistics' accessibility frames are a sidebar-width off once the inspector has opened") {
-            check("with the inspector open")
-        }
+        check("with the inspector open")
         app.typeKey("i", modifierFlags: [.control, .command])
         XCTAssertTrue(inspector.waitForNonExistence(timeout: 5))
-        XCTExpectFailure("Statistics' accessibility frames stay a sidebar-width off after the inspector closes") {
-            check("after the inspector closes")
-        }
+        check("after the inspector closes")
     }
 
     @MainActor
@@ -733,13 +726,11 @@ final class SeededTableUITests: XCTestCase {
     /// lists them. The seed's routes are loops of different sizes around one point, and its two
     /// identical rides share a loop, so a sweep along the centre line meets both cases.
     ///
-    /// Aimed by window position, from the map's frame read before anything opens. Once the
-    /// inspector has opened in Statistics, every element there reports an accessibility frame
-    /// 223 pt left of where it's drawn — the sidebar's width — even after it closes again
-    /// (measured 2026-10-27: the map reported at x 129.5 while drawn at ~353, and at 328 rather than
-    /// 551 once the inspector had closed). Aimed by the map's own frame, the sweep clicked
-    /// off the map after its first hit and failed 4 runs in 7. The inspector is hidden (⌃⌘I) after
-    /// each hit, so the drawn layout is the one the frame was read from.
+    /// Aimed by window position, from the map's frame read before anything opens. Written when the
+    /// statistics' accessibility frames were a sidebar-width off once the inspector had opened
+    /// (fixed 2026-10-28, see `testStatisticsReportWhereTheyAreDrawn`); aiming by the map's own
+    /// frame then failed 4 runs in 7. Kept: it doesn't depend on frames staying right. The
+    /// inspector is hidden (⌃⌘I) after each hit, so the layout is the one the frame was read from.
     @MainActor
     func testClickingTheHeatmapOpensAWorkoutOrOffersAChoice() throws {
         let app = launchSeeded()

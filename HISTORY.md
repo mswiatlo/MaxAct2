@@ -519,6 +519,25 @@ times, 3rd. Extended the next day: pointing at an attempt shows its exact date, 
 duration, and clicking it opens that workout and scrolls the table to it (`AppModel.reveal`). If
 a search or filter hides it, the table goes back to All Workouts. Going back is issue 32.
 
+**~~Statistics' accessibility frames~~ (found 2026-10-27) — fixed 2026-10-28.** — Statistics
+reported frames where nothing was drawn: once the inspector had opened, its contents a sidebar-width
+left, and still after it closed. VoiceOver's cursor and any click aimed by frame missed. Two causes,
+measured with a probe test and window shots:
+- **The system extended the scroll view under the floating sidebar.** A scroll view touching the
+  sidebar is moved under it with its content inset by the sidebar's width (documented for
+  horizontal scrolling), and accessibility doesn't follow: the scroll view reported x 551 where it
+  started at 329. `.clipped()`, which the docs suggest, didn't help; a 1 pt leading padding did.
+- **Frames froze mid-animation.** With that fixed, the open state was off by a different 11–76 pt
+  each run, unchanged 3 s later. The statistics now reflow at once (`.transaction` drops the
+  animation); the inspector still slides in.
+`testStatisticsReportWhereTheyAreDrawn` is a normal test again, not an expected failure; it failed
+with each half of the fix alone.
+
+**~~Settings' controls had no accessible names~~ (follow-up from 49) — fixed 2026-10-28.** — In a
+grouped form a control's title is separate text and the control itself unnamed: the address field
+read as "required". Explicit `accessibilityLabel`s on every Settings and welcome-sheet control.
+`testSettingsControlsAreNamed` failed 8 of 9 before, passes after, and fails with one label removed.
+
 **36. ~~A visual README.~~ — done 2026-10-27, approved by the user.** — `README.md` with six
 screenshots in `docs/`, taken from a realistic showcase library, never a real one:
 - **`ShowcaseData` / `ShowcaseRoutes`:** 85 workouts over ten weeks, dated to yesterday, on seven
@@ -1473,6 +1492,9 @@ and remove over a selection; and that a workout with no flag changes issues no `
 ---
 
 ## 8. Change log
+
+- **2026-10-28** — **Two accessibility bugs fixed:** Settings' unnamed controls, and Statistics'
+  misplaced frames (the scroll view extended under the sidebar, and frames froze mid-animation).
 
 - **2026-10-27** — **Issue 36 closed.** README approved; Strava credited. Per Strava's brand
   guidelines, the inspector's link now reads "View on Strava" in bold Strava orange; shots 1–3 retaken.

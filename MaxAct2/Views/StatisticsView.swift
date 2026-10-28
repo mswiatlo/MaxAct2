@@ -73,6 +73,13 @@ struct StatisticsView: View {
             .frame(maxWidth: 960, alignment: .leading)
             .containerRelativeFrame(.horizontal) { length, _ in max(length, Self.minimumWidth) }
         }
+        // A point clear of the sidebar, so the system doesn't extend this scroll view under it.
+        // A scroll view that touches the floating sidebar is moved under it with its content
+        // inset by the sidebar's width, and its accessibility frames don't follow: the scroll view
+        // reported starting 222 pt right of where it was drawn, and once the inspector had opened
+        // everything in it reported 222 pt left — so VoiceOver's cursor and any click aimed by
+        // frame missed (measured 2026-10-28). `.clipped()`, which the docs suggest, didn't help.
+        .padding(.leading, 1)
         // An explicit *ideal* width, so the split view sizes this pane from the space it's given
         // rather than from what the content would like. The content's ideal is its widest
         // single-line layout — the totals footnote alone wants 1,114pt, measured — and the split
