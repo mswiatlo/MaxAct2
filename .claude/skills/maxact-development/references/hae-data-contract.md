@@ -281,6 +281,11 @@ Turning on HTTPS in HAE's server settings offers to **export a CA certificate**.
 - The CA is self-signed: `CN=Health Auto Export MCP TLS CA`, `CA:TRUE`, valid ten years. The server
   certificate it issues names the phone's **IP** in its SAN (`IP:192.168.77.243`). It is also valid
   ten years, uses TLS 1.3, and is on the same port, 9000.
+- **HAE re-issues the server certificate for the current address; the CA stays the same.** Measured
+  2026-10-28: at home the leaf was new (`IP:10.0.0.158`, issued at server start), signed by the
+  same CA (SHA-256 `AB:6A:…:23:96`). MaxAct synced with the CA loaded on the work network. So
+  changing networks or restarting the server needs no new CA. Whether an HAE *update* keeps it
+  is unmeasured.
 - **Apple's SSL policy rejects the server certificate even with the CA as sole anchor:** "exceeds
   maximum temporal validity period" (825 days). `GuardedSession` therefore evaluates with
   `SecPolicyCreateBasicX509` (chain to the pinned CA, dates, signatures) and no name check.

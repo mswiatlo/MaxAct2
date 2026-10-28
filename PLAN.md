@@ -34,7 +34,7 @@ run makes no Keychain calls.
 Phases 0–7 are done and verified live. Since then: issues 6 and 8–14 fixed or closed (8: statistics); View ▸ Hide
 Sidebar (⌃⌘S); ⌥⌘U for the Strava check; MaxAct is one window (no tabs, no New Window).
 
-**Next (paused 2026-10-28):** check HTTPS at home (§ below), then the user tags **1.0.0**. After
+**Next (paused 2026-10-28):** HTTPS at home checked; the user tags **1.0.0**. After
 that, work pauses until HAE ships the fix for 21; 24's live run waits on it. Issue 7 (TrainingPeaks) starts with
 whether its API is open to us at all.
 
@@ -93,11 +93,9 @@ replaces in about 0.5 s. Unexplained. Next ideas: whether `Table` builds row vie
 - **Report to HAE:** its server certificate is valid for ten years, so Apple's TLS policy rejects it
   outright (825-day limit), even with the CA trusted. MaxAct works around it; other Apple clients
   can't.
-- **Check HTTPS at home.** The server certificate names `IP:192.168.77.243`, the work address.
-  MaxAct doesn't check the name (see the decision), so it should connect on 10.0.0.x all the same.
-  Confirm it does.
-- **Is the CA stable across HAE restarts and updates?** If HAE makes a new one, every sync fails with
-  "The iPhone's certificate isn't the one MaxAct trusts" until the new CA is loaded.
+- **Is the CA stable across HAE updates?** It survives network changes and server restarts
+  (measured; see the HAE data contract). If an update makes a new one, every sync fails with "The
+  iPhone's certificate isn't the one MaxAct trusts" until the new CA is loaded.
 
 Checked and fine in 28:
 - the OAuth `state` and scope checks;

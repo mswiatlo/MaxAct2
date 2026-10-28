@@ -1505,6 +1505,11 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-28** — **HTTPS checked at home** (10.0.0.158). HAE had issued a new server certificate
+  naming the home IP, signed by the same CA. `LiveTLSTests` passed with the CA saved at work:
+  handshake 0.13 s, and the phone is refused without the pin. The CA survives network changes and
+  server restarts. Whether it survives an HAE update is still open.
+
 - **2026-10-28** — **Stale `InspectorTimingProbe` cleared.** Clean Build Folder didn't remove it
   from Xcode's test index. Quitting Xcode and deleting `DerivedData/MaxAct2-*/Index.noindex` did:
   `GetTestList` now shows 101 tests and none from the probe. The test build has zero warnings. The
