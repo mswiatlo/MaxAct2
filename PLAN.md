@@ -4,7 +4,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 (HAE), with batch upload to Strava.
 
 **Status:** Phases 0–8 complete and checked by the user. Next: see §1.
-**Last updated:** 2026-10-27.
+**Last updated:** 2026-10-28.
 
 > **Working on this project?** Read `.claude/skills/maxact-development/` first: the HAE data
 > contract, the Xcode tooling limits, and the Strava API facts. **`HISTORY.md`** holds how we got
@@ -27,7 +27,7 @@ A fast, native macOS 26 app for browsing Apple Health workouts exported by **Hea
 ## 1. Where things stand — 2026-10-24
 
 All work is on `main`; no open branches. Builds clean with **zero warnings**. Tests: 403 in
-`MaxActCore` (`swift test`), 99 app and UI tests (`RunAllTests` — ask first, then leave the Mac
+`MaxActCore` (`swift test`), 100 app and UI tests (`RunAllTests` — ask first, then leave the Mac
 alone for ~15 minutes; the two real-content tests skip unless a library copy is in place). A full
 run makes no Keychain calls.
 

@@ -1493,6 +1493,11 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-28** — **Accessibility fixes merged.** Full suite: 94 passed, 7 skipped (README shots and
+  real-content tests), no expected failures left. That run also executed the deleted
+  `InspectorTimingProbe` from a stale test bundle; the app was current, since the app-side probe's log
+  never reappeared. `PlaceResolverTests` now deletes its series folder; 26 leftovers removed.
+
 - **2026-10-28** — **The inspector over Statistics was slow on a real library.** Measured inside the
   app (main thread busy after ⌃⌘I, on a copy of the user's library): 0.35–0.77 s to open and
   1.0–1.46 s to close, against 0.03–0.07 s beside the list. Every toggle rebuilt all of Statistics,
