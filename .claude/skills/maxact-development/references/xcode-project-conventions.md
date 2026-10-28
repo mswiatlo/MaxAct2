@@ -251,6 +251,12 @@ throwaway settings domain) must come *before* `--ui-testing`, or `-ui-testing` s
 the value is stray — same symptom, hit again 2026-10-14. `launchMaxAct(defaults:)` places them. To diagnose this class of thing, probe whether `WindowGroup`'s content closure runs at all
 — and write the probe to `NSTemporaryDirectory()`, because the sandbox blocks `/tmp`.
 
+## Delete test files through Xcode, not the shell
+
+A UI-test file deleted with `rm` (`InspectorTimingProbe`, 2026-10-28) stayed in Xcode's test index
+under its absolute path: `GetTestList` kept listing it, and `RunAllTests` kept reporting it passed,
+though no built bundle contained it. Use `XcodeRM` for test files, or clean the build folder after.
+
 ## UI tests must be launched with `--ui-testing`
 
 `MaxAct2UITests` drives the real app, which means it also drives the real *data*. A test that typed

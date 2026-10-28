@@ -1505,6 +1505,13 @@ and remove over a selection; and that a workout with no flag changes issues no `
 
 ## 8. Change log
 
+- **2026-10-28** — **Strava time zones merged.** Checked on the real library: all 481 located
+  workouts re-resolved with a zone (BC → America/Vancouver, Switzerland → Europe/Zurich, Illinois →
+  America/Chicago, …). 14 trip workouts change name (the Swiss 07:01 run: "Night Run" →
+  "Morning Run"). No indoor workout sits within a day of a trip. Full suite: 95 passed, 7 skipped.
+  Xcode's test index still lists the deleted `InspectorTimingProbe` (removed outside Xcode); no binary
+  contains it. A Clean Build Folder or re-index clears it.
+
 - **2026-10-28** — **Strava names in local time.** HAE's offset is the phone's zone (measured on
   three workouts); the zone now comes from the place via MapKit.
 
