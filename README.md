@@ -3,8 +3,8 @@
 A fast, native Mac app for browsing your Apple Health workouts — routes, heart rate, pace and
 elevation — with your whole history on one screen, and batch upload to Strava.
 
-MaxAct reads workouts from your iPhone through the Health Auto Export app, over your own Wi-Fi. Nothing goes through a
-server: your workouts stay on your Mac.
+MaxAct reads workouts from your iPhone through the Health Auto Export app, over your own Wi-Fi.
+Nothing goes through a server: your workouts stay on your Mac.
 
 ![The workout table with the inspector open on a run around the Stanley Park seawall](docs/1-workouts.png)
 
