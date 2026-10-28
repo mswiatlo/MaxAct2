@@ -10,10 +10,11 @@ import Testing
     static let town = Coordinate(latitude: 49.10, longitude: -122.60)
 
     /// One workout a day, newest first: `newest` starting in the park, then `older` in the town.
-    static func store(newest: Int, older: Int) async throws -> WorkoutStore {
+    /// Also returns the series folder, for the caller to delete: every run used to leave one behind.
+    static func store(newest: Int, older: Int) async throws -> (WorkoutStore, URL) {
         let store = WorkoutStore(modelContainer: try WorkoutStore.container(inMemory: true))
-        let series = try SeriesStore(directory: FileManager.default.temporaryDirectory
-            .appending(path: "PlaceResolverTests-\(UUID().uuidString)"))
+        let folder = FileManager.default.temporaryDirectory.appending(path: "PlaceResolverTests-\(UUID().uuidString)")
+        let series = try SeriesStore(directory: folder)
         let now = Date(timeIntervalSince1970: 1_760_000_000)
         let workouts = (0..<(newest + older)).map { day in
             let start = now.addingTimeInterval(-Double(day) * 86_400)
@@ -28,11 +29,12 @@ import Testing
             return IngestedWorkout(workout: workout, series: WorkoutSeries(workoutID: workout.id, route: route))
         }
         try await store.upsert(workouts, seriesStore: series)
-        return store
+        return (store, folder)
     }
 
     @Test func unnameableNewestStartsDontHideOlderWorkouts() async throws {
-        let store = try await Self.store(newest: 12, older: 3)
+        let (store, folder) = try await Self.store(newest: 12, older: 3)
+        defer { try? FileManager.default.removeItem(at: folder) }
         let resolver = PlaceResolver(store: store, requestInterval: .zero) { coordinate in
             coordinate.latitude > 49.2
                 ? .nothingThere
